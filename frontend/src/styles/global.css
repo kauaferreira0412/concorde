@@ -107,14 +107,17 @@ input::placeholder { color: var(--text-muted); }
 input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 
 /* input[type=range] (sliders de volume) nao deve herdar a caixa de text input (fundo, borda,
-   padding) - senao vira uma barra gigante em volta de um controle fininho. */
+   padding) - senao vira uma barra gigante em volta de um controle fininho. !important pra
+   nunca mais depender de guerra de especificidade com a regra ".volume-slider" (foi
+   exatamente isso que quebrou da primeira vez - "input[type=range]" e' mais especifico que
+   uma classe sozinha, entao ficava disputando propriedade por propriedade com ela). */
 input[type="range"] {
-  background: none;
-  border: none;
-  padding: 0;
-  border-radius: 0;
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
 }
-input[type="range"]:focus { box-shadow: none; }
+input[type="range"]:focus { box-shadow: none !important; }
 
 select {
   background: var(--bg-input);
@@ -835,27 +838,29 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
    navegador. */
 .volume-slider {
   flex: 1;
-  -webkit-appearance: none;
-  appearance: none;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
   height: 14px; /* area de clique confortavel - o trilho visual em si fica bem mais fino (ver track abaixo) */
-  background: transparent;
+  background: transparent !important;
   cursor: pointer;
 }
 .volume-slider::-webkit-slider-runnable-track {
+  -webkit-appearance: none !important;
   height: 4px;
   border-radius: 999px;
   background: var(--bg-input);
   border: 1px solid var(--border);
 }
 .volume-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
-  margin-top: -4.5px; /* centraliza a bolinha de 12px sobre o trilho de 4px */
+  -webkit-appearance: none !important;
+  width: 10px;
+  height: 10px;
+  margin-top: -4px; /* centraliza a bolinha de 10px sobre o trilho de 4px */
   border-radius: 50%;
   background: var(--accent);
-  border: 2px solid var(--bg-panel-2);
-  box-shadow: 0 0 0 1px var(--accent);
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 .volume-slider::-moz-range-track {
   height: 4px;
@@ -864,15 +869,15 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
   border: 1px solid var(--border);
 }
 .volume-slider::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--accent);
-  border: 2px solid var(--bg-panel-2);
-  box-shadow: 0 0 0 1px var(--accent);
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
-.volume-slider.boosted::-webkit-slider-thumb { background: var(--warning, #e0a032); box-shadow: 0 0 0 1px var(--warning, #e0a032); }
-.volume-slider.boosted::-moz-range-thumb { background: var(--warning, #e0a032); box-shadow: 0 0 0 1px var(--warning, #e0a032); }
+.volume-slider.boosted::-webkit-slider-thumb { background: var(--warning, #e0a032); }
+.volume-slider.boosted::-moz-range-thumb { background: var(--warning, #e0a032); }
 .volume-slider-value {
   min-width: 36px;
   text-align: right;
