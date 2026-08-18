@@ -1,14 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useServerMembers } from "../utils/useServerMembers";
-import { EyeIcon, EyeOffIcon, MaximizeIcon, ScreenShareIcon, WidenIcon } from "./icons.jsx";
+import {
+  EyeIcon,
+  EyeOffIcon,
+  MaximizeIcon,
+  ScreenShareIcon,
+  WidenIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
+} from "./icons.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
 import { MemberRow } from "./MemberList.jsx";
 
+// Tamanhos disponiveis pro tile de webcam - "size" vira uma classe CSS (.camera-tile-<size>,
+// ver global.css). Comeca em "md" (tamanho de antes), dá pra aumentar/diminuir pelos botoes
+// no cabecalho da secao (afeta TODOS os tiles de uma vez, ver CAMERA_SIZES/cameraSize abaixo).
+const CAMERA_SIZES = ["sm", "md", "lg", "xl"];
+
 /** Um tile de webcam (sua ou de outro participante) - anexa/solta o track de video do
  *  LiveKit num <video> proprio conforme o componente monta/desmonta (mesmo padrao usado
- *  pra tela compartilhada, so' que aqui varios tiles ficam visiveis ao mesmo tempo). */
-function CameraTile({ track, name, isLocal }) {
+ *  pra tela compartilhada, so' que aqui varios tiles ficam visiveis ao mesmo tempo). Cada
+ *  tile tem seu proprio botao de "tela cheia" (Fullscreen API), independente dos outros. */
+function CameraTile({ track, name, isLocal, size }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -18,10 +32,19 @@ function CameraTile({ track, name, isLocal }) {
     return () => track.detach(el);
   }, [track]);
 
+  function handleMaximize() {
+    const el = videoRef.current;
+    const request = el?.requestFullscreen || el?.webkitRequestFullscreen;
+    request?.call(el);
+  }
+
   return (
-    <div className="camera-tile">
-      <video ref={videoRef} autoPlay playsInline muted={isLocal} />
+    <div className={"camera-tile camera-tile-" + size}>
+      <video ref={videoRef} autoPlay playsInline muted={isLocal} onDoubleClick={handleMaximize} />
       <span className="camera-tile-name">{name}</span>
+      <button type="button" className="camera-tile-maximize" onClick={handleMaximize} title="Tela cheia">
+        <MaximizeIcon size={13} />
+      </button>
     </div>
   );
 }
@@ -56,6 +79,11 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
   const videoContainerRef = useRef(null);
   const isThisChannelActive = connected && activeChannel?.id === channel.id;
   const selectedShare = screenShares.find((s) => s.sid === selectedScreenShareSid) || null;
+
+  // Indice em CAMERA_SIZES - comeca no "md" (index 1, tamanho de antes). Afeta todos os
+  // tiles de webcam de uma vez (ver botoes +/- no cabecalho da secao CÂMERAS).
+  const [cameraSizeIdx, setCameraSizeIdx] = useState(1);
+  const cameraSize = CAMERA_SIZES[cameraSizeIdx];
 
   // "Ampliar" - estagio intermediario entre o tamanho normal e a tela cheia de verdade
   // (Fullscreen API, via handleFullscreen): ocupa 100% da largura da area central, mas
@@ -121,10 +149,32 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
 
         {cameraTracks.length > 0 && (
           <section className="voice-section">
-            <p className="voice-section-title">CÂMERAS</p>
+            <div className="voice-section-header">
+              <p className="voice-section-title">CÂMERAS</p>
+              <div className="voice-section-header-actions">
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => setCameraSizeIdx((i) => Math.max(0, i - 1))}
+                  disabled={cameraSizeIdx === 0}
+                  title="Diminuir câmeras"
+                >
+                  <ZoomOutIcon size={15} />
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => setCameraSizeIdx((i) => Math.min(CAMERA_SIZES.length - 1, i + 1))}
+                  disabled={cameraSizeIdx === CAMERA_SIZES.length - 1}
+                  title="Aumentar câmeras"
+                >
+                  <ZoomInIcon size={15} />
+                </button>
+              </div>
+            </div>
             <div className="camera-grid">
               {cameraTracks.map((c) => (
-                <CameraTile key={c.identity} track={c.track} name={c.name} isLocal={c.isLocal} />
+                <CameraTile key={c.identity} track={c.track} name={c.name} isLocal={c.isLocal} size={cameraSize} />
               ))}
             </div>
           </section>

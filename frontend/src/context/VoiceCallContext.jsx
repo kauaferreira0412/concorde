@@ -3,7 +3,7 @@ import { Room, RoomEvent, Track } from "livekit-client";
 import api from "../api/client";
 import { useAuth } from "./AuthContext.jsx";
 import { useMicLevel } from "../utils/useMicLevel";
-import { getNoiseSuppressionEnabled, getSavedAudioInput, getSavedAudioOutput } from "../utils/audioSettings";
+import { getNoiseSuppressionEnabled, getSavedAudioInput, getSavedAudioOutput, getSavedVideoInput } from "../utils/audioSettings";
 import {
   playJoinSound,
   playLeaveSound,
@@ -172,6 +172,34 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     if (!stompConnected || activeChannelRef.current) return;
     const saved = loadActiveChannel();
     if (saved) joinChannel(saved);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stompConnected]);
+
+  // Reconectou o WebSocket de CHAT enquanto voce ja' estava numa call (rede caiu e voltou por
+  // um instante, notebook dormiu, etc.) - isso e' uma conexao TOTALMENTE separada da call de
+  // voz em si (LiveKit), mais resiliente e que normalmente nem chega a cair nesses casos. O
+  // problema: o backend usa o socket de chat pra saber "quem esta na call" (ver
+  // VoiceDisconnectListener no backend) - quando ele cai, mesmo que so por um segundo, o
+  // backend automaticamente tira voce da lista de presenca de todo mundo, e sem isso aqui
+  // ninguem nunca ficava sabendo que voce voltou: a call de audio continuava tocando normal
+  // (dai o bug relatado - "ouço a pessoa mas ela nao aparece mais na call"), so' a LISTA que
+  // ficava desatualizada pra sempre, ate' a pessoa sair e entrar de novo manualmente.
+  useEffect(() => {
+    if (!stompConnected || !activeChannelRef.current || !stompClientRef.current) return;
+    const channelId = activeChannelRef.current.id;
+    publishVoiceJoin(stompClientRef.current, channelId);
+    publishVoiceMicState(stompClientRef.current, channelId, micEnabledRef.current);
+    publishVoiceDeafenState(stompClientRef.current, channelId, deafenedRef.current);
+    // A subscricao antiga morreu junto com a sessao STOMP anterior - refaz do zero.
+    try {
+      presenceSubRef.current?.unsubscribe();
+    } catch {
+      /* sessao antiga ja' nem existe mais no servidor, tanto faz */
+    }
+    presenceSubRef.current = subscribeToVoicePresence(stompClientRef.current, channelId, (list) => {
+      presenceDeafenedRef.current = new Map(list.map((p) => [String(p.userId), p.deafened]));
+      if (roomRef.current) refreshParticipants(roomRef.current);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stompConnected]);
 
@@ -697,7 +725,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     if (!room) return;
     const next = !cameraEnabledRef.current;
     try {
-      await room.localParticipant.setCameraEnabled(next);
+      const savedVideoInput = getSavedVideoInput();
+      await room.localParticipant.setCameraEnabled(
+        next,
+        savedVideoInput ? { deviceId: savedVideoInput } : undefined
+      );
       setCameraEnabled(next);
     } catch (err) {
       alert("Não foi possível acessar sua câmera (permissão negada ou nenhum dispositivo encontrado): " + err.message);

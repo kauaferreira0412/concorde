@@ -1,5 +1,6 @@
 const INPUT_KEY = "audioInputDeviceId";
 const OUTPUT_KEY = "audioOutputDeviceId";
+const VIDEO_INPUT_KEY = "videoInputDeviceId";
 const SOUND_EFFECTS_KEY = "voiceSoundEffectsEnabled";
 const NOISE_SUPPRESSION_KEY = "voiceNoiseSuppressionEnabled";
 
@@ -17,6 +18,14 @@ export function getSavedAudioOutput() {
 export function setSavedAudioOutput(deviceId) {
   if (deviceId) localStorage.setItem(OUTPUT_KEY, deviceId);
   else localStorage.removeItem(OUTPUT_KEY);
+}
+
+export function getSavedVideoInput() {
+  return localStorage.getItem(VIDEO_INPUT_KEY) || "";
+}
+export function setSavedVideoInput(deviceId) {
+  if (deviceId) localStorage.setItem(VIDEO_INPUT_KEY, deviceId);
+  else localStorage.removeItem(VIDEO_INPUT_KEY);
 }
 
 /** Som ao alguem entrar/sair da call - ligado por padrao, como no Discord. */

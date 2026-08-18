@@ -4,10 +4,12 @@ import {
   getNoiseSuppressionEnabled,
   getSavedAudioInput,
   getSavedAudioOutput,
+  getSavedVideoInput,
   getSoundEffectsEnabled,
   setNoiseSuppressionEnabled,
   setSavedAudioInput,
   setSavedAudioOutput,
+  setSavedVideoInput,
   setSoundEffectsEnabled,
 } from "../utils/audioSettings";
 import { getDesktopNotificationsEnabled, setDesktopNotificationsEnabled } from "../utils/notificationSettings";
@@ -77,8 +79,10 @@ export default function SettingsModal({ onClose }) {
 
   const [inputDevices, setInputDevices] = useState([]);
   const [outputDevices, setOutputDevices] = useState([]);
+  const [videoDevices, setVideoDevices] = useState([]);
   const [selectedInput, setSelectedInput] = useState(getSavedAudioInput());
   const [selectedOutput, setSelectedOutput] = useState(getSavedAudioOutput());
+  const [selectedVideoInput, setSelectedVideoInput] = useState(getSavedVideoInput());
   const [soundEffects, setSoundEffects] = useState(getSoundEffectsEnabled());
   const [noiseSuppression, setNoiseSuppression] = useState(getNoiseSuppressionEnabled());
   const [desktopNotifications, setDesktopNotifications] = useState(getDesktopNotificationsEnabled());
@@ -107,6 +111,12 @@ export default function SettingsModal({ onClose }) {
       .then((devices) => {
         setInputDevices(devices.filter((d) => d.kind === "audioinput"));
         setOutputDevices(devices.filter((d) => d.kind === "audiooutput"));
+        // As cameras tambem aparecem aqui (enumerateDevices lista TODOS os dispositivos, nao
+        // so' os de audio que acabamos de pedir permissao) - os nomes delas so' vem
+        // preenchidos se a permissao de camera ja' tiver sido concedida em algum momento
+        // (ex: ja' ligou a webcam numa call antes) - sem pedir um segundo popup de permissao
+        // so' por abrir essa tela.
+        setVideoDevices(devices.filter((d) => d.kind === "videoinput"));
       })
       .catch((err) => setPermissionError("Não foi possível acessar o microfone: " + err.message));
 
@@ -159,6 +169,7 @@ export default function SettingsModal({ onClose }) {
   async function handleSave() {
     setSavedAudioInput(selectedInput);
     setSavedAudioOutput(selectedOutput);
+    setSavedVideoInput(selectedVideoInput);
     setSoundEffectsEnabled(soundEffects);
     setNoiseSuppressionEnabled(noiseSuppression);
     setMuteShortcut(muteShortcut);
@@ -245,7 +256,7 @@ export default function SettingsModal({ onClose }) {
 
         <div className="settings-divider" />
 
-        <p className="settings-section-title">Dispositivos de áudio</p>
+        <p className="settings-section-title">Dispositivos de áudio e vídeo</p>
         <p className="admin-hint">A escolha aqui vale para a próxima vez que você entrar em uma call de voz.</p>
 
         {permissionError && <p className="auth-error">{permissionError}</p>}
@@ -278,6 +289,21 @@ export default function SettingsModal({ onClose }) {
               dispositivo padrão do sistema.
             </p>
           )}
+        </div>
+
+        <div className="settings-field">
+          <label className="settings-label">Câmera</label>
+          <select value={selectedVideoInput} onChange={(e) => setSelectedVideoInput(e.target.value)}>
+            <option value="">Padrão do sistema</option>
+            {videoDevices.map((d) => (
+              <option key={d.deviceId} value={d.deviceId}>
+                {d.label || `Câmera ${d.deviceId.slice(0, 6)}`}
+              </option>
+            ))}
+          </select>
+          <p className="admin-hint" style={{ margin: 0 }}>
+            Vale a partir da próxima vez que você ligar a câmera (ícone 📷 na barra de voz).
+          </p>
         </div>
 
         <div className="settings-test-row">
