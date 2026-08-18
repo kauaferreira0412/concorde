@@ -230,6 +230,24 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .auth-card a { color: var(--accent-text); text-decoration: none; font-weight: 600; }
 .auth-card a:hover { text-decoration: underline; }
 
+/* Link "Baixar app para Windows" abaixo do card de login - so' aparece no navegador (ver
+   isElectronDesktop em LoginPage.jsx), nunca dentro do proprio app desktop. */
+.auth-download {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+.auth-download:hover { color: var(--text-primary); background: var(--bg-hover); }
+
 /* ============================================================
    App shell
    ============================================================ */
@@ -1168,10 +1186,63 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
   gap: 14px;
 }
 .modal h2 { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
-.modal button:not(.link-btn):not(.status-dropdown-trigger):not(.status-option) { background: var(--accent); color: #fff; width: 100%; padding: 11px; margin-top: 4px; box-shadow: var(--glow-accent); }
-.modal button:not(.link-btn):not(.status-dropdown-trigger):not(.status-option):hover { background: var(--accent-hover); }
+.modal button:not(.link-btn):not(.status-dropdown-trigger):not(.status-option):not(.screen-picker-tab):not(.screen-picker-card) {
+  background: var(--accent); color: #fff; width: 100%; padding: 11px; margin-top: 4px; box-shadow: var(--glow-accent);
+}
+.modal button:not(.link-btn):not(.status-dropdown-trigger):not(.status-option):not(.screen-picker-tab):not(.screen-picker-card):hover {
+  background: var(--accent-hover);
+}
 .modal button.danger { background: var(--danger-soft); color: var(--danger); }
 .modal button.danger:hover { background: var(--danger); color: #fff; }
+.modal-wide { width: 640px; max-width: calc(100vw - 40px); }
+
+/* Seletor de tela/janela customizado (Electron, ver ScreenSharePicker.jsx) - so' existe
+   dentro do app desktop, nunca no navegador. */
+.screen-picker-tabs { display: flex; gap: 8px; }
+.screen-picker-tab {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg-panel-2) !important;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 9px 16px !important;
+  flex: 1;
+}
+.screen-picker-tab:hover { background: var(--bg-hover) !important; color: var(--text-primary); }
+.screen-picker-tab.active { background: var(--accent-soft) !important; border-color: rgba(47,107,255,0.4); color: var(--accent-text); }
+.screen-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.screen-picker-card {
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--bg-panel-2) !important;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 6px !important;
+  text-align: left;
+  cursor: pointer;
+}
+.screen-picker-card:hover { border-color: rgba(47,107,255,0.4); background: var(--bg-hover) !important; }
+.screen-picker-thumb {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; aspect-ratio: 16 / 9;
+  background: var(--bg-app);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  color: var(--text-muted);
+}
+.screen-picker-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.screen-picker-name {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.screen-picker-icon { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
 .invite-link-row { display: flex; gap: 8px; margin: 14px 0; }
 .invite-link-row input { flex: 1; }
 .invite-link-row button { width: auto; margin-top: 0; white-space: nowrap; }

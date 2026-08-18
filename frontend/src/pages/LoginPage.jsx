@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
-import { EyeIcon, EyeOffIcon, LockIcon, UserIcon } from "../components/icons.jsx";
+import { DownloadIcon, EyeIcon, EyeOffIcon, LockIcon, UserIcon } from "../components/icons.jsx";
+
+// window.concordeDesktop so' existe dentro do app Electron (ver electron/preload.cjs) - o
+// link de download so' faz sentido no navegador, quem ja esta no app desktop nao precisa
+// baixar de novo. Instalador gerado por "npm run package:desktop" (ver scripts/package-desktop.mjs).
+const isElectronDesktop = typeof window !== "undefined" && !!window.concordeDesktop;
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -75,6 +80,13 @@ export default function LoginPage() {
 
         <p className="auth-note">Não há cadastro público — peça acesso ao administrador.</p>
       </form>
+
+      {!isElectronDesktop && (
+        <a className="auth-download" href="/downloads/Concorde-Setup.exe" download>
+          <DownloadIcon size={15} />
+          Baixar app para Windows
+        </a>
+      )}
     </div>
   );
 }

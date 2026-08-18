@@ -292,3 +292,13 @@ export function ChevronsRightIcon(props) {
     </svg>
   );
 }
+
+export function DownloadIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <path d="M12 3v12" />
+      <polyline points="7 11 12 16 17 11" />
+      <path d="M4 19h16" />
+    </svg>
+  );
+}

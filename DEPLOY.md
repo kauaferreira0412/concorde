@@ -78,6 +78,57 @@ git pull
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 ```
 
+## Gerando o instalador do app desktop (Windows)
+
+O botão "Baixar app para Windows" da tela de login (`frontend/src/pages/LoginPage.jsx`) aponta
+pra `/downloads/Concorde-Setup.exe` - um arquivo estático como qualquer outro do site, servido
+pelo mesmo Caddy (ver Caddyfile). Ele só existe depois que você gera o instalador uma vez, na
+sua máquina Windows:
+
+```bash
+cd frontend
+npm run package:desktop
+```
+
+Isso builda o app **apontando pra VPS de produção** (`DESKTOP_ORIGIN` em
+`frontend/scripts/package-desktop.mjs` - hoje `https://187-127-37-101.sslip.io`, troque ali se o
+domínio mudar), empacota com `electron-builder` (ver `"build"` em `frontend/package.json`) e
+copia o instalador pra `frontend/public/downloads/Concorde-Setup.exe`. O site em si continua
+buildado do jeito de sempre (mesma origem) - só o app desktop empacotado leva a URL da VPS fixa,
+porque ele carrega a página via `file://` (sem "mesma origem" pra aproveitar, diferente do
+navegador). Ou seja: o app desktop instalado localmente por qualquer usuário fala com o **mesmo
+banco/backend da VPS**, exatamente como o site - não com o computador de quem instalou.
+
+> Nota: no Windows, a primeira vez que você rodar `npm run package:desktop`, o `electron-builder`
+> baixa uma ferramenta auxiliar (`winCodeSign`) que costuma falhar em extrair 2 arquivos de macOS
+> (symlinks) sem o "Modo desenvolvedor" do Windows ligado - isso não afeta o instalador gerado
+> (não estamos assinando nada). Se acontecer, ligue Configurações → Privacidade e segurança →
+> Para desenvolvedores → Modo desenvolvedor, e rode o comando de novo.
+
+### Publicando o instalador no site de verdade
+
+A VPS roda Linux (Docker) e não builda `.exe` do Windows - o instalador precisa ser gerado numa
+máquina Windows (acima) e depois **enviado** pra VPS. Duas formas:
+
+**Via rebuild normal (recomendado - fica valendo pros próximos builds também):**
+```bash
+scp "frontend/public/downloads/Concorde-Setup.exe" usuario@SEU_DOMINIO_OU_IP:~/concorde/frontend/public/downloads/
+ssh usuario@SEU_DOMINIO_OU_IP "cd ~/concorde && docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build"
+```
+
+**Via cópia direta no container (mais rápido, mas some se o container for recriado sem repetir o `scp` acima antes):**
+```bash
+scp "frontend/public/downloads/Concorde-Setup.exe" usuario@SEU_DOMINIO_OU_IP:/tmp/
+ssh usuario@SEU_DOMINIO_OU_IP "docker cp /tmp/Concorde-Setup.exe \$(docker compose -f docker-compose.prod.yml ps -q frontend):/srv/downloads/Concorde-Setup.exe"
+```
+
+Depois de qualquer uma das duas, `https://SEU_DOMINIO/downloads/Concorde-Setup.exe` já responde e o
+botão "Baixar app para Windows" da tela de login funciona pra qualquer visitante do site.
+
+O app desktop carrega o **mesmo bundle web** (mesmo HTML/CSS/JS) - a única diferença é que, ao
+compartilhar tela, ele usa um seletor nativo (janela ou tela inteira) em vez do diálogo do
+navegador (ver `frontend/electron/main.cjs`, `preload.cjs` e `src/components/ScreenSharePicker.jsx`).
+
 ## Sobre as portas de voz (LiveKit)
 
 - `443` (HTTPS/Caddy): site, API, chat e a *sinalização* da chamada de voz — tudo nessa porta só.

@@ -20,8 +20,14 @@ import {
   publishVoiceMicState,
   subscribeToVoicePresence,
 } from "../ws/chatSocket";
+import ScreenSharePicker from "../components/ScreenSharePicker.jsx";
 
 const VoiceCallContext = createContext(null);
+
+// window.concordeDesktop so' existe dentro do app Electron (ver electron/preload.cjs) - no
+// navegador normal isso e' sempre undefined, e o app inteiro cai pro fluxo padrao de
+// getDisplayMedia (ver toggleScreenShare), sem nenhuma mudanca de comportamento.
+const isElectronDesktop = typeof window !== "undefined" && !!window.concordeDesktop;
 
 // Um F5/recarregar destroi a pagina inteira - inclusive a conexao WebRTC, isso e' assim
 // em qualquer app web (o proprio Discord na web tambem desconecta). O que da pra fazer e'
@@ -70,6 +76,9 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const [selectedScreenShareSid, setSelectedScreenShareSid] = useState(null);
   const [participantVolumes, setParticipantVolumesState] = useState({}); // identity -> 0..200 (voz)
   const [streamVolumes, setStreamVolumesState] = useState({}); // identity -> 0..200 (audio da transmissao de tela dessa pessoa)
+  // So' usado no app desktop (Electron) - true enquanto o seletor customizado de tela/janela
+  // esta aberto, esperando o usuario escolher o que compartilhar (ver ScreenSharePicker.jsx).
+  const [screenPickerOpen, setScreenPickerOpen] = useState(false);
   const { level: micLevel, start: startMicMeter, stop: stopMicMeter } = useMicLevel();
 
   const roomRef = useRef(null);
@@ -84,6 +93,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const participantVolumesRef = useRef(new Map()); // identity -> 0..200, fonte da verdade sincrona
   const streamVolumesRef = useRef(new Map());
   const micEnabledBeforeDeafenRef = useRef(true);
+  // So' preenchido no app desktop (Electron), quando o compartilhamento foi iniciado pelo
+  // ScreenSharePicker (video/audio capturados "na mao" via chromeMediaSourceId, nao pelo
+  // setScreenShareEnabled padrao do LiveKit) - precisa pra saber COMO parar depois.
+  const electronScreenTracksRef = useRef({ video: null, audio: null });
   const joiningRef = useRef(false); // evita duas conexoes simultaneas (ex: React StrictMode chamando o efeito 2x)
   // Ensurdecido e' diferente de so mutar: quem ensurdece nao esta OUVINDO ninguem, nao so
   // calado. Isso nao vem do LiveKit (ele so sabe de audio publicado) - propagamos via
@@ -326,6 +339,12 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     screenAudioTracksRef.current.clear();
     participantVolumesRef.current = new Map();
     streamVolumesRef.current = new Map();
+    // Se voce estava compartilhando via seletor customizado (Electron), o track foi
+    // capturado "na mao" (getUserMedia) - precisa parar explicitamente, o room.disconnect()
+    // acima nao necessariamente libera a captura de tela/audio do sistema sozinho.
+    electronScreenTracksRef.current.video?.stop();
+    electronScreenTracksRef.current.audio?.stop();
+    electronScreenTracksRef.current = { video: null, audio: null };
     stopMicMeter();
     setConnected(false);
     setActiveChannel(null);
@@ -614,34 +633,132 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     }
   }
 
+  /**
+   * No NAVEGADOR normal usa o dialogo nativo (getDisplayMedia via LiveKit), com as mesmas
+   * restricoes de sempre pra evitar eco (ver comentario mais abaixo). No app DESKTOP
+   * (Electron) abre o seletor customizado (ScreenSharePicker) em vez de comecar direto -
+   * ele sabe exatamente qual superficie foi escolhida (Tela Inteira vs Janela) e decide o
+   * audio caso a caso: Tela Inteira leva audio do sistema (nativo do Electron, sem eco -
+   * so' entra no capturador quem estiver tocando ali na hora, nao existe o problema de
+   * "session loopback" que o getDisplayMedia do navegador tem); Janela fica sem audio por
+   * enquanto (isolar audio de UMA janela especifica exige um modulo nativo do Windows que
+   * ainda nao existe - ver TODO em startElectronScreenShare).
+   */
   async function toggleScreenShare() {
     const room = roomRef.current;
     if (!room) return;
-    const next = !screenSharingRef.current;
-    screenSharingRef.current = next;
-    // Captura tambem audio, igual ao "compartilhar com áudio" do Discord - mas so' o da
-    // ABA/JANELA sendo compartilhada, nunca o audio do SISTEMA inteiro:
-    // - systemAudio: "exclude" tira a opcao "compartilhar audio do sistema" do dialogo do
-    //   navegador. Sem isso, ao compartilhar uma Janela ou a Tela Inteira o Chrome/Edge so'
-    //   oferece capturar TODO o audio que estiver tocando no computador (inclusive a propria
-    //   chamada de voz saindo pela caixa de som) - e' isso que causava o eco: cada um ouvia
-    //   a propria voz "voltando" pela captura do sistema. Compartilhando uma ABA do navegador
-    //   o audio ja vem isolado (so' daquela aba); Janela/Tela Inteira, sem essa opcao, ficam
-    //   sem audio nenhum (nao tem como isolar so' o audio de uma janela/tela no SO) - e' a
-    //   troca certa, silencio e' melhor que eco.
-    // - selfBrowserSurface: "exclude" nao deixa escolher compartilhar a propria aba do
-    //   Concorde (geraria um espelho infinito, video dentro de video).
-    // - echoCancellation/noiseSuppression: reduz ainda mais qualquer resquicio de eco no
-    //   audio que sobra (ex: aba com audio proprio tocando perto do microfone).
-    await room.localParticipant.setScreenShareEnabled(next, {
-      video: { displaySurface: "browser" }, // sugere ABA como opcao padrao (audio mais limpo)
-      audio: { echoCancellation: true, noiseSuppression: true },
-      systemAudio: "exclude",
-      selfBrowserSurface: "exclude",
-    });
-    setScreenSharing(next);
-    if (next) playScreenShareStartSound();
-    else playScreenShareStopSound();
+
+    if (!screenSharingRef.current) {
+      if (isElectronDesktop) {
+        setScreenPickerOpen(true); // o inicio de verdade acontece em startElectronScreenShare
+        return;
+      }
+      screenSharingRef.current = true;
+      // Captura tambem audio, igual ao "compartilhar com áudio" do Discord - mas so' o da
+      // ABA sendo compartilhada, nunca o audio do SISTEMA inteiro:
+      // - systemAudio: "exclude" tira a opcao "compartilhar audio do sistema" do dialogo do
+      //   navegador. Sem isso, ao compartilhar uma Janela ou a Tela Inteira o Chrome/Edge so'
+      //   oferece capturar TODO o audio que estiver tocando no computador (inclusive a
+      //   propria chamada de voz saindo pela caixa de som) - e' isso que causava o eco: cada
+      //   um ouvia a propria voz "voltando" pela captura do sistema. Compartilhando uma ABA
+      //   do navegador o audio ja vem isolado (so' daquela aba); Janela/Tela Inteira, sem
+      //   essa opcao, ficam sem audio nenhum - e' a troca certa, silencio e' melhor que eco.
+      // - selfBrowserSurface: "exclude" nao deixa escolher compartilhar a propria aba do
+      //   Concorde (geraria um espelho infinito, video dentro de video).
+      // - echoCancellation/noiseSuppression: reduz ainda mais qualquer resquicio de eco.
+      await room.localParticipant.setScreenShareEnabled(true, {
+        video: { displaySurface: "browser" }, // sugere ABA como opcao padrao (audio mais limpo)
+        audio: { echoCancellation: true, noiseSuppression: true },
+        systemAudio: "exclude",
+        selfBrowserSurface: "exclude",
+      });
+      setScreenSharing(true);
+      playScreenShareStartSound();
+      return;
+    }
+
+    // Parando de compartilhar.
+    screenSharingRef.current = false;
+    if (electronScreenTracksRef.current.video) {
+      await stopElectronScreenShare();
+    } else {
+      await room.localParticipant.setScreenShareEnabled(false);
+    }
+    setScreenSharing(false);
+    playScreenShareStopSound();
+  }
+
+  /** Fecha o seletor de tela/janela sem compartilhar nada (usuario clicou em Cancelar). */
+  function closeScreenPicker() {
+    setScreenPickerOpen(false);
+  }
+
+  /**
+   * Chamado pelo ScreenSharePicker quando o usuario escolhe uma fonte - so' existe no app
+   * desktop (Electron). Captura video (e audio, se for Tela Inteira) via chromeMediaSourceId
+   * e publica os tracks manualmente no LiveKit (em vez de setScreenShareEnabled, que so'
+   * sabe chamar getDisplayMedia).
+   *
+   * TODO: audio isolado de uma JANELA especifica (nao a tela toda) exige capturar so' o
+   * audio daquele processo/janela - o Chromium/Electron nao expoe isso hoje (so' "audio do
+   * sistema inteiro" ou nenhum). O jeito certo e' um modulo nativo usando a API de "Process
+   * Loopback Capture" do Windows (WASAPI, Windows 10 2004+), que o Discord desktop usa - fica
+   * pra depois, precisa compilar com Python + Visual Studio Build Tools instalados.
+   */
+  async function startElectronScreenShare(source) {
+    const room = roomRef.current;
+    if (!room) return;
+    setScreenPickerOpen(false);
+    const wantAudio = source.type === "screen"; // so' Tela Inteira tem audio (do sistema) por enquanto
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: wantAudio ? { mandatory: { chromeMediaSource: "desktop" } } : false,
+        video: {
+          mandatory: {
+            chromeMediaSource: "desktop",
+            chromeMediaSourceId: source.id,
+            maxWidth: 1920,
+            maxHeight: 1080,
+            maxFrameRate: 30,
+          },
+        },
+      });
+      const videoTrack = stream.getVideoTracks()[0];
+      const audioTrack = stream.getAudioTracks()[0] || null;
+      electronScreenTracksRef.current = { video: videoTrack, audio: audioTrack };
+      // Nao existe botao nativo de "parar de compartilhar" aqui (dialogo e' nosso, nao do
+      // navegador) - se o usuario fechar a janela compartilhada ou parar a captura por
+      // fora, o track termina sozinho (onended) e precisamos refletir isso na UI.
+      videoTrack.onended = () => {
+        if (screenSharingRef.current) toggleScreenShare();
+      };
+      await room.localParticipant.publishTrack(videoTrack, { source: Track.Source.ScreenShare, name: "screen" });
+      if (audioTrack) {
+        await room.localParticipant.publishTrack(audioTrack, {
+          source: Track.Source.ScreenShareAudio,
+          name: "screen_audio",
+        });
+      }
+      screenSharingRef.current = true;
+      setScreenSharing(true);
+      playScreenShareStartSound();
+    } catch (err) {
+      console.warn("Não foi possível iniciar o compartilhamento de tela:", err);
+      alert("Não foi possível compartilhar essa tela/janela: " + err.message);
+    }
+  }
+
+  async function stopElectronScreenShare() {
+    const room = roomRef.current;
+    const { video, audio } = electronScreenTracksRef.current;
+    if (video) {
+      video.onended = null;
+      await room?.localParticipant.unpublishTrack(video, true);
+    }
+    if (audio) {
+      await room?.localParticipant.unpublishTrack(audio, true);
+    }
+    electronScreenTracksRef.current = { video: null, audio: null };
   }
 
   /** Chamado pelo VoiceChannel quando monta/desmonta, para anexar/soltar o video no container certo. */
@@ -678,6 +795,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       }}
     >
       {children}
+      {screenPickerOpen && <ScreenSharePicker onSelect={startElectronScreenShare} onClose={closeScreenPicker} />}
     </VoiceCallContext.Provider>
   );
 }

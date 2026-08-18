@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol } = require("electron");
+const { app, BrowserWindow, protocol, ipcMain, desktopCapturer } = require("electron");
 const path = require("path");
 
 const APP_PROTOCOL = "concorde";
@@ -16,6 +16,10 @@ function createWindow(deepLinkUrl) {
       // normalmente aqui, igual em um Chrome comum.
       contextIsolation: true,
       nodeIntegration: false,
+      // Expoe window.concordeDesktop (ver preload.cjs) - e' assim que o React sabe que esta
+      // rodando no app desktop e pode usar o seletor de tela customizado (com miniatura,
+      // estilo Discord) em vez do dialogo padrao do Chromium.
+      preload: path.join(__dirname, "preload.cjs"),
     },
   });
 
@@ -29,6 +33,25 @@ function createWindow(deepLinkUrl) {
     routeDeepLink(deepLinkUrl);
   }
 }
+
+// Lista as telas/janelas disponiveis pra compartilhar, com miniatura - so' o processo
+// principal (aqui) tem acesso a desktopCapturer, o renderer pede via preload.cjs.
+ipcMain.handle("concorde:list-screen-sources", async () => {
+  const sources = await desktopCapturer.getSources({
+    types: ["screen", "window"],
+    thumbnailSize: { width: 320, height: 180 },
+    fetchWindowIcons: true,
+  });
+  // Thumbnail/icon vem como NativeImage - so' o dataURL atravessa o IPC de forma segura
+  // (NativeImage nao e' serializavel).
+  return sources.map((s) => ({
+    id: s.id,
+    name: s.name,
+    type: s.id.startsWith("screen:") ? "screen" : "window",
+    thumbnailDataUrl: s.thumbnail.isEmpty() ? null : s.thumbnail.toDataURL(),
+    iconDataUrl: s.appIcon && !s.appIcon.isEmpty() ? s.appIcon.toDataURL() : null,
+  }));
+});
 
 /** concorde://invite/<code>  ->  /invite/<code> dentro do React Router */
 function routeDeepLink(url) {
