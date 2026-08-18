@@ -22,6 +22,7 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
     selectScreenShare,
     toggleScreenShare,
     toggleWatchScreenShare,
+    toggleMic,
     streamVolumes,
     setStreamVolume,
     getLocalMicTrack,
@@ -62,11 +63,15 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isThisChannelActive]);
 
-  function toggleMicTest() {
+  async function toggleMicTest() {
     if (micTesting) {
       stopMicTest();
       return;
     }
+    // So' da pra testar um microfone que esta LIGADO na call (senao nao tem audio nenhum
+    // publicado pra tocar de volta) - se estava mutado (ou ensurdecido, que tambem muta -
+    // toggleMic ja tira o ensurdecido nesse caso), o teste liga o microfone primeiro.
+    if (!micEnabled) await toggleMic();
     const track = getLocalMicTrack();
     if (!track || !testAudioRef.current) return;
     testAudioRef.current.srcObject = new MediaStream([track]);

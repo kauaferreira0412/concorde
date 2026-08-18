@@ -515,10 +515,28 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     await disconnectInternal();
   }
 
+  /** Tira o ensurdecido sem mexer no microfone (isso quem chama decide) - reaproveitado tanto
+   *  pelo botao de ensurdecer/reativar quanto por "desmutar enquanto ensurdecido" (ver toggleMic). */
+  function clearDeafened(room) {
+    setDeafened(false);
+    if (activeChannelRef.current && stompClientRef.current && stompConnectedRef.current) {
+      publishVoiceDeafenState(stompClientRef.current, activeChannelRef.current.id, false);
+    }
+    room.remoteParticipants.forEach((participant) => {
+      participant.audioTrackPublications.forEach((pub) => {
+        pub.track?.attachedElements.forEach((el) => (el.muted = false));
+      });
+    });
+  }
+
   async function toggleMic() {
     const room = roomRef.current;
     if (!room) return;
     const next = !micEnabledRef.current;
+    // "Desmutar enquanto ensurdecido" nao faz sentido sozinho (voce continuaria sem ouvir
+    // ninguem, so' emudo de novo na proxima fala) - igual ao Discord, clicar em desmutar
+    // aqui tambem tira o ensurdecido.
+    if (next && deafenedRef.current) clearDeafened(room);
     await room.localParticipant.setMicrophoneEnabled(next);
     setMicEnabled(next);
     if (next) playUnmuteSound();
