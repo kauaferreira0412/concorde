@@ -305,6 +305,14 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     screenAudioTracksRef.current.get(identity)?.setVolume(clamped / 100);
   }
 
+  /** Pega o MediaStreamTrack do seu proprio microfone ja publicado na call, pra "Testar
+   *  microfone" tocar de volta o que esta sendo captado sem precisar abrir outro getUserMedia
+   *  (diferente do teste de Configuracoes, que roda fora de uma call). */
+  function getLocalMicTrack() {
+    const pub = roomRef.current?.localParticipant?.getTrackPublication(Track.Source.Microphone);
+    return pub?.track?.mediaStreamTrack || null;
+  }
+
   /** Desconecta e limpa tudo - usado tanto no "Sair da call" quanto ao trocar de canal. */
   async function disconnectInternal() {
     const channelLeaving = activeChannelRef.current;
@@ -598,6 +606,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         streamVolumes,
         setParticipantVolume,
         setStreamVolume,
+        getLocalMicTrack,
         joinChannel,
         leaveChannel,
         toggleMic,

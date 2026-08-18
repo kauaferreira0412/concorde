@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useServerMembers } from "../utils/useServerMembers";
-import { EyeIcon, EyeOffIcon, HeadphonesOffIcon, MaximizeIcon, MicOffIcon, VolumeIcon } from "./icons.jsx";
+import { EyeIcon, EyeOffIcon, HeadphonesOffIcon, MaximizeIcon, MicIcon, MicOffIcon, VolumeIcon } from "./icons.jsx";
 import Avatar from "./Avatar.jsx";
 import { MemberRow } from "./MemberList.jsx";
 
@@ -47,6 +47,7 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
     streamVolumes,
     setParticipantVolume,
     setStreamVolume,
+    getLocalMicTrack,
     joinChannel,
     registerVideoContainer,
   } = useVoiceCall();
@@ -58,11 +59,39 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
   const isThisChannelActive = connected && activeChannel?.id === channel.id;
   const selectedShare = screenShares.find((s) => s.sid === selectedScreenShareSid) || null;
 
+  // "Testar microfone": toca de volta o que o LiveKit ja esta captando do seu mic AGORA na
+  // call, pra voce se ouvir sem precisar sair e abrir Configuracoes.
+  const [micTesting, setMicTesting] = useState(false);
+  const testAudioRef = useRef(null);
+
   useEffect(() => {
     if (!isThisChannelActive) return;
     registerVideoContainer(videoContainerRef.current);
     return () => registerVideoContainer(null);
   }, [isThisChannelActive, registerVideoContainer]);
+
+  // Para o teste sozinho se voce sair do canal, senao ficaria tocando de volta em segundo plano.
+  useEffect(() => {
+    if (!isThisChannelActive) stopMicTest();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isThisChannelActive]);
+
+  function toggleMicTest() {
+    if (micTesting) {
+      stopMicTest();
+      return;
+    }
+    const track = getLocalMicTrack();
+    if (!track || !testAudioRef.current) return;
+    testAudioRef.current.srcObject = new MediaStream([track]);
+    testAudioRef.current.play();
+    setMicTesting(true);
+  }
+
+  function stopMicTest() {
+    if (testAudioRef.current) testAudioRef.current.srcObject = null;
+    setMicTesting(false);
+  }
 
   function handleFullscreen() {
     const videoEl = videoContainerRef.current?.querySelector("video");
@@ -98,7 +127,12 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
 
       <div className="voice-body">
         <section className="voice-section">
-          <p className="voice-section-title">SEU MICROFONE</p>
+          <div className="voice-section-header">
+            <p className="voice-section-title">SEU MICROFONE</p>
+            <button type="button" className="link-btn screenshare-watch-btn" onClick={toggleMicTest}>
+              <MicIcon size={14} /> {micTesting ? "Parar teste" : "Testar microfone"}
+            </button>
+          </div>
           <div className="mic-meter-row">
             <div className="mic-meter-track">
               <div className="mic-meter-fill" style={{ width: `${micLevel}%` }} />
@@ -106,9 +140,11 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
             <span className="mic-meter-value">{micEnabled ? `${micLevel}%` : "mutado"}</span>
           </div>
           <p className="voice-hint">
-            Fale perto do microfone — a barra acima deve se mexer instantaneamente. Use os ícones 🎤/🎧 na barra
-            inferior esquerda para mutar ou ensurdecer.
+            Fale perto do microfone — a barra acima deve se mexer instantaneamente. Use "Testar microfone" pra se
+            ouvir, ou os ícones 🎤/🎧 na barra inferior esquerda para mutar ou ensurdecer.
           </p>
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <audio ref={testAudioRef} autoPlay />
         </section>
 
         <section className="voice-section">
