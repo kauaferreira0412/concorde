@@ -64,6 +64,33 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
   const [micTesting, setMicTesting] = useState(false);
   const testAudioRef = useRef(null);
 
+  // Popover de volume individual - abre no botao direito em cima do card de alguem na call
+  // (nao existe mais slider fixo no card, senao cada card ficava largo demais - ver print).
+  const [volumeMenu, setVolumeMenu] = useState(null); // { identity, x, y }
+  const volumeMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!volumeMenu) return;
+    function handlePointerDown(e) {
+      if (volumeMenuRef.current && !volumeMenuRef.current.contains(e.target)) setVolumeMenu(null);
+    }
+    function handleKeyDown(e) {
+      if (e.key === "Escape") setVolumeMenu(null);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [volumeMenu]);
+
+  // Fecha sozinho se a pessoa sair da call (ou voce trocar de canal) enquanto o popover
+  // estava aberto - senao ficaria apontando pra alguem que nao esta mais la.
+  useEffect(() => {
+    if (volumeMenu && !participants.some((p) => p.identity === volumeMenu.identity)) setVolumeMenu(null);
+  }, [participants, volumeMenu]);
+
   useEffect(() => {
     if (!isThisChannelActive) return;
     registerVideoContainer(videoContainerRef.current);
@@ -151,7 +178,17 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
           <p className="voice-section-title">NA CALL — {participants.length}</p>
           <div className="voice-call-list">
             {participants.map((p) => (
-              <div key={p.identity} className={"voice-call-card" + (speakingIds.has(p.identity) ? " speaking" : "")}>
+              <div
+                key={p.identity}
+                className={"voice-call-card" + (speakingIds.has(p.identity) ? " speaking" : "")}
+                // Volume so' faz sentido pra voz dos OUTROS - a sua propria voz voce nao ouve.
+                onContextMenu={(e) => {
+                  if (p.isLocal) return;
+                  e.preventDefault();
+                  setVolumeMenu({ identity: p.identity, x: e.clientX, y: e.clientY });
+                }}
+                title={!p.isLocal ? "Clique com o botão direito pra ajustar o volume" : undefined}
+              >
                 <Avatar name={p.name} url={p.avatarUrl} className="voice-avatar" />
                 <span className="voice-call-name">
                   {p.isLocal ? p.name.replace(" (você)", "") : p.name}
@@ -168,22 +205,34 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
                     </span>
                   )
                 )}
-                {/* Volume so' faz sentido pra voz dos OUTROS - a sua propria voz voce nao ouve. */}
-                {!p.isLocal && (
-                  <VolumeSlider
-                    value={participantVolumes[p.identity] ?? 100}
-                    onChange={(v) => setParticipantVolume(p.identity, v)}
-                    label={`Volume de ${p.name} (padrão 100%, pode passar de 100%)`}
-                  />
-                )}
               </div>
             ))}
           </div>
           <p className="voice-hint">
             O anel verde acende em volta de quem está falando de verdade — só quem está dentro da call vê esse
-            indicador. Arraste o controle de volume de cada pessoa para deixá-la mais alta (até 200%) ou mais baixa.
+            indicador. Clique com o botão direito em alguém pra ajustar o volume individual dela (até 200%).
           </p>
         </section>
+
+        {volumeMenu &&
+          (() => {
+            const p = participants.find((pp) => pp.identity === volumeMenu.identity);
+            if (!p) return null;
+            return (
+              <div
+                className="volume-popover"
+                ref={volumeMenuRef}
+                style={{ left: Math.min(volumeMenu.x, window.innerWidth - 232), top: Math.min(volumeMenu.y, window.innerHeight - 70) }}
+              >
+                <p className="volume-popover-title">Volume de {p.name}</p>
+                <VolumeSlider
+                  value={participantVolumes[p.identity] ?? 100}
+                  onChange={(v) => setParticipantVolume(p.identity, v)}
+                  label={`Volume de ${p.name} (padrão 100%, pode passar de 100%)`}
+                />
+              </div>
+            );
+          })()}
 
         <section className="voice-section">
           <div className="voice-section-header">
