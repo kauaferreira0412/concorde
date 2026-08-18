@@ -1,8 +1,23 @@
-const { app, BrowserWindow, protocol, ipcMain, desktopCapturer } = require("electron");
+const { app, BrowserWindow, protocol, ipcMain, desktopCapturer, net } = require("electron");
 const path = require("path");
+const { pathToFileURL } = require("url");
 
-const APP_PROTOCOL = "concorde";
+const APP_PROTOCOL = "concorde"; // concorde://invite/<code> - deep link, registrado no SO
 const DEV_URL = "http://localhost:5173";
+
+// Esquema custom que serve os arquivos de dist/ (o app empacotado) - em vez de abrir direto
+// via file://. O motivo: uma pagina file:// e' uma "origem opaca" pro navegador, manda
+// "Origin: null" em toda chamada de WebSocket - e o backend rejeita isso (403), porque a
+// whitelist de CORS so' aceita dominios especificos (ver app.cors.allowed-origins no
+// application.yml do backend, que ja' inclui "app://." esperando por isso). Registrando
+// "app" como esquema privilegiado ("standard"), o navegador trata como uma origem de
+// verdade (app://.) - o WebSocket do chat passa a autenticar normalmente.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "app",
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+  },
+]);
 
 let mainWindow;
 
@@ -23,15 +38,26 @@ function createWindow(deepLinkUrl) {
     },
   });
 
-  const startUrl = app.isPackaged
-    ? `file://${path.join(__dirname, "../dist/index.html")}`
-    : DEV_URL;
+  const startUrl = app.isPackaged ? "app://./index.html" : DEV_URL;
 
   mainWindow.loadURL(startUrl);
 
   if (deepLinkUrl) {
     routeDeepLink(deepLinkUrl);
   }
+}
+
+// Atende qualquer app://<algo> lendo o arquivo correspondente de dentro de dist/ (funciona
+// normal mesmo empacotado dentro do .asar - o Electron trata .asar como pasta comum pra
+// leitura de arquivo). So' precisa estar registrado antes da janela carregar a URL.
+function registerAppProtocol() {
+  protocol.handle("app", (request) => {
+    const url = new URL(request.url);
+    let pathname = decodeURIComponent(url.pathname);
+    if (pathname === "" || pathname === "/") pathname = "/index.html";
+    const filePath = path.normalize(path.join(__dirname, "../dist", pathname));
+    return net.fetch(pathToFileURL(filePath).toString());
+  });
 }
 
 // Lista as telas/janelas disponiveis pra compartilhar, com miniatura - so' o processo
@@ -60,7 +86,7 @@ function routeDeepLink(url) {
   if (match) {
     const code = match[1];
     const target = app.isPackaged
-      ? `file://${path.join(__dirname, "../dist/index.html")}#/invite/${code}`
+      ? `app://./index.html#/invite/${code}`
       : `${DEV_URL}/#/invite/${code}`;
     mainWindow.loadURL(target);
   }
@@ -86,6 +112,7 @@ if (!gotLock) {
   });
 
   app.whenReady().then(() => {
+    registerAppProtocol();
     const deepLink = process.argv.find((arg) => arg.startsWith(`${APP_PROTOCOL}://`));
     createWindow(deepLink);
   });
