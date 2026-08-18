@@ -5,9 +5,9 @@ import { MaximizeIcon, ScreenShareIcon } from "./icons.jsx";
  * Seletor de tela/janela customizado, so' usado dentro do app desktop (Electron - ver
  * preload.cjs/main.cjs). Existe pra dar mais controle do que o dialogo nativo do
  * navegador permite: aqui a gente sabe exatamente se o usuario escolheu "Tela Inteira"
- * (video + audio do sistema inteiro, nativo do Electron) ou "Janela" (video + audio so'
- * daquela janela, via modulo nativo do Windows - ver electron/native/window-audio-capture/
- * e startWindowAudioTrack em VoiceCallContext.jsx/windowAudioTrack.js).
+ * (video + audio do sistema inteiro) ou "Janela" (video + audio so' daquela janela) - o
+ * proprio Electron/Chromium entrega o audio certo sozinho a partir do id escolhido, ver
+ * startElectronScreenShare em VoiceCallContext.jsx.
  *
  * No NAVEGADOR normal (sem Electron) esse componente nunca e' montado - o fluxo cai pro
  * getDisplayMedia padrao, sem nenhuma mudanca (ver toggleScreenShare em VoiceCallContext.jsx).

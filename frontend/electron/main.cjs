@@ -5,21 +5,6 @@ const { pathToFileURL } = require("url");
 const APP_PROTOCOL = "concorde"; // concorde://invite/<code> - deep link, registrado no SO
 const DEV_URL = "http://localhost:5173";
 
-// Modulo nativo (C++/WASAPI) que captura o audio de UM processo especifico (arvore de
-// janela) - usado quando o usuario compartilha so' uma Janela em vez da Tela Inteira (que ja'
-// usa o audio do sistema todo, via getUserMedia normal - ver VoiceCallContext.jsx). So' existe
-// no Windows (arquivo .node so' e' buildado la', ver electron/native/window-audio-capture/) -
-// em outras plataformas windowAudioCapture fica null e o compartilhamento de janela
-// simplesmente fica sem audio, sem quebrar nada (ver startElectronScreenShare no renderer).
-let windowAudioCapture = null;
-if (process.platform === "win32") {
-  try {
-    windowAudioCapture = require(path.join(__dirname, "native", "window_audio_capture.node"));
-  } catch (err) {
-    console.warn("Modulo nativo de audio por janela nao carregou:", err.message);
-  }
-}
-
 // Esquema custom que serve os arquivos de dist/ (o app empacotado) - em vez de abrir direto
 // via file://. O motivo: uma pagina file:// e' uma "origem opaca" pro navegador, manda
 // "Origin: null" em toda chamada de WebSocket - e o backend rejeita isso (403), porque a
@@ -92,37 +77,6 @@ ipcMain.handle("concorde:list-screen-sources", async () => {
     thumbnailDataUrl: s.thumbnail.isEmpty() ? null : s.thumbnail.toDataURL(),
     iconDataUrl: s.appIcon && !s.appIcon.isEmpty() ? s.appIcon.toDataURL() : null,
   }));
-});
-
-// Audio por janela (so' Windows, ver windowAudioCapture acima) - chamado quando o usuario
-// escolhe compartilhar uma Janela especifica no ScreenSharePicker. "hwnd" vem do id da fonte
-// do desktopCapturer (formato "window:<hwnd>:0" - ver ScreenSharePicker.jsx/VoiceCallContext.jsx).
-ipcMain.handle("concorde:start-window-audio", (event, hwnd) => {
-  if (!windowAudioCapture) return { ok: false, error: "Modulo nativo indisponivel" };
-  try {
-    const pid = windowAudioCapture.getPidForHwnd(hwnd);
-    if (!pid) return { ok: false, error: "Nao foi possivel identificar o processo dessa janela" };
-    windowAudioCapture.startCapture(
-      pid,
-      (chunk) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send("concorde:window-audio-chunk", chunk);
-        }
-      },
-      (message) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send("concorde:window-audio-error", message);
-        }
-      }
-    );
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err.message };
-  }
-});
-
-ipcMain.handle("concorde:stop-window-audio", () => {
-  if (windowAudioCapture) windowAudioCapture.stopCapture();
 });
 
 /** concorde://invite/<code>  ->  /invite/<code> dentro do React Router */

@@ -12,27 +12,4 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("concordeDesktop", {
   /** Lista telas e janelas disponiveis pra compartilhar, com miniatura (dataURL). */
   listScreenSources: () => ipcRenderer.invoke("concorde:list-screen-sources"),
-
-  /**
-   * Audio isolado de UMA janela (so' Windows - ver electron/native/window-audio-capture) -
-   * usado quando o usuario compartilha uma Janela especifica (Tela Inteira continua usando
-   * getUserMedia normal, audio do sistema todo). "hwnd" vem do id da fonte escolhida no
-   * ScreenSharePicker ("window:<hwnd>:0"). Retorna {ok:boolean, error?:string} - se ok=false
-   * (modulo indisponivel, API do Windows indisponivel nessa build, etc.) quem chamou publica
-   * so' o video, sem travar o compartilhamento.
-   */
-  startWindowAudioCapture: (hwnd) => ipcRenderer.invoke("concorde:start-window-audio", hwnd),
-  stopWindowAudioCapture: () => ipcRenderer.invoke("concorde:stop-window-audio"),
-  /** cb(chunkBuffer) pra cada pedaco de audio PCM (float32, 48kHz, estereo, intercalado). */
-  onWindowAudioChunk: (cb) => {
-    const listener = (_event, chunk) => cb(chunk);
-    ipcRenderer.on("concorde:window-audio-chunk", listener);
-    return () => ipcRenderer.removeListener("concorde:window-audio-chunk", listener);
-  },
-  /** cb(message) quando a captura de audio da janela falha (ver ReportError no addon nativo). */
-  onWindowAudioError: (cb) => {
-    const listener = (_event, message) => cb(message);
-    ipcRenderer.on("concorde:window-audio-error", listener);
-    return () => ipcRenderer.removeListener("concorde:window-audio-error", listener);
-  },
 });
