@@ -818,6 +818,9 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
   font-size: 11.5px; font-weight: 700; flex-shrink: 0;
 }
 .voice-avatar.small { width: 22px; height: 22px; font-size: 9.5px; }
+/* Anel verde de "falando agora" - reaproveitado tanto nos cards da tela de voz (card inteiro
+   ganha borda) quanto na lista aninhada da sidebar (so' o avatar, que e' bem menor ali). */
+.voice-avatar.speaking { box-shadow: 0 0 0 2px var(--success); }
 .voice-status-badge {
   display: flex; align-items: center; gap: 4px;
   color: var(--text-muted); font-size: 11.5px; font-weight: 600;

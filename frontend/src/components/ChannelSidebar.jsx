@@ -48,6 +48,7 @@ export default function ChannelSidebar({
     micLevel,
     deafened,
     screenSharing,
+    speakingIds,
     toggleMic,
     toggleDeafen,
     toggleScreenShare,
@@ -233,7 +234,14 @@ export default function ChannelSidebar({
                       <div className="channel-voice-participants">
                         {presenceByChannel[c.id].map((p) => (
                           <div key={p.userId} className="channel-voice-participant">
-                            <Avatar name={p.username} url={p.avatarUrl} className="voice-avatar small" />
+                            <Avatar
+                              name={p.username}
+                              url={p.avatarUrl}
+                              // O anel so' acende pra quem esta REALMENTE falando agora - so' da pra
+                              // saber disso de dentro da call (ver speakingIds no VoiceCallContext),
+                              // entao so' aparece no canal em que voce mesmo esta conectado.
+                              className={"voice-avatar small" + (speakingIds.has(`user-${p.userId}`) ? " speaking" : "")}
+                            />
                             <span>{p.username}</span>
                             {p.deafened ? (
                               <HeadphonesOffIcon size={12} className="voice-status-icon" />
