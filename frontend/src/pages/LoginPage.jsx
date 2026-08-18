@@ -35,7 +35,11 @@ export default function LoginPage() {
     <div className="auth-screen">
       <form className="auth-card" onSubmit={handleSubmit}>
         <div className="auth-logo">
-          <img src="/icon-192.png" alt="" />
+          {/* import.meta.env.BASE_URL em vez de "/icon-192.png" direto - no site continua
+              "/" (mesmo caminho de sempre), mas no app desktop (Electron, file://) o Vite
+              troca pra "./" (ver vite.config.js) - caminho absoluto puro nao acha o arquivo
+              ali dentro do pacote. */}
+          <img src={`${import.meta.env.BASE_URL}icon-192.png`} alt="" />
         </div>
         <div className="auth-heading">
           <h1>Concorde</h1>

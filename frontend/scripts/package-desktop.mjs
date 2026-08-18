@@ -65,6 +65,10 @@ rmSync(downloadsDir, { recursive: true, force: true });
 run("npx vite build", {
   VITE_API_URL: DESKTOP_ORIGIN,
   VITE_WS_URL: `${DESKTOP_ORIGIN.replace(/^http/, "ws")}/ws`,
+  // Caminhos relativos (./assets/... em vez de /assets/...) - necessario pro app abrir via
+  // file:// sem dar tela branca (ver vite.config.js). O build do site (mais abaixo) NAO leva
+  // isso, continua com caminho absoluto de sempre.
+  VITE_DESKTOP_BUILD: "true",
 });
 run(`npx electron-builder ${builderFlag} --publish=never`);
 

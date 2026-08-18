@@ -3,6 +3,13 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  // O site normal precisa de "/" (caminho absoluto) pra funcionar com rotas tipo
+  // /servers/1/channels/5 - o Caddy serve index.html pra qualquer rota (SPA fallback, ver
+  // Caddyfile) e so' caminho absoluto acha os arquivos certos dali. Ja' o app desktop
+  // (Electron) abre a pagina via file://, sem rota nenhuma - la' caminho absoluto tentaria
+  // ler direto da raiz do disco (tela em branco). So' o build do desktop (ver
+  // scripts/package-desktop.mjs) passa VITE_DESKTOP_BUILD=true pra usar caminho relativo.
+  base: process.env.VITE_DESKTOP_BUILD === "true" ? "./" : "/",
   server: {
     port: 5173,
     // "true" faz o Vite escutar em 0.0.0.0 (todas as interfaces de rede), nao so

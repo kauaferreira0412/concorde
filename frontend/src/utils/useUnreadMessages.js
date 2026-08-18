@@ -108,7 +108,9 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
     try {
       const notification = new Notification(`${message.authorUsername} em #${channelName}`, {
         body,
-        icon: message.authorAvatarUrl || "/icon-192.png",
+        // import.meta.env.BASE_URL: "/" no site, "./" no app desktop (ver vite.config.js) -
+        // caminho absoluto puro nao acha o icone dentro do pacote Electron (file://).
+        icon: message.authorAvatarUrl || `${import.meta.env.BASE_URL}icon-192.png`,
         tag: `chat-${channelId}`, // agrupa notificacoes do mesmo canal em vez de empilhar
       });
       notification.onclick = () => {
