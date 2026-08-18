@@ -858,6 +858,9 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
    navegador. */
 .volume-slider {
   flex: 1;
+  min-width: 0; /* input[type=range] tem uma largura minima intrinseca no navegador que o
+    flexbox nao encolhe sozinho - sem isso o valor (%) ficava empurrado pra fora da caixa
+    (aconteceu no popover, que e' mais estreito que o resto da UI). */
   -webkit-appearance: none !important;
   -moz-appearance: none !important;
   appearance: none !important;
