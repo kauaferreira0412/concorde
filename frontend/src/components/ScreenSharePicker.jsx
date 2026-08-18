@@ -58,8 +58,8 @@ export default function ScreenSharePicker({ onSelect, onClose }) {
 
         <p className="admin-hint" style={{ margin: 0 }}>
           {tab === "screen"
-            ? "Compartilha a tela toda, com o áudio do sistema junto (o que estiver tocando no seu computador)."
-            : "Compartilha só essa janela, com o áudio só dela (não leva o resto do que estiver tocando no seu computador)."}
+            ? "Compartilha a tela toda, com o áudio do sistema junto (o que estiver tocando no seu computador). Enquanto isso, você fica sem ouvir a call (só você, os outros continuam ouvindo você normalmente) - é pra ninguém se ouvir de volta com eco."
+            : "Compartilha só essa janela. Ainda sem opção de áudio isolado da janela - fica muda por enquanto."}
         </p>
 
         {error && <p className="auth-error">{error}</p>}

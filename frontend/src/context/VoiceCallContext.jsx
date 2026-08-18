@@ -97,6 +97,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   // ScreenSharePicker (video/audio capturados "na mao" via chromeMediaSourceId, nao pelo
   // setScreenShareEnabled padrao do LiveKit) - precisa pra saber COMO parar depois.
   const electronScreenTracksRef = useRef({ video: null, audio: null });
+  // true so' durante Tela Inteira COM audio do sistema ligado (Electron) - nesse modo, tudo
+  // que sai pela caixa de som entra na captura, entao a voz de quem esta na call tocando ali
+  // "vaza" de volta pro compartilhamento (cada um se ouve com delay). Enquanto isso estiver
+  // true, silenciamos localmente a voz/audio dos outros - ver muteRemoteAudioForCapture.
+  const systemAudioSharingRef = useRef(false);
   const joiningRef = useRef(false); // evita duas conexoes simultaneas (ex: React StrictMode chamando o efeito 2x)
   // Ensurdecido e' diferente de so mutar: quem ensurdece nao esta OUVINDO ninguem, nao so
   // calado. Isso nao vem do LiveKit (ele so sabe de audio publicado) - propagamos via
@@ -308,17 +313,45 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     const clamped = Math.max(0, Math.min(200, Math.round(percent)));
     participantVolumesRef.current.set(identity, clamped);
     setParticipantVolumesState(Object.fromEntries(participantVolumesRef.current));
-    // Ensurdecido tem prioridade - so' aplica o volume de verdade no track se voce estiver
-    // ouvindo alguem no momento; a preferencia fica salva e volta a valer ao reativar (ver
-    // toggleMic/clearDeafened), senao mexer no slider "furaria" o ensurdecido sem querer.
-    if (!deafenedRef.current) micAudioTracksRef.current.get(identity)?.setVolume(clamped / 100);
+    // Ensurdecido/compartilhamento com audio do sistema tem prioridade - so' aplica o volume
+    // de verdade no track se voce estiver ouvindo alguem no momento; a preferencia fica salva
+    // e volta a valer depois (ver toggleMic/clearDeafened/muteRemoteAudioForCapture), senao
+    // mexer no slider "furaria" o silencio sem querer.
+    if (!deafenedRef.current && !systemAudioSharingRef.current) {
+      micAudioTracksRef.current.get(identity)?.setVolume(clamped / 100);
+    }
   }
 
   function setStreamVolume(identity, percent) {
     const clamped = Math.max(0, Math.min(200, Math.round(percent)));
     streamVolumesRef.current.set(identity, clamped);
     setStreamVolumesState(Object.fromEntries(streamVolumesRef.current));
-    if (!deafenedRef.current) screenAudioTracksRef.current.get(identity)?.setVolume(clamped / 100);
+    if (!deafenedRef.current && !systemAudioSharingRef.current) {
+      screenAudioTracksRef.current.get(identity)?.setVolume(clamped / 100);
+    }
+  }
+
+  /**
+   * So' existe no app desktop (Electron): enquanto Tela Inteira estiver compartilhando com
+   * audio do sistema, a captura pega TUDO que sai pela caixa de som - inclusive a voz de quem
+   * esta na call tocando ali. Sem isso, cada pessoa ouviria a propria voz voltando (com
+   * delay) pelo seu compartilhamento. Silencia localmente a voz/audio dos outros enquanto
+   * dura o compartilhamento (nao mexe no SEU microfone - voce continua podendo falar
+   * normalmente, so' nao ouve os outros ate' parar de compartilhar).
+   */
+  function muteRemoteAudioForCapture(mute) {
+    systemAudioSharingRef.current = mute;
+    if (mute) {
+      micAudioTracksRef.current.forEach((track) => track.setVolume(0));
+      screenAudioTracksRef.current.forEach((track) => track.setVolume(0));
+    } else if (!deafenedRef.current) {
+      micAudioTracksRef.current.forEach((track, identity) => {
+        track.setVolume((participantVolumesRef.current.get(identity) ?? 100) / 100);
+      });
+      screenAudioTracksRef.current.forEach((track, identity) => {
+        track.setVolume((streamVolumesRef.current.get(identity) ?? 100) / 100);
+      });
+    }
   }
 
   /** Desconecta e limpa tudo - usado tanto no "Sair da call" quanto ao trocar de canal. */
@@ -345,6 +378,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     electronScreenTracksRef.current.video?.stop();
     electronScreenTracksRef.current.audio?.stop();
     electronScreenTracksRef.current = { video: null, audio: null };
+    systemAudioSharingRef.current = false;
     stopMicMeter();
     setConnected(false);
     setActiveChannel(null);
@@ -398,14 +432,16 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         } else if (track.kind === Track.Kind.Audio) {
           // Voz (microfone) e audio da transmissao de tela tem controle de volume separado
           // um do outro - guarda a referencia do track de cada um pra poder ajustar depois.
-          // Se voce estiver ensurdecido, entra silenciado (volume 0) independente da
+          // Se voce estiver ensurdecido OU compartilhando Tela Inteira com audio do sistema
+          // (ver muteRemoteAudioForCapture), entra silenciado (volume 0) independente da
           // preferencia salva - ela so' volta a valer quando voce reativar o audio.
+          const silenced = deafenedRef.current || systemAudioSharingRef.current;
           if (pub.source === Track.Source.Microphone) {
             micAudioTracksRef.current.set(participant.identity, track);
-            track.setVolume(deafenedRef.current ? 0 : (participantVolumesRef.current.get(participant.identity) ?? 100) / 100);
+            track.setVolume(silenced ? 0 : (participantVolumesRef.current.get(participant.identity) ?? 100) / 100);
           } else if (pub.source === Track.Source.ScreenShareAudio) {
             screenAudioTracksRef.current.set(participant.identity, track);
-            track.setVolume(deafenedRef.current ? 0 : (streamVolumesRef.current.get(participant.identity) ?? 100) / 100);
+            track.setVolume(silenced ? 0 : (streamVolumesRef.current.get(participant.identity) ?? 100) / 100);
           }
           // audio toca sozinho, nao precisa aparecer na tela - o "el.muted" aqui e' so' um
           // reforco pro caso raro de webAudioMix nao estar disponivel (cai pro elemento nativo);
@@ -638,11 +674,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
    * restricoes de sempre pra evitar eco (ver comentario mais abaixo). No app DESKTOP
    * (Electron) abre o seletor customizado (ScreenSharePicker) em vez de comecar direto -
    * ele sabe exatamente qual superficie foi escolhida (Tela Inteira vs Janela) e decide o
-   * audio caso a caso, igual o Discord: Tela Inteira leva audio do sistema inteiro (nativo do
-   * Electron, sem eco - so' entra no capturador quem estiver tocando ali na hora, nao existe
-   * o problema de "session loopback" que o getDisplayMedia do navegador tem); Janela leva so'
-   * o audio DAQUELA janela (processo) - ver startElectronScreenShare, o proprio
-   * Electron/Chromium resolve isso sozinho a partir do chromeMediaSourceId escolhido.
+   * audio caso a caso: Tela Inteira leva audio do sistema inteiro (nativo do Electron, sem
+   * eco - so' entra no capturador quem estiver tocando ali na hora); Janela fica sem audio -
+   * ver comentario detalhado em startElectronScreenShare sobre por que isolar audio de UMA
+   * janela nao e' possivel hoje com as ferramentas disponiveis.
    */
   async function toggleScreenShare() {
     const room = roomRef.current;
@@ -695,22 +730,30 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
 
   /**
    * Chamado pelo ScreenSharePicker quando o usuario escolhe uma fonte - so' existe no app
-   * desktop (Electron). Captura video + audio via chromeMediaSourceId (o MESMO id serve pros
-   * dois - e' assim que o Electron/Chromium sabe qual audio pegar) e publica os tracks
-   * manualmente no LiveKit (em vez de setScreenShareEnabled, que so' sabe chamar
-   * getDisplayMedia). O audio muda sozinho de acordo com o que foi escolhido, igual o
-   * Discord: Tela Inteira leva o audio do sistema inteiro; Janela leva so' o audio daquela
-   * janela/processo (usa a Windows Graphics Capture API por baixo dos panos quando
-   * disponivel - Windows 10 2004+/Windows 11) - tudo isso e' resolvido pelo proprio
-   * Chromium, sem precisar de nenhum modulo nativo customizado nosso.
+   * desktop (Electron). Captura video (e audio, so' pra Tela Inteira) via chromeMediaSourceId
+   * e publica os tracks manualmente no LiveKit (em vez de setScreenShareEnabled, que so' sabe
+   * chamar getDisplayMedia).
+   *
+   * CORRECAO: tentamos usar chromeMediaSourceId tambem no audio pra isolar o som de UMA
+   * janela especifica (achamos que funcionava - um teste isolado retornou um audio track sem
+   * erro) - mas na pratica sempre devolve o audio do SISTEMA INTEIRO, nao importa qual id seja
+   * passado (usuarios reportaram ouvir tudo, inclusive a propria voz voltando pela chamada).
+   * Essa API legada (chromeMediaSource "desktop" via desktopCapturer) nunca teve filtro de
+   * audio por janela de verdade - o id so' controla o VIDEO, o audio sempre foi "o que
+   * estiver tocando no PC". Por isso, so' Tela Inteira leva audio (e' o esperado receber o
+   * audio do sistema ali); Janela fica sem audio ate' existir um jeito de verdade de isolar
+   * (ver historico de tentativas - modulo nativo WASAPI nao funcionou nesta maquina).
    */
   async function startElectronScreenShare(source) {
     const room = roomRef.current;
     if (!room) return;
     setScreenPickerOpen(false);
+    const wantAudio = source.type === "screen";
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: source.id } },
+        audio: wantAudio
+          ? { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: source.id } }
+          : false,
         video: {
           mandatory: {
             chromeMediaSource: "desktop",
@@ -740,6 +783,9 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       }
       screenSharingRef.current = true;
       setScreenSharing(true);
+      // So' quando tem audio do sistema mesmo (Tela Inteira) - Janela nao tem esse risco,
+      // ja que nao leva audio nenhum (ver comentario no topo da funcao).
+      if (audioTrack) muteRemoteAudioForCapture(true);
       playScreenShareStartSound();
     } catch (err) {
       console.warn("Não foi possível iniciar o compartilhamento de tela:", err);
@@ -757,6 +803,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     if (audio) {
       await room?.localParticipant.unpublishTrack(audio, true);
     }
+    if (systemAudioSharingRef.current) muteRemoteAudioForCapture(false);
     electronScreenTracksRef.current = { video: null, audio: null };
   }
 
