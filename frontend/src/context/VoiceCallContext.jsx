@@ -619,14 +619,25 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     if (!room) return;
     const next = !screenSharingRef.current;
     screenSharingRef.current = next;
-    // Captura tambem o audio do sistema/da aba, igual ao "compartilhar com áudio" do Discord.
-    // echoCancellation ajuda a reduzir o eco classico desse tipo de captura: se quem
-    // compartilha nao estiver de fone, o audio dos OUTROS participantes tocando na caixa de
-    // som dele acaba sendo captado de volta pelo compartilhamento e reenviado pra call -
-    // cada um ouve a propria voz "voltando" com atraso. Nao elimina 100% (e' um problema de
-    // hardware/SO tambem, so' fone de ouvido resolve de vez), mas reduz bastante.
+    // Captura tambem audio, igual ao "compartilhar com áudio" do Discord - mas so' o da
+    // ABA/JANELA sendo compartilhada, nunca o audio do SISTEMA inteiro:
+    // - systemAudio: "exclude" tira a opcao "compartilhar audio do sistema" do dialogo do
+    //   navegador. Sem isso, ao compartilhar uma Janela ou a Tela Inteira o Chrome/Edge so'
+    //   oferece capturar TODO o audio que estiver tocando no computador (inclusive a propria
+    //   chamada de voz saindo pela caixa de som) - e' isso que causava o eco: cada um ouvia
+    //   a propria voz "voltando" pela captura do sistema. Compartilhando uma ABA do navegador
+    //   o audio ja vem isolado (so' daquela aba); Janela/Tela Inteira, sem essa opcao, ficam
+    //   sem audio nenhum (nao tem como isolar so' o audio de uma janela/tela no SO) - e' a
+    //   troca certa, silencio e' melhor que eco.
+    // - selfBrowserSurface: "exclude" nao deixa escolher compartilhar a propria aba do
+    //   Concorde (geraria um espelho infinito, video dentro de video).
+    // - echoCancellation/noiseSuppression: reduz ainda mais qualquer resquicio de eco no
+    //   audio que sobra (ex: aba com audio proprio tocando perto do microfone).
     await room.localParticipant.setScreenShareEnabled(next, {
+      video: { displaySurface: "browser" }, // sugere ABA como opcao padrao (audio mais limpo)
       audio: { echoCancellation: true, noiseSuppression: true },
+      systemAudio: "exclude",
+      selfBrowserSurface: "exclude",
     });
     setScreenSharing(next);
     if (next) playScreenShareStartSound();

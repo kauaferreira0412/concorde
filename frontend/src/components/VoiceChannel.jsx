@@ -122,7 +122,7 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
                 title={
                   screenSharing
                     ? "Parar compartilhamento"
-                    : "Compartilhar tela (com áudio) - use fone de ouvido pra evitar eco"
+                    : "Compartilhar tela - escolha uma ABA pra ter áudio limpo (Janela/Tela Inteira ficam sem áudio, pra evitar eco)"
                 }
               >
                 <ScreenShareIcon size={15} />
