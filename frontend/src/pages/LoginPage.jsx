@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
-import { DownloadIcon, EyeIcon, EyeOffIcon, LockIcon, UserIcon } from "../components/icons.jsx";
+import { DownloadIcon, EyeIcon, EyeOffIcon, LockIcon, ScreenShareIcon, UserIcon } from "../components/icons.jsx";
 
 // window.concordeDesktop so' existe dentro do app Electron (ver electron/preload.cjs) - o
 // link de download so' faz sentido no navegador, quem ja esta no app desktop nao precisa
@@ -86,10 +86,20 @@ export default function LoginPage() {
       </form>
 
       {!isElectronDesktop && (
-        <a className="auth-download" href="/downloads/Concorde-Setup.exe" download>
-          <DownloadIcon size={15} />
-          Baixar app para Windows
-        </a>
+        <div className="auth-download-card">
+          <div className="auth-download-icon">
+            <ScreenShareIcon size={22} />
+          </div>
+          <h2>Prefere usar o app desktop?</h2>
+          <p>
+            Instale o Concorde no Windows: notificações mesmo com a janela fechada, atalho no
+            menu iniciar e compartilhamento de tela nativo, com áudio de janelas e programas.
+          </p>
+          <a className="auth-download-btn" href="/downloads/Concorde-Setup.exe" download>
+            <DownloadIcon size={16} />
+            Baixar para Windows
+          </a>
+        </div>
       )}
     </div>
   );
