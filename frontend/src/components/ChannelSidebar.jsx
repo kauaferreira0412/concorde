@@ -42,8 +42,17 @@ export default function ChannelSidebar({
 }) {
   const { isAdmin } = useAuth();
   const { openProfile } = useProfile();
-  const { activeChannel, micEnabled, deafened, screenSharing, toggleMic, toggleDeafen, toggleScreenShare, leaveChannel } =
-    useVoiceCall();
+  const {
+    activeChannel,
+    micEnabled,
+    micLevel,
+    deafened,
+    screenSharing,
+    toggleMic,
+    toggleDeafen,
+    toggleScreenShare,
+    leaveChannel,
+  } = useVoiceCall();
   const textChannels = channels.filter((c) => c.type === "TEXT");
   const voiceChannels = channels.filter((c) => c.type === "VOICE");
   const members = useServerMembers(server?.id, stompClient, stompConnected);
@@ -142,7 +151,8 @@ export default function ChannelSidebar({
         <div className="connected-block">
           <button className="connected-block-header" onClick={() => setConnectedExpanded((v) => !v)}>
             <span className={"connected-chevron" + (connectedExpanded ? " open" : "")}>▸</span>
-            <span className="channel-group-title">CONECTADOS AGORA — {connectedList.length}</span>
+            <span className="channel-group-title">CONECTADOS AGORA</span>
+            <span className="connected-count">{connectedList.length}</span>
           </button>
           {connectedExpanded && (
             <div className="connected-list">
@@ -150,7 +160,9 @@ export default function ChannelSidebar({
                 <div key={p.userId} className="connected-user">
                   <Avatar name={p.username} url={p.avatarUrl} className="voice-avatar small" />
                   <span className="connected-user-name">{p.username}</span>
-                  <span className="connected-user-channel">🔊 {p.channelName}</span>
+                  <span className="connected-user-channel">
+                    <VolumeIcon size={13} /> {p.channelName}
+                  </span>
                   {p.deafened ? (
                     <HeadphonesOffIcon size={13} className="voice-status-icon" />
                   ) : (
@@ -206,7 +218,11 @@ export default function ChannelSidebar({
                 {voiceChannels.map((c) => (
                   <div key={c.id}>
                     <button
-                      className={"channel-item" + (c.id === selectedChannelId ? " active" : "")}
+                      className={
+                        "channel-item" +
+                        (c.id === selectedChannelId ? " active" : "") +
+                        (activeChannel?.id === c.id ? " connected-active" : "")
+                      }
                       onClick={() => onSelectChannel(c)}
                     >
                       <VolumeIcon size={16} className="channel-item-icon" />
@@ -243,10 +259,13 @@ export default function ChannelSidebar({
           navegando por outros canais (a call continua ativa em segundo plano). */}
       {activeChannel && (
         <div className="voice-status-bar">
-          <div className="voice-status-info">
+          <div className="voice-status-top">
             <span className="voice-status-dot" />
-            <span className="voice-status-channel" title={`Conectado a #${activeChannel.name}`}>
-              {activeChannel.name}
+            <span className="voice-status-text">
+              <span className="voice-status-label">Voz conectada</span>
+              <span className="voice-status-channel" title={`Conectado a #${activeChannel.name}`}>
+                {activeChannel.name} · {micEnabled ? `${micLevel}%` : "mutado"}
+              </span>
             </span>
           </div>
           <div className="voice-status-icons">
@@ -271,7 +290,7 @@ export default function ChannelSidebar({
             >
               <ScreenShareIcon />
             </button>
-            <button className="icon-btn icon-btn-danger" onClick={leaveChannel} title="Sair da call">
+            <button className="icon-btn icon-btn-leave" onClick={leaveChannel} title="Sair da call">
               <PhoneOffIcon />
             </button>
           </div>

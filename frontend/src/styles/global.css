@@ -347,6 +347,16 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .channel-item.add { color: var(--text-muted); font-size: 12.5px; font-weight: 600; }
 .channel-item-icon { flex-shrink: 0; margin-right: 8px; color: var(--text-muted); }
 .channel-item.active .channel-item-icon { color: var(--accent-text); }
+/* Canal de voz que voce esta REALMENTE conectado agora (nao so' selecionado/olhando) -
+   preenchimento solido, mais forte que o ".active" comum, pra deixar bem claro visualmente
+   onde sua call esta rolando. */
+.channel-item.connected-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.channel-item.connected-active:hover { background: var(--accent-hover); }
+.channel-item.connected-active .channel-item-icon { color: #fff; }
 .link-btn {
   background: transparent;
   border: none;
@@ -359,8 +369,8 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .channel-item-live {
   margin-left: auto;
   flex-shrink: 0;
-  background: var(--success-soft);
-  color: var(--success);
+  background: var(--success);
+  color: #fff;
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -437,28 +447,52 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   transition: transform 0.15s ease;
 }
 .connected-chevron.open { transform: rotate(90deg); }
+.connected-count { margin-left: auto; color: var(--success); font-size: 12px; font-weight: 700; flex-shrink: 0; }
 .connected-list { display: flex; flex-direction: column; gap: 8px; padding: 6px 16px 10px; }
 .connected-user { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .connected-user-name { font-weight: 600; color: var(--text-primary); }
-.connected-user-channel { color: var(--text-muted); font-size: 11.5px; margin-left: auto; }
+.connected-user-channel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--success);
+  font-size: 11.5px;
+  font-weight: 600;
+  margin-left: auto;
+  flex-shrink: 0;
+}
 
-/* Barra de status de voz - so aparece quando conectado a uma call, persiste entre canais */
+/* Barra de status de voz - so aparece quando conectado a uma call, persiste entre canais.
+   Empilhada (info em cima, botoes embaixo ocupando a largura toda) em vez de tudo numa
+   linha so' - da mais espaco pro nome do canal + nivel do mic e deixa os botoes maiores. */
 .voice-status-bar {
-  padding: 10px 12px;
+  padding: 12px;
   background: var(--bg-elevated);
   border-top: 1px solid var(--border-soft);
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 10px;
 }
-.voice-status-info { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.voice-status-top { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .voice-status-dot {
   width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex-shrink: 0;
   box-shadow: 0 0 0 3px var(--success-soft);
 }
-.voice-status-channel { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.voice-status-icons { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.voice-status-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.voice-status-label {
+  font-size: 13.5px; font-weight: 700; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.voice-status-channel {
+  font-size: 11.5px; font-weight: 600; color: var(--success);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.voice-status-icons { display: flex; align-items: center; gap: 6px; }
+.voice-status-icons .icon-btn { flex: 1; width: auto; }
+/* Botao de sair da call e' sempre vermelho solido (nao so' no hover, como os outros
+   .icon-btn-danger) - e' uma acao permanente/destacada na barra, nao um estado de alternancia. */
+.icon-btn-leave { background: var(--danger); color: #fff; }
+.icon-btn-leave:hover { background: #ff5c6c; }
 
 .user-bar {
   padding: 12px 14px;
