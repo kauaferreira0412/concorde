@@ -25,6 +25,7 @@
     "@vitejs/plugin-react": "^4.3.1",
     "electron": "^32.1.2",
     "electron-builder": "^25.1.8",
+    "node-addon-api": "^8.9.2",
     "vite": "^5.4.8"
   },
   "build": {
@@ -40,6 +41,9 @@
       "package.json",
       "!node_modules/**/*",
       "!dist/downloads/**/*"
+    ],
+    "asarUnpack": [
+      "electron/native/**/*"
     ],
     "win": {
       "target": [

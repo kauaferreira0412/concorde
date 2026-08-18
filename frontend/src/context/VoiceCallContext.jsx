@@ -21,6 +21,7 @@ import {
   subscribeToVoicePresence,
 } from "../ws/chatSocket";
 import ScreenSharePicker from "../components/ScreenSharePicker.jsx";
+import { startWindowAudioTrack } from "../utils/windowAudioTrack";
 
 const VoiceCallContext = createContext(null);
 
@@ -344,6 +345,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     // acima nao necessariamente libera a captura de tela/audio do sistema sozinho.
     electronScreenTracksRef.current.video?.stop();
     electronScreenTracksRef.current.audio?.stop();
+    electronScreenTracksRef.current.audio?._concordeCleanup?.();
     electronScreenTracksRef.current = { video: null, audio: null };
     stopMicMeter();
     setConnected(false);
@@ -638,11 +640,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
    * restricoes de sempre pra evitar eco (ver comentario mais abaixo). No app DESKTOP
    * (Electron) abre o seletor customizado (ScreenSharePicker) em vez de comecar direto -
    * ele sabe exatamente qual superficie foi escolhida (Tela Inteira vs Janela) e decide o
-   * audio caso a caso: Tela Inteira leva audio do sistema (nativo do Electron, sem eco -
-   * so' entra no capturador quem estiver tocando ali na hora, nao existe o problema de
-   * "session loopback" que o getDisplayMedia do navegador tem); Janela fica sem audio por
-   * enquanto (isolar audio de UMA janela especifica exige um modulo nativo do Windows que
-   * ainda nao existe - ver TODO em startElectronScreenShare).
+   * audio caso a caso, igual o Discord: Tela Inteira leva audio do sistema inteiro (nativo do
+   * Electron, sem eco - so' entra no capturador quem estiver tocando ali na hora, nao existe
+   * o problema de "session loopback" que o getDisplayMedia do navegador tem); Janela leva so'
+   * o audio DAQUELA janela (processo), via modulo nativo do Windows - ver
+   * electron/native/window-audio-capture e startWindowAudioTrack em startElectronScreenShare.
    */
   async function toggleScreenShare() {
     const room = roomRef.current;
@@ -695,24 +697,23 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
 
   /**
    * Chamado pelo ScreenSharePicker quando o usuario escolhe uma fonte - so' existe no app
-   * desktop (Electron). Captura video (e audio, se for Tela Inteira) via chromeMediaSourceId
-   * e publica os tracks manualmente no LiveKit (em vez de setScreenShareEnabled, que so'
-   * sabe chamar getDisplayMedia).
-   *
-   * TODO: audio isolado de uma JANELA especifica (nao a tela toda) exige capturar so' o
-   * audio daquele processo/janela - o Chromium/Electron nao expoe isso hoje (so' "audio do
-   * sistema inteiro" ou nenhum). O jeito certo e' um modulo nativo usando a API de "Process
-   * Loopback Capture" do Windows (WASAPI, Windows 10 2004+), que o Discord desktop usa - fica
-   * pra depois, precisa compilar com Python + Visual Studio Build Tools instalados.
+   * desktop (Electron). Captura video (e audio) via chromeMediaSourceId e publica os tracks
+   * manualmente no LiveKit (em vez de setScreenShareEnabled, que so' sabe chamar
+   * getDisplayMedia). O audio muda de acordo com o que foi escolhido, igual o Discord:
+   * - Tela Inteira: audio do SISTEMA inteiro, via getUserMedia (nativo do Electron/Chromium).
+   * - Janela: audio SO' daquela janela/processo, via modulo nativo do Windows (WASAPI Process
+   *   Loopback - ver electron/native/window-audio-capture/ e src/utils/windowAudioTrack.js).
+   *   Se essa API nao estiver disponivel (Windows mais antigo que 10 2004+, ou modulo nao
+   *   carregou por algum motivo), cai pra compartilhar so' o video, sem travar nada.
    */
   async function startElectronScreenShare(source) {
     const room = roomRef.current;
     if (!room) return;
     setScreenPickerOpen(false);
-    const wantAudio = source.type === "screen"; // so' Tela Inteira tem audio (do sistema) por enquanto
+    const wantSystemAudio = source.type === "screen";
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: wantAudio ? { mandatory: { chromeMediaSource: "desktop" } } : false,
+        audio: wantSystemAudio ? { mandatory: { chromeMediaSource: "desktop" } } : false,
         video: {
           mandatory: {
             chromeMediaSource: "desktop",
@@ -724,7 +725,17 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         },
       });
       const videoTrack = stream.getVideoTracks()[0];
-      const audioTrack = stream.getAudioTracks()[0] || null;
+      let audioTrack = stream.getAudioTracks()[0] || null;
+
+      // Janela especifica: tenta pegar so' o audio DAQUELA janela (nunca o sistema todo).
+      // source.id vem do desktopCapturer no formato "window:<hwnd>:0" (ver main.cjs).
+      if (!audioTrack && source.type === "window") {
+        const hwnd = Number(source.id.split(":")[1]);
+        if (Number.isFinite(hwnd) && hwnd > 0) {
+          audioTrack = await startWindowAudioTrack(hwnd);
+        }
+      }
+
       electronScreenTracksRef.current = { video: videoTrack, audio: audioTrack };
       // Nao existe botao nativo de "parar de compartilhar" aqui (dialogo e' nosso, nao do
       // navegador) - se o usuario fechar a janela compartilhada ou parar a captura por
@@ -757,6 +768,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     }
     if (audio) {
       await room?.localParticipant.unpublishTrack(audio, true);
+      // So' existe pra tracks de audio de JANELA (ver startWindowAudioTrack) - desliga a
+      // captura nativa + o AudioContext. Audio de Tela Inteira (getUserMedia puro) nao tem
+      // isso, so' precisa do .stop() de sempre.
+      await audio._concordeCleanup?.();
     }
     electronScreenTracksRef.current = { video: null, audio: null };
   }
