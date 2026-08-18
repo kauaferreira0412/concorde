@@ -344,10 +344,24 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const toggleWatchScreenShare = useCallback(async (sid) => {
     const entry = videoTracksRef.current.get(sid);
     if (!entry || entry.isLocal || !entry.pub) return;
+    const nextWatching = !entry.track;
     try {
-      await entry.pub.setSubscribed(!entry.track);
+      await entry.pub.setSubscribed(nextWatching);
     } catch (err) {
       console.warn("Não foi possível mudar a inscrição da transmissão:", err);
+    }
+    // O audio da transmissao e' uma publicacao SEPARADA (Track.Source.ScreenShareAudio) da
+    // do video - sem isso aqui, "Parar de assistir" so' cortava o video e voce continuava
+    // ouvindo o audio da transmissao rolando sozinho. Inscreve/desinscreve os dois juntos,
+    // sempre no mesmo estado (assistindo = video + audio; parado = nenhum dos dois).
+    const participant = roomRef.current?.remoteParticipants.get(entry.participantIdentity);
+    const audioPub = participant?.getTrackPublication(Track.Source.ScreenShareAudio);
+    if (audioPub) {
+      try {
+        await audioPub.setSubscribed(nextWatching);
+      } catch (err) {
+        console.warn("Não foi possível mudar a inscrição do áudio da transmissão:", err);
+      }
     }
     // O proprio evento TrackSubscribed/TrackUnsubscribed do LiveKit vai atualizar entry.track
     // e chamar syncScreenShares/renderSelectedVideo quando a mudanca for confirmada.
