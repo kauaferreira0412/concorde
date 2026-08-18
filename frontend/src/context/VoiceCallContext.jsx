@@ -393,6 +393,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           }
           const el = track.attach(); // audio toca sozinho, nao precisa aparecer na tela
           if (deafenedRef.current) el.muted = true;
+          // O microfone so fica "inscrito" (chega aqui) depois que a pessoa efetivamente
+          // publica o track - se a gente nao atualizar a lista agora, quem entrou na call
+          // fica preso mostrando "mudo" pros outros ate' a proxima vez que mutar/desmutar
+          // (o snapshot de ParticipantConnected roda ANTES do mic estar publicado).
+          if (pub.source === Track.Source.Microphone) refreshParticipants(newRoom);
         }
       });
       newRoom.on(RoomEvent.TrackUnsubscribed, (track, pub, participant) => {
@@ -407,7 +412,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
             if (selectedSidRef.current === pub.trackSid) renderSelectedVideo(pub.trackSid);
           }
         }
-        if (pub.source === Track.Source.Microphone) micAudioTracksRef.current.delete(participant.identity);
+        if (pub.source === Track.Source.Microphone) {
+          micAudioTracksRef.current.delete(participant.identity);
+          refreshParticipants(newRoom);
+        }
         if (pub.source === Track.Source.ScreenShareAudio) screenAudioTracksRef.current.delete(participant.identity);
         track.detach().forEach((el) => el.remove());
       });
