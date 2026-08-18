@@ -295,22 +295,17 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     const clamped = Math.max(0, Math.min(200, Math.round(percent)));
     participantVolumesRef.current.set(identity, clamped);
     setParticipantVolumesState(Object.fromEntries(participantVolumesRef.current));
-    micAudioTracksRef.current.get(identity)?.setVolume(clamped / 100);
+    // Ensurdecido tem prioridade - so' aplica o volume de verdade no track se voce estiver
+    // ouvindo alguem no momento; a preferencia fica salva e volta a valer ao reativar (ver
+    // toggleMic/clearDeafened), senao mexer no slider "furaria" o ensurdecido sem querer.
+    if (!deafenedRef.current) micAudioTracksRef.current.get(identity)?.setVolume(clamped / 100);
   }
 
   function setStreamVolume(identity, percent) {
     const clamped = Math.max(0, Math.min(200, Math.round(percent)));
     streamVolumesRef.current.set(identity, clamped);
     setStreamVolumesState(Object.fromEntries(streamVolumesRef.current));
-    screenAudioTracksRef.current.get(identity)?.setVolume(clamped / 100);
-  }
-
-  /** Pega o MediaStreamTrack do seu proprio microfone ja publicado na call, pra "Testar
-   *  microfone" tocar de volta o que esta sendo captado sem precisar abrir outro getUserMedia
-   *  (diferente do teste de Configuracoes, que roda fora de uma call). */
-  function getLocalMicTrack() {
-    const pub = roomRef.current?.localParticipant?.getTrackPublication(Track.Source.Microphone);
-    return pub?.track?.mediaStreamTrack || null;
+    if (!deafenedRef.current) screenAudioTracksRef.current.get(identity)?.setVolume(clamped / 100);
   }
 
   /** Desconecta e limpa tudo - usado tanto no "Sair da call" quanto ao trocar de canal. */
@@ -384,14 +379,21 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         } else if (track.kind === Track.Kind.Audio) {
           // Voz (microfone) e audio da transmissao de tela tem controle de volume separado
           // um do outro - guarda a referencia do track de cada um pra poder ajustar depois.
+          // Se voce estiver ensurdecido, entra silenciado (volume 0) independente da
+          // preferencia salva - ela so' volta a valer quando voce reativar o audio.
           if (pub.source === Track.Source.Microphone) {
             micAudioTracksRef.current.set(participant.identity, track);
-            track.setVolume((participantVolumesRef.current.get(participant.identity) ?? 100) / 100);
+            track.setVolume(deafenedRef.current ? 0 : (participantVolumesRef.current.get(participant.identity) ?? 100) / 100);
           } else if (pub.source === Track.Source.ScreenShareAudio) {
             screenAudioTracksRef.current.set(participant.identity, track);
-            track.setVolume((streamVolumesRef.current.get(participant.identity) ?? 100) / 100);
+            track.setVolume(deafenedRef.current ? 0 : (streamVolumesRef.current.get(participant.identity) ?? 100) / 100);
           }
-          const el = track.attach(); // audio toca sozinho, nao precisa aparecer na tela
+          // audio toca sozinho, nao precisa aparecer na tela - o "el.muted" aqui e' so' um
+          // reforco pro caso raro de webAudioMix nao estar disponivel (cai pro elemento nativo);
+          // o controle de verdade (inclusive do ensurdecido) e' via track.setVolume() acima,
+          // porque com webAudioMix ligado (ver joinChannel) o audio toca por fora do elemento
+          // <audio>, direto pelo Web Audio API - mutar o elemento sozinho nao silencia nada.
+          const el = track.attach();
           if (deafenedRef.current) el.muted = true;
           // O microfone so fica "inscrito" (chega aqui) depois que a pessoa efetivamente
           // publica o track - se a gente nao atualizar a lista agora, quem entrou na call
@@ -566,8 +568,25 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     // que o ref ja mudou, senao "Na call" so mostraria o icone novo na proxima mudanca de outra pessoa.
     if (roomRef.current) refreshParticipants(roomRef.current);
 
-    // Ensurdecer muta o audio de todo mundo que voce ouve (e, como no Discord, tambem
-    // desliga seu proprio microfone; ao reativar, volta pro estado de mic anterior).
+    // Ensurdecer zera o volume de TODO audio que voce ouve - voz e audio de transmissao de
+    // tela - e, como no Discord, tambem desliga seu proprio microfone; ao reativar, volta
+    // pro estado de mic anterior. Importante: precisa ser via track.setVolume(), nao
+    // "el.muted" - com webAudioMix ligado (ver joinChannel) o LiveKit toca o audio por fora
+    // do elemento <audio>, direto pelo Web Audio API, entao mutar o elemento nao silencia
+    // nada de verdade (era esse o bug: dava pra continuar ouvindo todo mundo ensurdecido).
+    if (next) {
+      micAudioTracksRef.current.forEach((track) => track.setVolume(0));
+      screenAudioTracksRef.current.forEach((track) => track.setVolume(0));
+    } else {
+      micAudioTracksRef.current.forEach((track, identity) => {
+        track.setVolume((participantVolumesRef.current.get(identity) ?? 100) / 100);
+      });
+      screenAudioTracksRef.current.forEach((track, identity) => {
+        track.setVolume((streamVolumesRef.current.get(identity) ?? 100) / 100);
+      });
+    }
+    // Reforco pro caso raro de webAudioMix nao estar disponivel (cai pro elemento nativo) -
+    // o controle de verdade e' o setVolume() acima.
     room.remoteParticipants.forEach((participant) => {
       participant.audioTrackPublications.forEach((pub) => {
         pub.track?.attachedElements.forEach((el) => (el.muted = next));
@@ -600,8 +619,15 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     if (!room) return;
     const next = !screenSharingRef.current;
     screenSharingRef.current = next;
-    // { audio: true } captura tambem o audio do sistema/da aba, igual ao "compartilhar com áudio" do Discord
-    await room.localParticipant.setScreenShareEnabled(next, { audio: true });
+    // Captura tambem o audio do sistema/da aba, igual ao "compartilhar com áudio" do Discord.
+    // echoCancellation ajuda a reduzir o eco classico desse tipo de captura: se quem
+    // compartilha nao estiver de fone, o audio dos OUTROS participantes tocando na caixa de
+    // som dele acaba sendo captado de volta pelo compartilhamento e reenviado pra call -
+    // cada um ouve a propria voz "voltando" com atraso. Nao elimina 100% (e' um problema de
+    // hardware/SO tambem, so' fone de ouvido resolve de vez), mas reduz bastante.
+    await room.localParticipant.setScreenShareEnabled(next, {
+      audio: { echoCancellation: true, noiseSuppression: true },
+    });
     setScreenSharing(next);
     if (next) playScreenShareStartSound();
     else playScreenShareStopSound();
@@ -632,7 +658,6 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         streamVolumes,
         setParticipantVolume,
         setStreamVolume,
-        getLocalMicTrack,
         joinChannel,
         leaveChannel,
         toggleMic,

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useServerMembers } from "../utils/useServerMembers";
-import { EyeIcon, EyeOffIcon, MaximizeIcon, MicIcon, ScreenShareIcon, WidenIcon } from "./icons.jsx";
+import { EyeIcon, EyeOffIcon, MaximizeIcon, ScreenShareIcon, WidenIcon } from "./icons.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
 import { MemberRow } from "./MemberList.jsx";
 
@@ -22,10 +22,8 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
     selectScreenShare,
     toggleScreenShare,
     toggleWatchScreenShare,
-    toggleMic,
     streamVolumes,
     setStreamVolume,
-    getLocalMicTrack,
     joinChannel,
     registerVideoContainer,
   } = useVoiceCall();
@@ -36,11 +34,6 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
   const videoContainerRef = useRef(null);
   const isThisChannelActive = connected && activeChannel?.id === channel.id;
   const selectedShare = screenShares.find((s) => s.sid === selectedScreenShareSid) || null;
-
-  // "Testar microfone": toca de volta o que o LiveKit ja esta captando do seu mic AGORA na
-  // call, pra voce se ouvir sem precisar sair e abrir Configuracoes.
-  const [micTesting, setMicTesting] = useState(false);
-  const testAudioRef = useRef(null);
 
   // "Ampliar" - estagio intermediario entre o tamanho normal e a tela cheia de verdade
   // (Fullscreen API, via handleFullscreen): ocupa 100% da largura da area central, mas
@@ -56,33 +49,6 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
     registerVideoContainer(videoContainerRef.current);
     return () => registerVideoContainer(null);
   }, [isThisChannelActive, registerVideoContainer]);
-
-  // Para o teste sozinho se voce sair do canal, senao ficaria tocando de volta em segundo plano.
-  useEffect(() => {
-    if (!isThisChannelActive) stopMicTest();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isThisChannelActive]);
-
-  async function toggleMicTest() {
-    if (micTesting) {
-      stopMicTest();
-      return;
-    }
-    // So' da pra testar um microfone que esta LIGADO na call (senao nao tem audio nenhum
-    // publicado pra tocar de volta) - se estava mutado (ou ensurdecido, que tambem muta -
-    // toggleMic ja tira o ensurdecido nesse caso), o teste liga o microfone primeiro.
-    if (!micEnabled) await toggleMic();
-    const track = getLocalMicTrack();
-    if (!track || !testAudioRef.current) return;
-    testAudioRef.current.srcObject = new MediaStream([track]);
-    testAudioRef.current.play();
-    setMicTesting(true);
-  }
-
-  function stopMicTest() {
-    if (testAudioRef.current) testAudioRef.current.srcObject = null;
-    setMicTesting(false);
-  }
 
   function handleFullscreen() {
     const videoEl = videoContainerRef.current?.querySelector("video");
@@ -118,12 +84,7 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
 
       <div className="voice-body">
         <section className="voice-section">
-          <div className="voice-section-header">
-            <p className="voice-section-title">SEU MICROFONE</p>
-            <button type="button" className="link-btn screenshare-watch-btn" onClick={toggleMicTest}>
-              <MicIcon size={14} /> {micTesting ? "Parar teste" : "Testar microfone"}
-            </button>
-          </div>
+          <p className="voice-section-title">SEU MICROFONE</p>
           <div className="mic-meter-row">
             <div className="mic-meter-track">
               <div className="mic-meter-fill" style={{ width: `${micLevel}%` }} />
@@ -131,11 +92,9 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
             <span className="mic-meter-value">{micEnabled ? `${micLevel}%` : "mutado"}</span>
           </div>
           <p className="voice-hint">
-            Fale perto do microfone — a barra acima deve se mexer instantaneamente. Use "Testar microfone" pra se
-            ouvir, ou os ícones 🎤/🎧 na barra inferior esquerda para mutar ou ensurdecer.
+            Fale perto do microfone — a barra acima deve se mexer instantaneamente. Use os ícones 🎤/🎧 na barra
+            inferior esquerda para mutar ou ensurdecer.
           </p>
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <audio ref={testAudioRef} autoPlay />
         </section>
 
         <section className="voice-section">
@@ -160,6 +119,11 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
                 type="button"
                 className={"btn-accent-sm" + (screenSharing ? " active" : "")}
                 onClick={toggleScreenShare}
+                title={
+                  screenSharing
+                    ? "Parar compartilhamento"
+                    : "Compartilhar tela (com áudio) - use fone de ouvido pra evitar eco"
+                }
               >
                 <ScreenShareIcon size={15} />
                 {screenSharing ? "Parar compartilhamento" : "Compartilhar tela"}

@@ -339,7 +339,11 @@ export default function ChannelSidebar({
             <button
               className={"icon-btn" + (screenSharing ? " icon-btn-active" : "")}
               onClick={toggleScreenShare}
-              title={screenSharing ? "Parar compartilhamento" : "Compartilhar tela (com áudio)"}
+              title={
+                screenSharing
+                  ? "Parar compartilhamento"
+                  : "Compartilhar tela (com áudio) - use fone de ouvido pra evitar eco"
+              }
             >
               <ScreenShareIcon />
             </button>
