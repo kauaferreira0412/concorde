@@ -21,6 +21,7 @@ import {
   subscribeToVoicePresence,
 } from "../ws/chatSocket";
 import ScreenSharePicker from "../components/ScreenSharePicker.jsx";
+import { startWindowAudioTrack } from "../utils/windowAudioTrack";
 
 const VoiceCallContext = createContext(null);
 
@@ -377,6 +378,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     // acima nao necessariamente libera a captura de tela/audio do sistema sozinho.
     electronScreenTracksRef.current.video?.stop();
     electronScreenTracksRef.current.audio?.stop();
+    electronScreenTracksRef.current.audio?._concordeCleanup?.();
     electronScreenTracksRef.current = { video: null, audio: null };
     systemAudioSharingRef.current = false;
     stopMicMeter();
@@ -672,11 +674,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   /**
    * No NAVEGADOR normal usa o dialogo nativo (getDisplayMedia via LiveKit), com as mesmas
    * restricoes de sempre pra evitar eco (ver comentario mais abaixo). No app DESKTOP
-   * (Electron) abre o seletor customizado (ScreenSharePicker) em vez de comecar direto - os
-   * dois modos (Tela Inteira e Janela) levam o audio do sistema inteiro (ver nota detalhada
-   * em startElectronScreenShare sobre por que nao da' pra isolar so' o audio de uma janela
-   * hoje) e, pra ninguem se ouvir de volta, a call fica localmente muda enquanto dura o
-   * compartilhamento - ver muteRemoteAudioForCapture.
+   * (Electron) abre o seletor customizado (ScreenSharePicker) em vez de comecar direto - Tela
+   * Inteira leva audio do sistema inteiro (silencia a call localmente enquanto compartilha,
+   * pra ninguem se ouvir de volta); Janela leva audio isolado so' daquele processo (nao
+   * precisa silenciar nada) - ver nota detalhada em startElectronScreenShare.
    */
   async function toggleScreenShare() {
     const room = roomRef.current;
@@ -729,26 +730,28 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
 
   /**
    * Chamado pelo ScreenSharePicker quando o usuario escolhe uma fonte - so' existe no app
-   * desktop (Electron). Captura video + audio via chromeMediaSourceId e publica os tracks
-   * manualmente no LiveKit (em vez de setScreenShareEnabled, que so' sabe chamar
-   * getDisplayMedia).
-   *
-   * NOTA sobre o audio na Janela: essa API legada (chromeMediaSource "desktop" via
-   * desktopCapturer) nunca teve filtro de audio por janela de verdade - o id so' controla o
-   * VIDEO, o audio sempre e' "o que estiver tocando no PC inteiro", nao so' daquela janela
-   * (tentamos isolar por modulo nativo WASAPI e por essa mesma API - nenhum dos dois
-   * conseguiu de verdade). Ou seja: tanto Tela Inteira quanto Janela levam o audio do SISTEMA
-   * INTEIRO igual. Pra evitar cada um se ouvir de volta (a voz de quem esta na call tocando
-   * na caixa de som entraria na propria captura), ver muteRemoteAudioForCapture logo abaixo -
-   * silencia localmente a call inteira enquanto qualquer um dos dois modos estiver ativo.
+   * desktop (Electron). Captura video sempre via chromeMediaSourceId; o audio muda de
+   * jeito conforme o que foi escolhido, igual o Discord de verdade:
+   * - Tela Inteira: audio do SISTEMA INTEIRO, via getUserMedia (nativo do Electron/Chromium).
+   *   Como isso inclui a propria voz de quem esta na call tocando na caixa de som, silenciamos
+   *   localmente a call enquanto dura (ver muteRemoteAudioForCapture) - senao cada um ouviria
+   *   a propria voz voltando.
+   * - Janela: audio ISOLADO so' daquele processo (WASAPI Process Loopback por PID, via a
+   *   biblioteca "process-audio-capture" - ver electron/main.cjs/windowAudioTrack.js).
+   *   Testado e confirmado que isola de verdade (dois sons simultaneos, so' o do processo
+   *   escolhido aparece) - por isso NAO precisa silenciar a call: como o audio do Concorde
+   *   nunca entra na captura pra comecar, nao tem risco de eco.
    */
   async function startElectronScreenShare(source) {
     const room = roomRef.current;
     if (!room) return;
     setScreenPickerOpen(false);
+    const wantSystemAudio = source.type === "screen";
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: source.id } },
+        audio: wantSystemAudio
+          ? { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: source.id } }
+          : false,
         video: {
           mandatory: {
             chromeMediaSource: "desktop",
@@ -760,7 +763,16 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         },
       });
       const videoTrack = stream.getVideoTracks()[0];
-      const audioTrack = stream.getAudioTracks()[0] || null;
+      let audioTrack = stream.getAudioTracks()[0] || null;
+
+      // Janela especifica: pega o audio isolado daquele processo (ver comentario acima).
+      // source.id vem do desktopCapturer no formato "window:<hwnd>:0".
+      if (!wantSystemAudio) {
+        const hwnd = Number(source.id.split(":")[1]);
+        if (Number.isFinite(hwnd) && hwnd > 0) {
+          audioTrack = await startWindowAudioTrack(hwnd);
+        }
+      }
 
       electronScreenTracksRef.current = { video: videoTrack, audio: audioTrack };
       // Nao existe botao nativo de "parar de compartilhar" aqui (dialogo e' nosso, nao do
@@ -778,9 +790,8 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       }
       screenSharingRef.current = true;
       setScreenSharing(true);
-      // So' quando tem audio do sistema mesmo (Tela Inteira) - Janela nao tem esse risco,
-      // ja que nao leva audio nenhum (ver comentario no topo da funcao).
-      if (audioTrack) muteRemoteAudioForCapture(true);
+      // So' Tela Inteira precisa disso - audio de Janela ja' vem isolado, sem risco de eco.
+      if (wantSystemAudio && audioTrack) muteRemoteAudioForCapture(true);
       playScreenShareStartSound();
     } catch (err) {
       console.warn("Não foi possível iniciar o compartilhamento de tela:", err);
@@ -797,6 +808,9 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     }
     if (audio) {
       await room?.localParticipant.unpublishTrack(audio, true);
+      // So' existe pra audio de JANELA (ver startWindowAudioTrack) - desliga a captura
+      // nativa + o AudioContext. Audio de Tela Inteira (getUserMedia puro) nao tem isso.
+      await audio._concordeCleanup?.();
     }
     if (systemAudioSharingRef.current) muteRemoteAudioForCapture(false);
     electronScreenTracksRef.current = { video: null, audio: null };

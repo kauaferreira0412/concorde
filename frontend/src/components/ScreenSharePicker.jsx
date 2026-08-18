@@ -4,10 +4,11 @@ import { MaximizeIcon, ScreenShareIcon } from "./icons.jsx";
 /**
  * Seletor de tela/janela customizado, so' usado dentro do app desktop (Electron - ver
  * preload.cjs/main.cjs). Existe pra dar mais controle do que o dialogo nativo do
- * navegador permite: tanto "Tela Inteira" quanto "Janela" levam o audio do sistema inteiro
- * (nao da' pra isolar so' o audio de uma janela com as ferramentas disponiveis hoje - ver
- * nota detalhada em startElectronScreenShare/VoiceCallContext.jsx) - pra ninguem se ouvir de
- * volta, a call fica localmente muda enquanto dura o compartilhamento.
+ * navegador permite: "Tela Inteira" leva audio do sistema inteiro (a call fica localmente
+ * muda enquanto compartilha, pra ninguem se ouvir de volta - ver muteRemoteAudioForCapture em
+ * VoiceCallContext.jsx); "Janela" leva audio isolado so' daquele processo (WASAPI Process
+ * Loopback por PID - ver startElectronScreenShare/windowAudioTrack.js), sem precisar mutar
+ * nada.
  *
  * No NAVEGADOR normal (sem Electron) esse componente nunca e' montado - o fluxo cai pro
  * getDisplayMedia padrao, sem nenhuma mudanca (ver toggleScreenShare em VoiceCallContext.jsx).
@@ -58,9 +59,8 @@ export default function ScreenSharePicker({ onSelect, onClose }) {
 
         <p className="admin-hint" style={{ margin: 0 }}>
           {tab === "screen"
-            ? "Compartilha a tela toda, com o áudio do sistema junto (o que estiver tocando no seu computador)."
-            : "Compartilha só essa janela, com o áudio do sistema junto (ainda não dá pra isolar só o áudio dela)."}
-          {" "}Enquanto compartilha, você fica sem ouvir a call (só você — os outros continuam te ouvindo normalmente), pra ninguém se ouvir de volta com eco.
+            ? "Compartilha a tela toda, com o áudio do sistema junto. Enquanto isso, você fica sem ouvir a call (só você — os outros continuam te ouvindo normalmente), pra ninguém se ouvir de volta com eco."
+            : "Compartilha só essa janela, com o áudio só dela — você continua ouvindo a call normalmente."}
         </p>
 
         {error && <p className="auth-error">{error}</p>}

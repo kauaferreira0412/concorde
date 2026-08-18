@@ -105,6 +105,25 @@ banco/backend da VPS**, exatamente como o site - não com o computador de quem i
 > (não estamos assinando nada). Se acontecer, ligue Configurações → Privacidade e segurança →
 > Para desenvolvedores → Modo desenvolvedor, e rode o comando de novo.
 
+> Nota: o áudio isolado de "Janela" (ver `frontend/electron/main.cjs`) depende do módulo nativo
+> da biblioteca `process-audio-capture`, que fica dentro de `node_modules/` (ignorado pelo git) -
+> então numa máquina nova ele precisa ser recompilado uma vez para a ABI do Electron antes de
+> gerar o instalador (o `electron-builder` NÃO faz isso sozinho - por isso `"npmRebuild": false`
+> no `package.json`, pra ele não tentar recompilar errado e quebrar o binário):
+>
+> ```bash
+> cd frontend
+> npm install
+> cd node_modules/process-audio-capture
+> npx node-gyp@13 rebuild --target=32.3.3 --arch=x64 --dist-url=https://electronjs.org/headers
+> cd ../..
+> npm run package:desktop
+> ```
+>
+> Precisa do Python 3.12 e do Visual Studio (com "Desktop development with C++") instalados e no
+> PATH, igual pra qualquer módulo nativo do Node. O `32.3.3` é a versão do Electron usada aqui
+> (ver `devDependencies.electron` no `package.json`) - se ela mudar, troque o `--target` junto.
+
 ### Publicando o instalador no site de verdade
 
 A VPS roda Linux (Docker) e não builda `.exe` do Windows - o instalador precisa ser gerado numa

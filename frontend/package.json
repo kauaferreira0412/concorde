@@ -17,6 +17,7 @@
     "@stomp/stompjs": "^7.0.0",
     "axios": "^1.7.7",
     "livekit-client": "^2.5.7",
+    "process-audio-capture": "^1.0.14",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2"
@@ -34,12 +35,25 @@
     "directories": {
       "output": "release"
     },
+    "npmRebuild": false,
     "files": [
       "dist/**/*",
       "electron/**/*",
       "package.json",
       "!node_modules/**/*",
+      "node_modules/process-audio-capture/**/*",
+      "node_modules/bindings/**/*",
+      "node_modules/file-uri-to-path/**/*",
+      "!node_modules/process-audio-capture/src/**/*",
+      "!node_modules/process-audio-capture/include/**/*",
+      "!node_modules/process-audio-capture/build/**/*.obj",
+      "!node_modules/process-audio-capture/build/*.sln",
+      "!node_modules/process-audio-capture/build/**/*.vcxproj*",
       "!dist/downloads/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/process-audio-capture/**/*",
+      "electron/native/hwnd-utils/**/*"
     ],
     "win": {
       "target": [

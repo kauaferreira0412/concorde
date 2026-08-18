@@ -12,4 +12,19 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("concordeDesktop", {
   /** Lista telas e janelas disponiveis pra compartilhar, com miniatura (dataURL). */
   listScreenSources: () => ipcRenderer.invoke("concorde:list-screen-sources"),
+
+  /**
+   * Audio isolado de UMA janela (so' Windows - process-audio-capture, ver main.cjs) - usado
+   * quando o usuario compartilha uma Janela especifica. "hwnd" vem do id da fonte escolhida
+   * no ScreenSharePicker ("window:<hwnd>:0"). Retorna {ok:boolean, error?:string} - se
+   * ok=false, quem chamou publica so' o video, sem travar o compartilhamento.
+   */
+  startWindowAudioCapture: (hwnd) => ipcRenderer.invoke("concorde:start-window-audio", hwnd),
+  stopWindowAudioCapture: () => ipcRenderer.invoke("concorde:stop-window-audio"),
+  /** cb({buffer: Float32Array, channels, sampleRate}) pra cada pedaco de audio PCM. */
+  onWindowAudioChunk: (cb) => {
+    const listener = (_event, audioData) => cb(audioData);
+    ipcRenderer.on("concorde:window-audio-chunk", listener);
+    return () => ipcRenderer.removeListener("concorde:window-audio-chunk", listener);
+  },
 });
