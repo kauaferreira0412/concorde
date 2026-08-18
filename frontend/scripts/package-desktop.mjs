@@ -26,7 +26,7 @@
 //      que sera servido pelo Caddy. Se pulassemos esse passo o proprio SITE ficaria com as
 //      chamadas de API fixadas na VPS em vez de "mesma origem".
 import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, copyFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, copyFileSync, statSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -52,6 +52,15 @@ function run(cmd, extraEnv) {
 }
 
 console.log(`== Empacotando Concorde desktop (${platform}) - apontando pra ${DESKTOP_ORIGIN} ==`);
+
+// Se um instalador de uma execucao anterior ja estiver em public/downloads/, o vite build
+// abaixo copiaria ele pra dentro de dist/downloads/ - e o electron-builder empacotaria esse
+// instalador ANTIGO dentro do instalador NOVO (o app desktop nunca precisa do proprio
+// instalador dentro dele, so' o site precisa servir ele). Sem essa limpeza, cada execucao
+// dobraria de tamanho (aconteceu: 85MB -> 169MB -> 250MB antes desse fix). O "files" do
+// electron-builder (ver package.json) tambem exclui "dist/downloads/**/*" como segunda
+// camada de protecao, mas remover aqui evita ate esse dist/downloads/ intermediario existir.
+rmSync(downloadsDir, { recursive: true, force: true });
 
 run("npx vite build", {
   VITE_API_URL: DESKTOP_ORIGIN,
