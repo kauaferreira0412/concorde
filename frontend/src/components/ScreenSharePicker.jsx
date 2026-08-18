@@ -4,10 +4,10 @@ import { MaximizeIcon, ScreenShareIcon } from "./icons.jsx";
 /**
  * Seletor de tela/janela customizado, so' usado dentro do app desktop (Electron - ver
  * preload.cjs/main.cjs). Existe pra dar mais controle do que o dialogo nativo do
- * navegador permite: aqui a gente sabe exatamente se o usuario escolheu "Tela Inteira"
- * (video + audio do sistema inteiro) ou "Janela" (video + audio so' daquela janela) - o
- * proprio Electron/Chromium entrega o audio certo sozinho a partir do id escolhido, ver
- * startElectronScreenShare em VoiceCallContext.jsx.
+ * navegador permite: tanto "Tela Inteira" quanto "Janela" levam o audio do sistema inteiro
+ * (nao da' pra isolar so' o audio de uma janela com as ferramentas disponiveis hoje - ver
+ * nota detalhada em startElectronScreenShare/VoiceCallContext.jsx) - pra ninguem se ouvir de
+ * volta, a call fica localmente muda enquanto dura o compartilhamento.
  *
  * No NAVEGADOR normal (sem Electron) esse componente nunca e' montado - o fluxo cai pro
  * getDisplayMedia padrao, sem nenhuma mudanca (ver toggleScreenShare em VoiceCallContext.jsx).
@@ -58,8 +58,9 @@ export default function ScreenSharePicker({ onSelect, onClose }) {
 
         <p className="admin-hint" style={{ margin: 0 }}>
           {tab === "screen"
-            ? "Compartilha a tela toda, com o áudio do sistema junto (o que estiver tocando no seu computador). Enquanto isso, você fica sem ouvir a call (só você, os outros continuam ouvindo você normalmente) - é pra ninguém se ouvir de volta com eco."
-            : "Compartilha só essa janela. Ainda sem opção de áudio isolado da janela - fica muda por enquanto."}
+            ? "Compartilha a tela toda, com o áudio do sistema junto (o que estiver tocando no seu computador)."
+            : "Compartilha só essa janela, com o áudio do sistema junto (ainda não dá pra isolar só o áudio dela)."}
+          {" "}Enquanto compartilha, você fica sem ouvir a call (só você — os outros continuam te ouvindo normalmente), pra ninguém se ouvir de volta com eco.
         </p>
 
         {error && <p className="auth-error">{error}</p>}

@@ -672,12 +672,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   /**
    * No NAVEGADOR normal usa o dialogo nativo (getDisplayMedia via LiveKit), com as mesmas
    * restricoes de sempre pra evitar eco (ver comentario mais abaixo). No app DESKTOP
-   * (Electron) abre o seletor customizado (ScreenSharePicker) em vez de comecar direto -
-   * ele sabe exatamente qual superficie foi escolhida (Tela Inteira vs Janela) e decide o
-   * audio caso a caso: Tela Inteira leva audio do sistema inteiro (nativo do Electron, sem
-   * eco - so' entra no capturador quem estiver tocando ali na hora); Janela fica sem audio -
-   * ver comentario detalhado em startElectronScreenShare sobre por que isolar audio de UMA
-   * janela nao e' possivel hoje com as ferramentas disponiveis.
+   * (Electron) abre o seletor customizado (ScreenSharePicker) em vez de comecar direto - os
+   * dois modos (Tela Inteira e Janela) levam o audio do sistema inteiro (ver nota detalhada
+   * em startElectronScreenShare sobre por que nao da' pra isolar so' o audio de uma janela
+   * hoje) e, pra ninguem se ouvir de volta, a call fica localmente muda enquanto dura o
+   * compartilhamento - ver muteRemoteAudioForCapture.
    */
   async function toggleScreenShare() {
     const room = roomRef.current;
@@ -730,30 +729,26 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
 
   /**
    * Chamado pelo ScreenSharePicker quando o usuario escolhe uma fonte - so' existe no app
-   * desktop (Electron). Captura video (e audio, so' pra Tela Inteira) via chromeMediaSourceId
-   * e publica os tracks manualmente no LiveKit (em vez de setScreenShareEnabled, que so' sabe
-   * chamar getDisplayMedia).
+   * desktop (Electron). Captura video + audio via chromeMediaSourceId e publica os tracks
+   * manualmente no LiveKit (em vez de setScreenShareEnabled, que so' sabe chamar
+   * getDisplayMedia).
    *
-   * CORRECAO: tentamos usar chromeMediaSourceId tambem no audio pra isolar o som de UMA
-   * janela especifica (achamos que funcionava - um teste isolado retornou um audio track sem
-   * erro) - mas na pratica sempre devolve o audio do SISTEMA INTEIRO, nao importa qual id seja
-   * passado (usuarios reportaram ouvir tudo, inclusive a propria voz voltando pela chamada).
-   * Essa API legada (chromeMediaSource "desktop" via desktopCapturer) nunca teve filtro de
-   * audio por janela de verdade - o id so' controla o VIDEO, o audio sempre foi "o que
-   * estiver tocando no PC". Por isso, so' Tela Inteira leva audio (e' o esperado receber o
-   * audio do sistema ali); Janela fica sem audio ate' existir um jeito de verdade de isolar
-   * (ver historico de tentativas - modulo nativo WASAPI nao funcionou nesta maquina).
+   * NOTA sobre o audio na Janela: essa API legada (chromeMediaSource "desktop" via
+   * desktopCapturer) nunca teve filtro de audio por janela de verdade - o id so' controla o
+   * VIDEO, o audio sempre e' "o que estiver tocando no PC inteiro", nao so' daquela janela
+   * (tentamos isolar por modulo nativo WASAPI e por essa mesma API - nenhum dos dois
+   * conseguiu de verdade). Ou seja: tanto Tela Inteira quanto Janela levam o audio do SISTEMA
+   * INTEIRO igual. Pra evitar cada um se ouvir de volta (a voz de quem esta na call tocando
+   * na caixa de som entraria na propria captura), ver muteRemoteAudioForCapture logo abaixo -
+   * silencia localmente a call inteira enquanto qualquer um dos dois modos estiver ativo.
    */
   async function startElectronScreenShare(source) {
     const room = roomRef.current;
     if (!room) return;
     setScreenPickerOpen(false);
-    const wantAudio = source.type === "screen";
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: wantAudio
-          ? { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: source.id } }
-          : false,
+        audio: { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: source.id } },
         video: {
           mandatory: {
             chromeMediaSource: "desktop",
