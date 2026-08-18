@@ -5,6 +5,27 @@ import { EyeIcon, EyeOffIcon, MaximizeIcon, ScreenShareIcon, WidenIcon } from ".
 import VolumeSlider from "./VolumeSlider.jsx";
 import { MemberRow } from "./MemberList.jsx";
 
+/** Um tile de webcam (sua ou de outro participante) - anexa/solta o track de video do
+ *  LiveKit num <video> proprio conforme o componente monta/desmonta (mesmo padrao usado
+ *  pra tela compartilhada, so' que aqui varios tiles ficam visiveis ao mesmo tempo). */
+function CameraTile({ track, name, isLocal }) {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !track) return;
+    track.attach(el);
+    return () => track.detach(el);
+  }, [track]);
+
+  return (
+    <div className="camera-tile">
+      <video ref={videoRef} autoPlay playsInline muted={isLocal} />
+      <span className="camera-tile-name">{name}</span>
+    </div>
+  );
+}
+
 /**
  * Vista de UM canal de voz. A conexao em si (LiveKit) vive no VoiceCallContext, entao
  * ela sobrevive mesmo se voce sair desse canal para ler um canal de texto - igual ao
@@ -18,6 +39,7 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
     micLevel,
     screenSharing,
     screenShares,
+    cameraTracks,
     selectedScreenShareSid,
     selectScreenShare,
     toggleScreenShare,
@@ -96,6 +118,17 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
             inferior esquerda para mutar ou ensurdecer.
           </p>
         </section>
+
+        {cameraTracks.length > 0 && (
+          <section className="voice-section">
+            <p className="voice-section-title">CÂMERAS</p>
+            <div className="camera-grid">
+              {cameraTracks.map((c) => (
+                <CameraTile key={c.identity} track={c.track} name={c.name} isLocal={c.isLocal} />
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="voice-section">
           <div className="voice-section-header">

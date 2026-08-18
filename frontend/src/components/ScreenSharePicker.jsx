@@ -4,11 +4,9 @@ import { MaximizeIcon, ScreenShareIcon } from "./icons.jsx";
 /**
  * Seletor de tela/janela customizado, so' usado dentro do app desktop (Electron - ver
  * preload.cjs/main.cjs). Existe pra dar mais controle do que o dialogo nativo do
- * navegador permite: "Tela Inteira" leva audio do sistema inteiro (a call fica localmente
- * muda enquanto compartilha, pra ninguem se ouvir de volta - ver muteRemoteAudioForCapture em
- * VoiceCallContext.jsx); "Janela" leva audio isolado so' daquele processo (WASAPI Process
- * Loopback por PID - ver startElectronScreenShare/windowAudioTrack.js), sem precisar mutar
- * nada.
+ * navegador permite: "Tela Inteira" leva audio do sistema inteiro; "Janela" leva audio
+ * isolado so' daquele processo (WASAPI Process Loopback por PID - ver
+ * startElectronScreenShare/windowAudioTrack.js).
  *
  * No NAVEGADOR normal (sem Electron) esse componente nunca e' montado - o fluxo cai pro
  * getDisplayMedia padrao, sem nenhuma mudanca (ver toggleScreenShare em VoiceCallContext.jsx).
@@ -59,7 +57,7 @@ export default function ScreenSharePicker({ onSelect, onClose }) {
 
         <p className="admin-hint" style={{ margin: 0 }}>
           {tab === "screen"
-            ? "Compartilha a tela toda, com o áudio do sistema junto. Enquanto isso, você fica sem ouvir a call (só você — os outros continuam te ouvindo normalmente), pra ninguém se ouvir de volta com eco."
+            ? "Compartilha a tela toda, com o áudio do sistema junto."
             : "Compartilha só essa janela, com o áudio só dela — você continua ouvindo a call normalmente."}
         </p>
 

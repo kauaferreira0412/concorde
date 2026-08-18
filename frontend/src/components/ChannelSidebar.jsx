@@ -8,6 +8,8 @@ import { subscribeToVoicePresence } from "../ws/chatSocket";
 import { useUnreadMessages } from "../utils/useUnreadMessages";
 import { useServerMembers } from "../utils/useServerMembers";
 import {
+  CameraIcon,
+  CameraOffIcon,
   ChevronsLeftIcon,
   ChevronsRightIcon,
   HashIcon,
@@ -49,6 +51,7 @@ export default function ChannelSidebar({
     micLevel,
     deafened,
     screenSharing,
+    cameraEnabled,
     speakingIds,
     participants,
     participantVolumes,
@@ -56,6 +59,7 @@ export default function ChannelSidebar({
     toggleMic,
     toggleDeafen,
     toggleScreenShare,
+    toggleCamera,
     leaveChannel,
   } = useVoiceCall();
   const textChannels = channels.filter((c) => c.type === "TEXT");
@@ -335,6 +339,13 @@ export default function ChannelSidebar({
               title={deafened ? "Reativar áudio" : "Ensurdecer (não ouvir ninguém)"}
             >
               {deafened ? <HeadphonesOffIcon /> : <HeadphonesIcon />}
+            </button>
+            <button
+              className={"icon-btn" + (cameraEnabled ? " icon-btn-active" : "")}
+              onClick={toggleCamera}
+              title={cameraEnabled ? "Desligar câmera" : "Ligar câmera"}
+            >
+              {cameraEnabled ? <CameraIcon /> : <CameraOffIcon />}
             </button>
             <button
               className={"icon-btn" + (screenSharing ? " icon-btn-active" : "")}

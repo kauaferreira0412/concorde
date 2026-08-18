@@ -71,9 +71,14 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const [micEnabled, setMicEnabledState] = useState(true);
   const [deafened, setDeafenedState] = useState(false);
   const [screenSharing, setScreenSharing] = useState(false);
+  const [cameraEnabled, setCameraEnabledState] = useState(false);
   const [participants, setParticipants] = useState([]); // dentro da call, com quem realmente entrou
   const [speakingIds, setSpeakingIds] = useState(new Set());
   const [screenShares, setScreenShares] = useState([]); // [{ sid, name, isLocal, watching }]
+  // Webcam de quem estiver com a camera ligada (voce e/ou outros) - funciona igual no
+  // navegador e no app desktop, e' so' getUserMedia comum via LiveKit (setCameraEnabled),
+  // sem nenhuma parte nativa envolvida. Ver toggleCamera/CameraTile em VoiceChannel.jsx.
+  const [cameraTracks, setCameraTracks] = useState([]); // [{ identity, name, isLocal, track }]
   const [selectedScreenShareSid, setSelectedScreenShareSid] = useState(null);
   const [participantVolumes, setParticipantVolumesState] = useState({}); // identity -> 0..200 (voz)
   const [streamVolumes, setStreamVolumesState] = useState({}); // identity -> 0..200 (audio da transmissao de tela dessa pessoa)
@@ -89,6 +94,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   // participantName, isLocal }
   const videoTracksRef = useRef(new Map());
   const selectedSidRef = useRef(null);
+  // identity -> { track (LocalVideoTrack ou RemoteVideoTrack), name, isLocal } - diferente de
+  // videoTracksRef (compartilhamento de tela, um "palco" so' de cada vez), camera mostra TODOS
+  // que estiverem com ela ligada ao mesmo tempo, em tiles pequenos - ver CameraTile.
+  const cameraTracksRef = useRef(new Map());
+  const cameraEnabledRef = useRef(false);
   const micAudioTracksRef = useRef(new Map()); // identity -> RemoteAudioTrack (voz, pro controle de volume)
   const screenAudioTracksRef = useRef(new Map()); // identity -> RemoteAudioTrack (audio da transmissao de tela dessa pessoa)
   const participantVolumesRef = useRef(new Map()); // identity -> 0..200, fonte da verdade sincrona
@@ -98,11 +108,6 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   // ScreenSharePicker (video/audio capturados "na mao" via chromeMediaSourceId, nao pelo
   // setScreenShareEnabled padrao do LiveKit) - precisa pra saber COMO parar depois.
   const electronScreenTracksRef = useRef({ video: null, audio: null });
-  // true so' durante Tela Inteira COM audio do sistema ligado (Electron) - nesse modo, tudo
-  // que sai pela caixa de som entra na captura, entao a voz de quem esta na call tocando ali
-  // "vaza" de volta pro compartilhamento (cada um se ouve com delay). Enquanto isso estiver
-  // true, silenciamos localmente a voz/audio dos outros - ver muteRemoteAudioForCapture.
-  const systemAudioSharingRef = useRef(false);
   const joiningRef = useRef(false); // evita duas conexoes simultaneas (ex: React StrictMode chamando o efeito 2x)
   // Ensurdecido e' diferente de so mutar: quem ensurdece nao esta OUVINDO ninguem, nao so
   // calado. Isso nao vem do LiveKit (ele so sabe de audio publicado) - propagamos via
@@ -140,6 +145,16 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   function setDeafened(value) {
     deafenedRef.current = value;
     setDeafenedState(value);
+  }
+  function setCameraEnabled(value) {
+    cameraEnabledRef.current = value;
+    setCameraEnabledState(value);
+  }
+
+  function syncCameraTracks() {
+    setCameraTracks(
+      [...cameraTracksRef.current.entries()].map(([identity, v]) => ({ identity, ...v }))
+    );
   }
 
   useEffect(() => {
@@ -314,11 +329,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     const clamped = Math.max(0, Math.min(200, Math.round(percent)));
     participantVolumesRef.current.set(identity, clamped);
     setParticipantVolumesState(Object.fromEntries(participantVolumesRef.current));
-    // Ensurdecido/compartilhamento com audio do sistema tem prioridade - so' aplica o volume
-    // de verdade no track se voce estiver ouvindo alguem no momento; a preferencia fica salva
-    // e volta a valer depois (ver toggleMic/clearDeafened/muteRemoteAudioForCapture), senao
-    // mexer no slider "furaria" o silencio sem querer.
-    if (!deafenedRef.current && !systemAudioSharingRef.current) {
+    // Ensurdecido tem prioridade - so' aplica o volume de verdade no track se voce estiver
+    // ouvindo alguem no momento; a preferencia fica salva e volta a valer depois (ver
+    // toggleMic/clearDeafened), senao mexer no slider "furaria" o silencio sem querer.
+    if (!deafenedRef.current) {
       micAudioTracksRef.current.get(identity)?.setVolume(clamped / 100);
     }
   }
@@ -327,31 +341,8 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     const clamped = Math.max(0, Math.min(200, Math.round(percent)));
     streamVolumesRef.current.set(identity, clamped);
     setStreamVolumesState(Object.fromEntries(streamVolumesRef.current));
-    if (!deafenedRef.current && !systemAudioSharingRef.current) {
+    if (!deafenedRef.current) {
       screenAudioTracksRef.current.get(identity)?.setVolume(clamped / 100);
-    }
-  }
-
-  /**
-   * So' existe no app desktop (Electron): enquanto Tela Inteira estiver compartilhando com
-   * audio do sistema, a captura pega TUDO que sai pela caixa de som - inclusive a voz de quem
-   * esta na call tocando ali. Sem isso, cada pessoa ouviria a propria voz voltando (com
-   * delay) pelo seu compartilhamento. Silencia localmente a voz/audio dos outros enquanto
-   * dura o compartilhamento (nao mexe no SEU microfone - voce continua podendo falar
-   * normalmente, so' nao ouve os outros ate' parar de compartilhar).
-   */
-  function muteRemoteAudioForCapture(mute) {
-    systemAudioSharingRef.current = mute;
-    if (mute) {
-      micAudioTracksRef.current.forEach((track) => track.setVolume(0));
-      screenAudioTracksRef.current.forEach((track) => track.setVolume(0));
-    } else if (!deafenedRef.current) {
-      micAudioTracksRef.current.forEach((track, identity) => {
-        track.setVolume((participantVolumesRef.current.get(identity) ?? 100) / 100);
-      });
-      screenAudioTracksRef.current.forEach((track, identity) => {
-        track.setVolume((streamVolumesRef.current.get(identity) ?? 100) / 100);
-      });
     }
   }
 
@@ -380,7 +371,9 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     electronScreenTracksRef.current.audio?.stop();
     electronScreenTracksRef.current.audio?._concordeCleanup?.();
     electronScreenTracksRef.current = { video: null, audio: null };
-    systemAudioSharingRef.current = false;
+    cameraTracksRef.current.clear();
+    setCameraTracks([]);
+    setCameraEnabled(false);
     stopMicMeter();
     setConnected(false);
     setActiveChannel(null);
@@ -431,13 +424,19 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
             participantName: participant.name || participant.identity,
             isLocal: false,
           });
+        } else if (track.kind === Track.Kind.Video && pub.source === Track.Source.Camera) {
+          cameraTracksRef.current.set(participant.identity, {
+            track,
+            name: participant.name || participant.identity,
+            isLocal: false,
+          });
+          syncCameraTracks();
         } else if (track.kind === Track.Kind.Audio) {
           // Voz (microfone) e audio da transmissao de tela tem controle de volume separado
           // um do outro - guarda a referencia do track de cada um pra poder ajustar depois.
-          // Se voce estiver ensurdecido OU compartilhando Tela Inteira com audio do sistema
-          // (ver muteRemoteAudioForCapture), entra silenciado (volume 0) independente da
+          // Se voce estiver ensurdecido, entra silenciado (volume 0) independente da
           // preferencia salva - ela so' volta a valer quando voce reativar o audio.
-          const silenced = deafenedRef.current || systemAudioSharingRef.current;
+          const silenced = deafenedRef.current;
           if (pub.source === Track.Source.Microphone) {
             micAudioTracksRef.current.set(participant.identity, track);
             track.setVolume(silenced ? 0 : (participantVolumesRef.current.get(participant.identity) ?? 100) / 100);
@@ -476,14 +475,18 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           refreshParticipants(newRoom);
         }
         if (pub.source === Track.Source.ScreenShareAudio) screenAudioTracksRef.current.delete(participant.identity);
+        if (pub.source === Track.Source.Camera) {
+          cameraTracksRef.current.delete(participant.identity);
+          syncCameraTracks();
+        }
         track.detach().forEach((el) => el.remove());
       });
       // A pessoa parou de compartilhar a tela de vez (nao so' alguem deixou de assistir).
       newRoom.on(RoomEvent.TrackUnpublished, (pub) => {
         if (pub.source === Track.Source.ScreenShare) removeVideoTrack(pub.trackSid);
       });
-      // Sua propria tela compartilhada tambem entra na lista, pra voce poder conferir
-      // o que esta sendo transmitido (assim como as dos outros).
+      // Sua propria tela compartilhada e sua propria camera tambem entram na lista, pra
+      // voce poder conferir o que esta sendo transmitido (assim como as dos outros).
       newRoom.on(RoomEvent.LocalTrackPublished, (pub, participant) => {
         if (pub.source === Track.Source.ScreenShare && pub.track) {
           upsertScreenShare(pub.trackSid, {
@@ -494,9 +497,21 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
             isLocal: true,
           });
         }
+        if (pub.source === Track.Source.Camera && pub.track) {
+          cameraTracksRef.current.set(participant.identity, {
+            track: pub.track,
+            name: `${participant.name || participant.identity} (você)`,
+            isLocal: true,
+          });
+          syncCameraTracks();
+        }
       });
       newRoom.on(RoomEvent.LocalTrackUnpublished, (pub) => {
         if (pub.source === Track.Source.ScreenShare) removeVideoTrack(pub.trackSid);
+        if (pub.source === Track.Source.Camera) {
+          cameraTracksRef.current.delete(newRoom.localParticipant.identity);
+          syncCameraTracks();
+        }
       });
       // Toca so quando OUTRA pessoa entra/sai enquanto voce ja esta na call - o efeito de
       // voce mesmo entrando/saindo e' tocado explicitamente logo abaixo, uma vez so.
@@ -672,12 +687,29 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   }
 
   /**
+   * Liga/desliga a webcam - funciona igual no navegador e no app desktop (Electron), sem
+   * nenhuma parte nativa: e' so' getUserMedia comum (video), publicado como Track.Source.Camera
+   * via LiveKit. Aparece pros outros (e pra voce mesmo) como um tile em CameraTile - ver
+   * VoiceChannel.jsx.
+   */
+  async function toggleCamera() {
+    const room = roomRef.current;
+    if (!room) return;
+    const next = !cameraEnabledRef.current;
+    try {
+      await room.localParticipant.setCameraEnabled(next);
+      setCameraEnabled(next);
+    } catch (err) {
+      alert("Não foi possível acessar sua câmera (permissão negada ou nenhum dispositivo encontrado): " + err.message);
+    }
+  }
+
+  /**
    * No NAVEGADOR normal usa o dialogo nativo (getDisplayMedia via LiveKit), com as mesmas
    * restricoes de sempre pra evitar eco (ver comentario mais abaixo). No app DESKTOP
    * (Electron) abre o seletor customizado (ScreenSharePicker) em vez de comecar direto - Tela
-   * Inteira leva audio do sistema inteiro (silencia a call localmente enquanto compartilha,
-   * pra ninguem se ouvir de volta); Janela leva audio isolado so' daquele processo (nao
-   * precisa silenciar nada) - ver nota detalhada em startElectronScreenShare.
+   * Inteira leva audio do sistema inteiro; Janela leva audio isolado so' daquele processo -
+   * ver nota detalhada em startElectronScreenShare.
    */
   async function toggleScreenShare() {
     const room = roomRef.current;
@@ -733,14 +765,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
    * desktop (Electron). Captura video sempre via chromeMediaSourceId; o audio muda de
    * jeito conforme o que foi escolhido, igual o Discord de verdade:
    * - Tela Inteira: audio do SISTEMA INTEIRO, via getUserMedia (nativo do Electron/Chromium).
-   *   Como isso inclui a propria voz de quem esta na call tocando na caixa de som, silenciamos
-   *   localmente a call enquanto dura (ver muteRemoteAudioForCapture) - senao cada um ouviria
-   *   a propria voz voltando.
    * - Janela: audio ISOLADO so' daquele processo (WASAPI Process Loopback por PID, via a
    *   biblioteca "process-audio-capture" - ver electron/main.cjs/windowAudioTrack.js).
    *   Testado e confirmado que isola de verdade (dois sons simultaneos, so' o do processo
-   *   escolhido aparece) - por isso NAO precisa silenciar a call: como o audio do Concorde
-   *   nunca entra na captura pra comecar, nao tem risco de eco.
+   *   escolhido aparece).
    */
   async function startElectronScreenShare(source) {
     const room = roomRef.current;
@@ -790,8 +818,6 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       }
       screenSharingRef.current = true;
       setScreenSharing(true);
-      // So' Tela Inteira precisa disso - audio de Janela ja' vem isolado, sem risco de eco.
-      if (wantSystemAudio && audioTrack) muteRemoteAudioForCapture(true);
       playScreenShareStartSound();
     } catch (err) {
       console.warn("Não foi possível iniciar o compartilhamento de tela:", err);
@@ -812,7 +838,6 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       // nativa + o AudioContext. Audio de Tela Inteira (getUserMedia puro) nao tem isso.
       await audio._concordeCleanup?.();
     }
-    if (systemAudioSharingRef.current) muteRemoteAudioForCapture(false);
     electronScreenTracksRef.current = { video: null, audio: null };
   }
 
@@ -830,6 +855,8 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         micEnabled,
         deafened,
         screenSharing,
+        cameraEnabled,
+        cameraTracks,
         participants,
         speakingIds,
         micLevel,
@@ -846,6 +873,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         toggleMic,
         toggleDeafen,
         toggleScreenShare,
+        toggleCamera,
         registerVideoContainer,
       }}
     >

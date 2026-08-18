@@ -1206,6 +1206,40 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
 }
 .voice-video-grid:not(.empty) { cursor: pointer; }
 
+/* Webcams - ao contrario da tela compartilhada (um "palco" so' de cada vez), varias podem
+   ficar ligadas ao mesmo tempo, entao aparecem lado a lado em tiles pequenos. */
+.camera-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.camera-tile {
+  position: relative;
+  width: 168px;
+  height: 94px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-app);
+  border: 1px solid var(--border-soft);
+}
+.camera-tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.camera-tile-name {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  background: rgba(4, 5, 8, 0.6);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  max-width: calc(100% - 12px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ============================================================
    Modal
    ============================================================ */

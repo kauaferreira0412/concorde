@@ -152,6 +152,19 @@ export function CameraIcon(props) {
   );
 }
 
+export function CameraOffIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <line x1="1" y1="1" x2="23" y2="23" />
+      <path d="M21 19a2 2 0 0 1-2 2H5.5" />
+      <path d="M3.5 15.5A2 2 0 0 1 3 15V8a2 2 0 0 1 2-2h4l2-3h4.2" />
+      <path d="M17.5 6H19a2 2 0 0 1 2 2v9.5" />
+      <path d="M14.5 13.4a4 4 0 0 1-5.9 2.1" />
+      <path d="M9.2 9.2A4 4 0 0 1 16 12" />
+    </svg>
+  );
+}
+
 export function PencilIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
