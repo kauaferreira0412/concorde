@@ -831,40 +831,11 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
 .voice-status-icon.danger { color: var(--danger); }
 .voice-hint { color: var(--text-muted); font-size: 12px; margin: 10px 0 0; line-height: 1.5; }
 
-/* "NA CALL" - cards lado a lado (mesma largura fixa do grid de "Membros com acesso"),
-   quebrando linha quando nao cabe mais - em vez de uma linha cheia por pessoa. O volume
-   nao fica mais visivel direto no card - e' um popover que abre no botao direito (ver
-   .volume-popover), pra nao brigar por espaco com o nome. */
-.voice-call-list { display: flex; flex-wrap: wrap; gap: 10px; }
-.voice-call-card {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 210px;
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
-  background: var(--bg-panel-2);
-  border: 1px solid var(--border-soft);
-  transition: all 0.15s ease;
-}
-.voice-call-card.speaking {
-  border-color: var(--success);
-  background: var(--success-soft);
-  box-shadow: 0 0 0 3px rgba(23, 178, 106, 0.12);
-}
-.voice-call-name {
-  font-size: 13.5px;
-  font-weight: 600;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.voice-call-you { margin-left: 6px; font-weight: 500; font-size: 12px; color: var(--text-muted); }
 .voice-hint:first-child { margin-top: 0; }
 
-/* Popover de volume individual - abre no botao direito do mouse em cima do card de alguem
-   na call (ver onContextMenu em VoiceChannel.jsx), posicionado onde o clique aconteceu. */
+/* Popover de volume individual - abre no botao direito do mouse em cima do avatar de
+   alguem na lista de "quem esta na call" (aninhada sob o canal, ver ChannelSidebar.jsx),
+   posicionado onde o clique aconteceu. */
 .volume-popover {
   position: fixed;
   z-index: 60;

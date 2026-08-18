@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
@@ -24,6 +24,7 @@ import {
 } from "./icons.jsx";
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
+import VolumeSlider from "./VolumeSlider.jsx";
 
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", INVISIBLE: "offline" };
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", INVISIBLE: "Invisível" };
@@ -49,6 +50,9 @@ export default function ChannelSidebar({
     deafened,
     screenSharing,
     speakingIds,
+    participants,
+    participantVolumes,
+    setParticipantVolume,
     toggleMic,
     toggleDeafen,
     toggleScreenShare,
@@ -73,6 +77,32 @@ export default function ChannelSidebar({
   const [textExpanded, setTextExpanded] = useState(true);
   const [voiceExpanded, setVoiceExpanded] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  // Popover de volume individual - abre no botao direito em cima do avatar de alguem na
+  // lista de "quem esta na call", aninhada sob o canal de voz (so' faz sentido pra quem
+  // esta na MESMA call que voce, ja que e' o LiveKit que sabe controlar esse volume).
+  const [volumeMenu, setVolumeMenu] = useState(null); // { identity, x, y }
+  const volumeMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!volumeMenu) return;
+    function handlePointerDown(e) {
+      if (volumeMenuRef.current && !volumeMenuRef.current.contains(e.target)) setVolumeMenu(null);
+    }
+    function handleKeyDown(e) {
+      if (e.key === "Escape") setVolumeMenu(null);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [volumeMenu]);
+
+  // Fecha sozinho se a pessoa sair da call enquanto o popover estava aberto.
+  useEffect(() => {
+    if (volumeMenu && !participants.some((p) => p.identity === volumeMenu.identity)) setVolumeMenu(null);
+  }, [participants, volumeMenu]);
   // Painel inteiro (canais, call, icones) pode recolher pra dar mais espaco pro chat -
   // fica lembrado entre sessoes.
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("channelSidebarCollapsed") === "true");
@@ -232,24 +262,39 @@ export default function ChannelSidebar({
                     </button>
                     {(presenceByChannel[c.id] || []).length > 0 && (
                       <div className="channel-voice-participants">
-                        {presenceByChannel[c.id].map((p) => (
-                          <div key={p.userId} className="channel-voice-participant">
-                            <Avatar
-                              name={p.username}
-                              url={p.avatarUrl}
-                              // O anel so' acende pra quem esta REALMENTE falando agora - so' da pra
-                              // saber disso de dentro da call (ver speakingIds no VoiceCallContext),
-                              // entao so' aparece no canal em que voce mesmo esta conectado.
-                              className={"voice-avatar small" + (speakingIds.has(`user-${p.userId}`) ? " speaking" : "")}
-                            />
-                            <span>{p.username}</span>
-                            {p.deafened ? (
-                              <HeadphonesOffIcon size={12} className="voice-status-icon" />
-                            ) : (
-                              !p.micEnabled && <MicOffIcon size={12} className="voice-status-icon danger" />
-                            )}
-                          </div>
-                        ))}
+                        {presenceByChannel[c.id].map((p) => {
+                          const identity = `user-${p.userId}`;
+                          // Volume so' da pra ajustar de dentro da MESMA call (e' o LiveKit
+                          // que controla isso) e nunca pra voce mesmo.
+                          const canAdjustVolume = activeChannel?.id === c.id && p.userId !== user?.id;
+                          return (
+                            <div
+                              key={p.userId}
+                              className="channel-voice-participant"
+                              onContextMenu={(e) => {
+                                if (!canAdjustVolume) return;
+                                e.preventDefault();
+                                setVolumeMenu({ identity, x: e.clientX, y: e.clientY });
+                              }}
+                              title={canAdjustVolume ? "Clique com o botão direito pra ajustar o volume" : undefined}
+                            >
+                              <Avatar
+                                name={p.username}
+                                url={p.avatarUrl}
+                                // O anel so' acende pra quem esta REALMENTE falando agora - so' da pra
+                                // saber disso de dentro da call (ver speakingIds no VoiceCallContext),
+                                // entao so' aparece no canal em que voce mesmo esta conectado.
+                                className={"voice-avatar small" + (speakingIds.has(identity) ? " speaking" : "")}
+                              />
+                              <span>{p.username}</span>
+                              {p.deafened ? (
+                                <HeadphonesOffIcon size={12} className="voice-status-icon" />
+                              ) : (
+                                !p.micEnabled && <MicOffIcon size={12} className="voice-status-icon danger" />
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -334,6 +379,29 @@ export default function ChannelSidebar({
         </div>
       </div>
       </div>
+
+      {volumeMenu &&
+        (() => {
+          const p = participants.find((pp) => pp.identity === volumeMenu.identity);
+          if (!p) return null;
+          return (
+            <div
+              className="volume-popover"
+              ref={volumeMenuRef}
+              style={{
+                left: Math.min(volumeMenu.x, window.innerWidth - 232),
+                top: Math.min(volumeMenu.y, window.innerHeight - 70),
+              }}
+            >
+              <p className="volume-popover-title">Volume de {p.name}</p>
+              <VolumeSlider
+                value={participantVolumes[p.identity] ?? 100}
+                onChange={(v) => setParticipantVolume(p.identity, v)}
+                label={`Volume de ${p.name} (padrão 100%, pode passar de 100%)`}
+              />
+            </div>
+          );
+        })()}
 
       {showLogoutConfirm && (
         <ConfirmModal
