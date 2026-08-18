@@ -751,8 +751,33 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
   gap: 16px;
   width: 100%;
 }
-.voice-section-header { display: flex; align-items: center; justify-content: space-between; margin: 0 0 12px; }
+.voice-section-header { display: flex; align-items: center; justify-content: space-between; margin: 0 0 12px; gap: 10px; }
 .voice-section-header .voice-section-title { margin: 0; }
+.voice-section-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* Botao primario pequeno (preenchido, cor de destaque) - "Compartilhar tela". */
+.btn-accent-sm {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--accent); color: #fff;
+  font-size: 12.5px; padding: 8px 14px;
+  box-shadow: var(--glow-accent);
+}
+.btn-accent-sm:hover { background: var(--accent-hover); }
+.btn-accent-sm.active { background: var(--danger); box-shadow: none; }
+.btn-accent-sm.active:hover { background: #ff5c6c; }
+
+/* Botao secundario pequeno (so' contorno) - "Assistir transmissão" / "Testar microfone". */
+.btn-outline-sm {
+  display: flex; align-items: center; gap: 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12.5px; padding: 7px 13px;
+}
+.btn-outline-sm:hover { background: var(--bg-hover); color: var(--text-primary); }
+/* "active" aqui marca a transmissao PAUSADA (voce parou de assistir) - destaca em azul pra
+   chamar atencao de que precisa clicar de novo pra voltar a ver, nao e' um erro. */
+.btn-outline-sm.active { border-color: rgba(47,107,255,0.4); background: var(--accent-soft); color: var(--accent-text); }
 .voice-section {
   background: var(--bg-panel);
   border: 1px solid var(--border-soft);
@@ -1079,11 +1104,37 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 90px;
   overflow: hidden;
 }
+/* Ninguem compartilhando ainda: caixa tracejada com icone, maior e mais convidativa do que
+   so' um texto solto (era assim antes - um <p> sozinho fora do "palco"). */
+.screenshare-stage.empty {
+  border-style: dashed;
+  border-color: var(--border);
+  background: var(--bg-app);
+  min-height: 220px;
+}
+.screenshare-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+  text-align: center;
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.screenshare-empty svg { color: var(--text-muted); }
+.screenshare-empty p { margin: 0; }
+/* "Ampliar" (WidenIcon, ver VoiceChannel.jsx) - estagio intermediario antes da tela cheia de
+   verdade: o video ocupa 100% da largura da area central, mas continua dentro da pagina -
+   ainda da pra rolar e ver as outras secoes (participantes, membros) normalmente. */
+.screenshare-stage.theater .voice-video-grid video { max-width: 100%; width: 100%; max-height: 75vh; }
 .voice-video-grid { width: 100%; display: flex; align-items: center; justify-content: center; padding: 14px; }
 .voice-video-grid.empty { padding: 0; min-height: 0; }
 .voice-video-grid video {

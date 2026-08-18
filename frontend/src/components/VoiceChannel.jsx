@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useServerMembers } from "../utils/useServerMembers";
-import { EyeIcon, EyeOffIcon, MaximizeIcon, MicIcon } from "./icons.jsx";
+import { EyeIcon, EyeOffIcon, MaximizeIcon, MicIcon, ScreenShareIcon, WidenIcon } from "./icons.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
 import { MemberRow } from "./MemberList.jsx";
 
@@ -16,9 +16,11 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
     connected,
     micEnabled,
     micLevel,
+    screenSharing,
     screenShares,
     selectedScreenShareSid,
     selectScreenShare,
+    toggleScreenShare,
     toggleWatchScreenShare,
     streamVolumes,
     setStreamVolume,
@@ -38,6 +40,15 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
   // call, pra voce se ouvir sem precisar sair e abrir Configuracoes.
   const [micTesting, setMicTesting] = useState(false);
   const testAudioRef = useRef(null);
+
+  // "Ampliar" - estagio intermediario entre o tamanho normal e a tela cheia de verdade
+  // (Fullscreen API, via handleFullscreen): ocupa 100% da largura da area central, mas
+  // continua dentro da pagina - da pra rolar e ver participantes/membros normalmente.
+  const [theaterMode, setTheaterMode] = useState(false);
+
+  useEffect(() => {
+    if (screenShares.length === 0) setTheaterMode(false);
+  }, [screenShares.length]);
 
   useEffect(() => {
     if (!isThisChannelActive) return;
@@ -125,37 +136,51 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
         <section className="voice-section">
           <div className="voice-section-header">
             <p className="voice-section-title">COMPARTILHAMENTO DE TELA</p>
-            {screenShares.length > 0 && (
-              <button className="icon-btn" onClick={handleFullscreen} title="Ver em tela cheia">
-                <MaximizeIcon />
-              </button>
-            )}
-          </div>
-          {screenShares.length === 0 ? (
-            <p className="voice-hint" style={{ margin: 0 }}>
-              Ninguém está compartilhando a tela agora.
-            </p>
-          ) : (
-            screenShares.length > 1 && (
-              <div className="screenshare-tabs">
-                {screenShares.map((s) => (
+            <div className="voice-section-header-actions">
+              {screenShares.length > 0 && (
+                <>
                   <button
-                    key={s.sid}
-                    className={"screenshare-tab" + (s.sid === selectedScreenShareSid ? " active" : "")}
-                    onClick={() => selectScreenShare(s.sid)}
+                    className={"icon-btn" + (theaterMode ? " icon-btn-active" : "")}
+                    onClick={() => setTheaterMode((v) => !v)}
+                    title={theaterMode ? "Voltar ao tamanho normal" : "Ampliar (ocupa a largura toda, sem sair da página)"}
                   >
-                    🖥️ {s.name}
+                    <WidenIcon />
                   </button>
-                ))}
-              </div>
-            )
+                  <button className="icon-btn" onClick={handleFullscreen} title="Ver em tela cheia">
+                    <MaximizeIcon />
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                className={"btn-accent-sm" + (screenSharing ? " active" : "")}
+                onClick={toggleScreenShare}
+              >
+                <ScreenShareIcon size={15} />
+                {screenSharing ? "Parar compartilhamento" : "Compartilhar tela"}
+              </button>
+            </div>
+          </div>
+
+          {screenShares.length > 1 && (
+            <div className="screenshare-tabs">
+              {screenShares.map((s) => (
+                <button
+                  key={s.sid}
+                  className={"screenshare-tab" + (s.sid === selectedScreenShareSid ? " active" : "")}
+                  onClick={() => selectScreenShare(s.sid)}
+                >
+                  🖥️ {s.name}
+                </button>
+              ))}
+            </div>
           )}
 
           {selectedShare && !selectedShare.isLocal && (
             <div className="screenshare-controls">
               <button
                 type="button"
-                className="link-btn screenshare-watch-btn"
+                className={"btn-outline-sm" + (!selectedShare.watching ? " active" : "")}
                 onClick={() => toggleWatchScreenShare(selectedShare.sid)}
                 title={
                   selectedShare.watching
@@ -181,7 +206,19 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
             </div>
           )}
 
-          <div className="screenshare-stage">
+          <div
+            className={
+              "screenshare-stage" +
+              (screenShares.length === 0 ? " empty" : "") +
+              (theaterMode ? " theater" : "")
+            }
+          >
+            {screenShares.length === 0 && (
+              <div className="screenshare-empty">
+                <ScreenShareIcon size={28} />
+                <p>Ninguém está compartilhando a tela agora.</p>
+              </div>
+            )}
             {/* Fica sempre montado (mesmo sem ninguem compartilhando) para o VoiceCallContext
                 ter uma referencia estavel de onde anexar o video quando alguem comecar. */}
             <div

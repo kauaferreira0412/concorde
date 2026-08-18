@@ -121,6 +121,18 @@ export function MaximizeIcon(props) {
   );
 }
 
+/** "Ampliar" (modo largo/teatro) - estagio intermediario antes da tela cheia de verdade,
+    ocupa a largura toda da area central sem sair da pagina. */
+export function WidenIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <polyline points="7 8 3 12 7 16" />
+      <polyline points="17 8 21 12 17 16" />
+      <line x1="3" y1="12" x2="21" y2="12" />
+    </svg>
+  );
+}
+
 export function ImageIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
