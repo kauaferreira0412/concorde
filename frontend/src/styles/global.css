@@ -829,13 +829,50 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
    transmissao de tela selecionada. Acima de 100% (boosted) o preenchimento fica laranja,
    pra deixar claro visualmente que aquilo esta sendo amplificado alem do normal. */
 .volume-slider-row { display: flex; align-items: center; gap: 8px; }
+/* accent-color sozinho estiliza a cor mas nao o TAMANHO do polegar nativo do navegador/SO
+   (em alguns Chrome/Windows sai bem maior que o resto da UI, deixando a linha toda mais alta).
+   Zera a aparencia nativa e desenha um trilho fino + bolinha pequena do zero, igual em qualquer
+   navegador. */
 .volume-slider {
   flex: 1;
-  height: 4px;
-  accent-color: var(--accent);
+  -webkit-appearance: none;
+  appearance: none;
+  height: 14px; /* area de clique confortavel - o trilho visual em si fica bem mais fino (ver track abaixo) */
+  background: transparent;
   cursor: pointer;
 }
-.volume-slider.boosted { accent-color: var(--warning, #e0a032); }
+.volume-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+}
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px; /* centraliza a bolinha de 12px sobre o trilho de 4px */
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-panel-2);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.volume-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+}
+.volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-panel-2);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.volume-slider.boosted::-webkit-slider-thumb { background: var(--warning, #e0a032); box-shadow: 0 0 0 1px var(--warning, #e0a032); }
+.volume-slider.boosted::-moz-range-thumb { background: var(--warning, #e0a032); box-shadow: 0 0 0 1px var(--warning, #e0a032); }
 .volume-slider-value {
   min-width: 36px;
   text-align: right;
