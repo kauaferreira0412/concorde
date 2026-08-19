@@ -3,22 +3,35 @@ import { getSoundEffectsEnabled } from "./audioSettings";
 /**
  * Efeitos sonoros da call (entrar/sair, mutar/desmutar, compartilhar tela). A maioria e'
  * sintetizada via Web Audio API - sem depender de arquivo .mp3 externo, funciona offline,
- * sem licenciamento, sem CORS. O de "entrar na call" e' um .mp3 de verdade (ver
- * public/sounds/join.mp3) - todos respeitam o toggle "Tocar som..." de Configuracoes.
+ * sem licenciamento, sem CORS. Os de "entrar"/"sair" da call sao .mp3 de verdade (ver
+ * public/sounds/join.mp3 e leave.mp3) - todos respeitam o toggle "Tocar som..." de
+ * Configuracoes.
  */
 let audioCtx = null;
 
 // import.meta.env.BASE_URL: "/" no site, "./" no app desktop empacotado (ver vite.config.js) -
-// precisa disso em vez de "/sounds/join.mp3" direto pro caminho funcionar dentro do .exe
-// tambem (que serve os arquivos via app://, nao file:// na raiz).
-let joinAudioEl = null;
-function getJoinAudioEl() {
-  if (!joinAudioEl) {
-    joinAudioEl = new Audio(`${import.meta.env.BASE_URL}sounds/join.mp3`);
-    joinAudioEl.preload = "auto";
-    joinAudioEl.volume = 0.55;
+// precisa disso em vez de "/sounds/<arquivo>" direto pro caminho funcionar dentro do .exe
+// tambem (que serve os arquivos via app://, nao file:// na raiz). Um <audio> por arquivo,
+// criado so' na primeira vez que toca - reaproveitado depois (evita recarregar do zero
+// toda vez que alguem entra/sai da call).
+const fileAudioEls = {};
+function getFileAudioEl(filename) {
+  if (!fileAudioEls[filename]) {
+    const el = new Audio(`${import.meta.env.BASE_URL}sounds/${filename}`);
+    el.preload = "auto";
+    el.volume = 0.55;
+    fileAudioEls[filename] = el;
   }
-  return joinAudioEl;
+  return fileAudioEls[filename];
+}
+
+function playFile(filename) {
+  const el = getFileAudioEl(filename);
+  el.currentTime = 0; // permite tocar de novo mesmo se o anterior ainda nao tinha acabado
+  el.play().catch(() => {
+    // Navegador pode bloquear play() antes de qualquer interacao do usuario na pagina -
+    // sem problema, so nao toca dessa vez.
+  });
 }
 
 function getAudioContext() {
@@ -52,12 +65,7 @@ function playTone(freq, startOffset, duration, gainPeak = 0.16) {
 export function playJoinSound() {
   if (!getSoundEffectsEnabled()) return;
   try {
-    const el = getJoinAudioEl();
-    el.currentTime = 0; // permite tocar de novo mesmo se o anterior ainda nao tinha acabado
-    el.play().catch(() => {
-      // Navegador pode bloquear play() antes de qualquer interacao do usuario na pagina -
-      // sem problema, so nao toca dessa vez.
-    });
+    playFile("join.mp3");
   } catch {
     // idem
   }
@@ -66,8 +74,7 @@ export function playJoinSound() {
 export function playLeaveSound() {
   if (!getSoundEffectsEnabled()) return;
   try {
-    playTone(880, 0, 0.1); // A5
-    playTone(523.25, 0.07, 0.18); // C5 - descendo, sensacao de "saiu"
+    playFile("leave.mp3");
   } catch {
     // idem
   }
