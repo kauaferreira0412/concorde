@@ -74,7 +74,7 @@ export default function ChannelSidebar({
   const voiceChannels = channels.filter((c) => c.type === "VOICE");
   const members = useServerMembers(server?.id, stompClient, stompConnected);
   const onlineCount = members.filter((m) => m.status !== "OFFLINE").length;
-  const { unreadCounts } = useUnreadMessages(
+  const { unreadCounts, mentionedChannels } = useUnreadMessages(
     textChannels,
     selectedChannelId,
     stompClient,
@@ -308,8 +308,17 @@ export default function ChannelSidebar({
                   >
                     <HashIcon size={16} className="channel-item-icon" />
                     {c.name}
-                    {unreadCounts[c.id] > 0 && (
-                      <span className="channel-unread-badge">{unreadCounts[c.id] > 99 ? "99+" : unreadCounts[c.id]}</span>
+                    {(mentionedChannels[c.id] || unreadCounts[c.id] > 0) && (
+                      <span className="channel-item-badges">
+                        {mentionedChannels[c.id] && (
+                          <span className="channel-mention-badge" title="Você foi mencionado aqui">
+                            @
+                          </span>
+                        )}
+                        {unreadCounts[c.id] > 0 && (
+                          <span className="channel-unread-badge">{unreadCounts[c.id] > 99 ? "99+" : unreadCounts[c.id]}</span>
+                        )}
+                      </span>
                     )}
                   </button>
                 ))}

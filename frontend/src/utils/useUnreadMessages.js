@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { subscribeToChannel } from "../ws/chatSocket";
 import { getDesktopNotificationsEnabled } from "./notificationSettings";
+import { mentionsUser } from "./mentions";
 
 const LAST_READ_PREFIX = "chatLastRead_";
 
@@ -24,6 +25,11 @@ function saveLastRead(channelId, messageId) {
  */
 export function useUnreadMessages(textChannels, selectedChannelId, stompClient, stompConnected, currentUsername, onNotificationClick) {
   const [unreadCounts, setUnreadCounts] = useState({}); // channelId -> quantidade
+  // channelId -> true se alguma mensagem NAO LIDA daquele canal menciona voce (@seu_username) -
+  // mostra um "@" destacado do lado do numerozinho de nao lidas (ver ChannelSidebar.jsx), pedido
+  // explicito do usuario pra ficar mais em destaque que uma mencao normal em meio a outras
+  // mensagens nao lidas.
+  const [mentionedChannels, setMentionedChannels] = useState({});
 
   const selectedChannelIdRef = useRef(selectedChannelId);
   useEffect(() => {
@@ -39,6 +45,7 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
     if (!messageId) return;
     saveLastRead(channelId, messageId);
     setUnreadCounts((prev) => (prev[channelId] ? { ...prev, [channelId]: 0 } : prev));
+    setMentionedChannels((prev) => (prev[channelId] ? { ...prev, [channelId]: false } : prev));
   }
 
   // Assim que a lista de canais aparece, calcula o nao-lido inicial comparando o historico
@@ -49,8 +56,11 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
       api.get(`/api/channels/${c.id}/messages`).then(({ data }) => {
         if (cancelled) return;
         const lastRead = loadLastRead(c.id);
-        const unread = data.filter((m) => m.id > lastRead && m.authorUsername !== currentUsername).length;
-        setUnreadCounts((prev) => ({ ...prev, [c.id]: unread }));
+        const unreadMessages = data.filter((m) => m.id > lastRead && m.authorUsername !== currentUsername);
+        setUnreadCounts((prev) => ({ ...prev, [c.id]: unreadMessages.length }));
+        if (unreadMessages.some((m) => mentionsUser(m.content, currentUsername))) {
+          setMentionedChannels((prev) => ({ ...prev, [c.id]: true }));
+        }
       });
     });
     return () => {
@@ -93,6 +103,9 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
           return;
         }
         setUnreadCounts((prev) => ({ ...prev, [c.id]: (prev[c.id] || 0) + 1 }));
+        if (mentionsUser(event.message.content, currentUsername)) {
+          setMentionedChannels((prev) => ({ ...prev, [c.id]: true }));
+        }
         notifyDesktop(c.id, event.message);
       })
     );
@@ -123,5 +136,5 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
     }
   }
 
-  return { unreadCounts, markRead };
+  return { unreadCounts, mentionedChannels, markRead };
 }

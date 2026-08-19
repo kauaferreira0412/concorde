@@ -510,9 +510,27 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   padding: 2px 7px;
   border-radius: var(--radius-pill);
 }
+/* Agrupa o "@" de mencao + o numerozinho de nao lidas, colados na direita do nome do canal -
+   um wrapper so' com margin-left:auto (em vez de cada badge ter o seu) pra eles ficarem juntos
+   um do lado do outro em vez de cada um tentar ocupar o espaco sozinho. */
+.channel-item-badges { margin-left: auto; flex-shrink: 0; display: flex; align-items: center; gap: 4px; }
+/* "Você foi mencionado aqui" - mais chamativo que o numerozinho de nao lidas comum (pedido
+   explicito do usuario: precisa se destacar MAIS que uma mencao perdida em meio a outras
+   mensagens nao lidas), mesma cor de aviso usada pra "mensagem te menciona" no proprio chat
+   (ver .chat-message.mentioned). */
+.channel-mention-badge {
+  background: var(--warning);
+  color: #1a1200;
+  font-size: 11px;
+  font-weight: 800;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .channel-unread-badge {
-  margin-left: auto;
-  flex-shrink: 0;
   background: var(--accent);
   color: #fff;
   font-size: 10.5px;
@@ -522,9 +540,9 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   min-width: 18px;
   text-align: center;
 }
-/* "CONECTADO" ja usa margin-left:auto - se o unread badge tambem aparecer no mesmo item
-   (caso raro, canal de voz nao tem unread hoje) o :not evita os dois disputarem o auto. */
-.channel-item-live + .channel-unread-badge { margin-left: 6px; }
+/* "CONECTADO" ja usa margin-left:auto - se os badges tambem aparecerem no mesmo item (caso
+   raro, canal de voz nao tem unread/mencao hoje) evita os dois disputarem o auto. */
+.channel-item-live + .channel-item-badges { margin-left: 6px; }
 
 /* Lista de quem esta na call, aninhada embaixo do canal de voz na propria sidebar. */
 .channel-voice-participants { padding: 2px 0 4px 12px; display: flex; flex-direction: column; gap: 1px; }
