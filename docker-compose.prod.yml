@@ -50,6 +50,12 @@ services:
       PUBLIC_ORIGIN: https://${DOMAIN}
       GCS_CREDENTIALS_JSON: ${GCS_CREDENTIALS_JSON:-}
       GCS_BUCKET: ${GCS_BUCKET:-}
+      # Versao minima do app desktop (Electron) - quem estiver com versao instalada MENOR
+      # fica bloqueado antes do login (ver DesktopVersionController). Pra forcar todo mundo a
+      # atualizar depois de publicar um instalador novo, so' subir esse numero no .env.prod e
+      # reiniciar o backend (docker compose up -d backend) - nao precisa rebuildar nada.
+      DESKTOP_MIN_VERSION: ${DESKTOP_MIN_VERSION:-0.1.0}
+      DESKTOP_DOWNLOAD_URL: ${DESKTOP_DOWNLOAD_URL:-https://187-127-37-101.sslip.io/login}
     # DNS publico explicito - em algumas VPS o /etc/resolv.conf do host aponta pro
     # stub do systemd-resolved (127.0.0.53), que os containers nao conseguem alcancar,
     # e qualquer chamada de rede pra fora (aqui, a API do Google Cloud Storage) falha

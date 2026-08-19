@@ -44,6 +44,16 @@ app:
     secret: "troque-este-segredo-por-um-valor-forte-de-32-bytes-no-minimo"
     expiration-minutes: 1440
 
+  # Controle de versao do app desktop (Electron) - ver DesktopVersionController. Quem esta
+  # com versao instalada MENOR que essa fica bloqueado ANTES do login, com tela pedindo pra
+  # atualizar (ver UpdateRequiredGate.jsx no frontend). Pra forcar todo mundo a atualizar
+  # depois de publicar uma versao nova (npm run package:desktop, bump em package.json version),
+  # so' subir esse numero aqui (ou a variavel DESKTOP_MIN_VERSION na VPS) - nao precisa mexer
+  # em mais nada, nem reconstruir o instalador de novo.
+  desktop:
+    min-version: ${DESKTOP_MIN_VERSION:0.1.0}
+    download-url: ${DESKTOP_DOWNLOAD_URL:https://187-127-37-101.sslip.io/login}
+
   # Conta de administrador criada automaticamente na primeira subida (se ainda nao existir).
   # E' o UNICO jeito de ter uma primeira conta, ja que o cadastro publico foi removido:
   # so o ADMIN pode criar outros usuarios e servidores dali em diante.

@@ -1,6 +1,8 @@
-const { app, BrowserWindow, protocol, ipcMain, desktopCapturer, net } = require("electron");
+const { app, BrowserWindow, protocol, ipcMain, desktopCapturer, net, shell } = require("electron");
 const path = require("path");
 const { pathToFileURL } = require("url");
+const { spawn } = require("child_process");
+const fs = require("fs");
 
 const APP_PROTOCOL = "concorde"; // concorde://invite/<code> - deep link, registrado no SO
 const DEV_URL = "http://localhost:5173";
@@ -124,6 +126,45 @@ ipcMain.handle("concorde:start-window-audio", async (event, hwnd) => {
 
 ipcMain.handle("concorde:stop-window-audio", () => {
   if (audioCapture) audioCapture.stopCapture();
+});
+
+// Controle de versao (ver UpdateRequiredGate.jsx) - a UI compara isso com o
+// /api/desktop/version do backend ANTES de deixar logar.
+ipcMain.handle("concorde:get-app-version", () => app.getVersion());
+
+// Abre o link de download (site) no navegador PADRAO do usuario, nao numa janela do proprio
+// Concorde - faz mais sentido baixar um instalador novo por fora do app que esta desatualizado
+// (e que a pessoa esta prestes a desinstalar).
+ipcMain.handle("concorde:open-external", (_event, url) => {
+  if (typeof url === "string" && /^https:\/\//.test(url)) shell.openExternal(url);
+});
+
+// Dispara o desinstalador do NSIS (gerado pelo electron-builder, ver "nsis" em package.json) -
+// fica sempre do lado do .exe principal, nomeado "Uninstall <productName>.exe" por padrao. Abre
+// a janela normal do desinstalador (o usuario ainda confirma por la', igual clicando em
+// "Desinstalar" no Painel de Controle) e fecha o Concorde OFERECER pra o desinstalador poder
+// apagar os arquivos sem o processo estar com eles abertos/travados.
+ipcMain.handle("concorde:uninstall", () => {
+  if (process.platform !== "win32" || !app.isPackaged) {
+    return { ok: false, error: "Desinstalação automática só é suportada no instalador Windows." };
+  }
+  // app.getName() le o campo "name" do package.json ("concorde-frontend", tecnico) - o
+  // desinstalador do NSIS e' nomeado com o "productName" ("Concorde"), que e' o mesmo nome do
+  // proprio .exe principal (Concorde.exe) - usar o basename do exe da' o nome certo sem
+  // precisar duplicar "Concorde" cru aqui.
+  const installDir = path.dirname(app.getPath("exe"));
+  const productName = path.basename(app.getPath("exe"), ".exe");
+  const uninstallerPath = path.join(installDir, `Uninstall ${productName}.exe`);
+  if (!fs.existsSync(uninstallerPath)) {
+    return { ok: false, error: `Desinstalador não encontrado (${uninstallerPath}).` };
+  }
+  try {
+    spawn(uninstallerPath, [], { detached: true, stdio: "ignore" }).unref();
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+  app.quit();
+  return { ok: true };
 });
 
 /** concorde://invite/<code>  ->  /invite/<code> dentro do React Router */

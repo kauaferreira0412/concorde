@@ -27,4 +27,11 @@ contextBridge.exposeInMainWorld("concordeDesktop", {
     ipcRenderer.on("concorde:window-audio-chunk", listener);
     return () => ipcRenderer.removeListener("concorde:window-audio-chunk", listener);
   },
+
+  /** Versao instalada (package.json "version", ver electron-builder) - ver UpdateRequiredGate.jsx. */
+  getAppVersion: () => ipcRenderer.invoke("concorde:get-app-version"),
+  /** Abre um link no navegador padrao do SO (nao dentro do proprio Concorde). */
+  openExternal: (url) => ipcRenderer.invoke("concorde:open-external", url),
+  /** Dispara o desinstalador do Windows e fecha o app. {ok:boolean, error?:string} */
+  uninstall: () => ipcRenderer.invoke("concorde:uninstall"),
 });

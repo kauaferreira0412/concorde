@@ -230,6 +230,46 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .auth-card a { color: var(--accent-text); text-decoration: none; font-weight: 600; }
 .auth-card a:hover { text-decoration: underline; }
 
+/* Tela de "atualização necessária" (ver UpdateRequiredGate.jsx) - reaproveita o .auth-card
+   (mesmo card do login), so' com o "logo" trocado por um alerta amarelo e dois botoes de
+   acao cheios em vez de um formulario. */
+.update-required-card { width: 400px; }
+.update-required-icon {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 6px rgba(240, 68, 56, 0.12);
+  margin-bottom: 4px;
+  color: var(--danger);
+}
+.update-required-card > button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 16px;
+  font-size: 14px;
+}
+.update-required-card > button:first-of-type {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: var(--glow-accent);
+  margin-top: 4px;
+}
+.update-required-card > button:first-of-type:hover { background: var(--accent-hover); }
+.update-required-card > button.danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+.update-required-card > button.danger:hover { background: var(--danger-soft); }
+
 /* Secao de destaque "Baixar app para Windows" abaixo do card de login - so' aparece no
    navegador (ver isElectronDesktop em LoginPage.jsx), nunca dentro do proprio app desktop.
    Card proprio (nao um link discreto) pra ficar visivel de verdade, com icone + texto

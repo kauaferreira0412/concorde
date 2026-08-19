@@ -38,7 +38,10 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/api/auth/**", "/ws/**", "/h2-console/**").permitAll()
+                    // /api/desktop/** precisa ser publico - e' checado ANTES do login (ver
+                    // DesktopVersionController/UpdateRequiredGate.jsx), entao ainda nao existe
+                    // token nenhum nessa hora.
+                    .requestMatchers("/api/auth/**", "/api/desktop/**", "/ws/**", "/h2-console/**").permitAll()
                     .anyRequest().authenticated()
             )
             .headers(headers -> headers.frameOptions(frame -> frame.disable())) // necessario para /h2-console
