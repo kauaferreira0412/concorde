@@ -1481,6 +1481,32 @@ img.chat-header-avatar { object-fit: cover; }
 @media (hover: none) {
   .screenshare-tile-stop { opacity: 1; }
 }
+/* Botao de "modo teatro" - por tela, POR ISSO fica dentro do proprio tile (nao no cabecalho
+   da secao) - ativar numa transmissao especifica nao deve afetar as outras. Ao lado do botao
+   de tela cheia, mesmo estilo discreto-ate-o-hover. */
+.screenshare-tile-theater-btn {
+  position: absolute;
+  top: 6px;
+  right: 36px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: rgba(4, 5, 8, 0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.camera-tile:hover .screenshare-tile-theater-btn { opacity: 1; }
+.screenshare-tile-theater-btn:hover { background: rgba(4, 5, 8, 0.8); }
+.screenshare-tile-theater-btn.active { opacity: 1; background: var(--accent); }
+@media (hover: none) {
+  .screenshare-tile-theater-btn { opacity: 1; }
+}
 
 /* Webcams - ao contrario da tela compartilhada (um "palco" so' de cada vez), varias podem
    ficar ligadas ao mesmo tempo, entao aparecem lado a lado em tiles pequenos. O tamanho de
@@ -1500,15 +1526,14 @@ img.chat-header-avatar { object-fit: cover; }
 .camera-tile-xl { width: 340px; height: 191px; }
 /* Tela compartilhada assistida (ou a sua propria, se estiver compartilhando - ve do MESMO
    jeito que quem esta assistindo) - bem maior que webcam, texto/detalhe numa tela precisa de
-   mais espaco pra dar pra ler. So' dois tamanhos (sem zoom manual, pedido explicito do
-   usuario): normal e "modo teatro" (ver theaterMode/WidenIcon em VoiceChannel.jsx). */
+   mais espaco pra dar pra ler. So' dois tamanhos por tile (sem zoom manual, pedido explicito
+   do usuario): normal e "modo teatro" - e' POR TELA (ver theaterSids/WidenIcon em
+   VoiceChannel.jsx), ativar numa transmissao nao mexe nas outras. */
 .screenshare-tile-default { width: 560px; height: 315px; max-width: 100%; }
-/* .camera-grid.theater forca coluna unica (ver abaixo) - o tile de teatro ocupa quase toda a
-   largura disponivel em vez de uma largura fixa, pra acompanhar o tamanho real da area central. */
-.screenshare-tile-theater { width: 100%; max-width: 1600px; aspect-ratio: 16 / 9; height: auto; }
-/* Modo teatro: os quadrados grandes empilham em coluna unica (lado a lado nao caberia mais de
-   um) - o "clique pra assistir" (sempre pequeno) continua lado a lado normalmente entre eles. */
-.camera-grid.theater { flex-direction: column; align-items: flex-start; }
+/* Sempre ocupa a linha toda sozinha (flex-basis:100%) mesmo dentro do .camera-grid flex-wrap
+   normal - com varias transmissoes, uma em modo teatro nao devia tentar dividir espaco na
+   mesma linha que as outras (pequenas ou nao). */
+.screenshare-tile-theater { flex-basis: 100%; width: 100%; max-width: 1600px; aspect-ratio: 16 / 9; height: auto; }
 .camera-tile video {
   width: 100%;
   height: 100%;

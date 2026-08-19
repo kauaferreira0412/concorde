@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useServerMembers } from "../utils/useServerMembers";
 import {
@@ -100,7 +100,7 @@ function CameraTile({ track, name, isLocal, size }) {
  * outra pessoa que voce esta assistindo) abre o controle de volume do audio dela - mesmo padrao
  * do botao direito num participante na sidebar (ver onVolumeMenu/VolumeSlider em VoiceChannel).
  */
-function ScreenShareTile({ share, theaterMode, onToggleWatch, onVolumeMenu }) {
+function ScreenShareTile({ share, theaterMode, onToggleWatch, onToggleTheater, onVolumeMenu }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -145,6 +145,14 @@ function ScreenShareTile({ share, theaterMode, onToggleWatch, onVolumeMenu }) {
     >
       <video ref={videoRef} autoPlay playsInline muted={share.isLocal} onDoubleClick={handleMaximize} />
       <span className="camera-tile-name">{share.name}</span>
+      <button
+        type="button"
+        className={"screenshare-tile-theater-btn" + (theaterMode ? " active" : "")}
+        onClick={onToggleTheater}
+        title={theaterMode ? "Voltar ao tamanho normal" : "Modo teatro (bem maior, so' essa tela)"}
+      >
+        <WidenIcon size={13} />
+      </button>
       <button type="button" className="camera-tile-maximize" onClick={handleMaximize} title="Tela cheia">
         <MaximizeIcon size={13} />
       </button>
@@ -220,17 +228,36 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
   const [cameraSizeIdx, setCameraSizeIdx] = useState(1);
   const cameraSize = CAMERA_SIZES[cameraSizeIdx];
 
-  // "Modo teatro" - so' dois estados (tamanho fixo normal ou bem maior), sem zoom manual
-  // (pedido explicito do usuario). Afeta todos os tiles que estao sendo ASSISTIDOS de verdade
-  // de uma vez (incluindo a sua propria tela, se estiver compartilhando) - o quadrado "clique
-  // pra assistir" continua sempre pequeno (ver ScreenShareTile).
-  const [theaterMode, setTheaterMode] = useState(false);
+  // "Modo teatro" - POR TELA (um Set de sids), nao um botao global: ativar/desativar numa
+  // transmissao nao deve mexer nas outras (bug relatado: parar de assistir uma tirava o modo
+  // teatro de TODAS). So' dois tamanhos por tile (normal ou bem maior), sem zoom manual.
+  const [theaterSids, setTheaterSids] = useState(() => new Set());
   const screenshareSectionRef = useRef(null);
-  const anyScreenShareWatched = screenShares.some((s) => s.watching);
 
+  const toggleTheater = useCallback((sid) => {
+    setTheaterSids((prev) => {
+      const next = new Set(prev);
+      if (next.has(sid)) next.delete(sid);
+      else next.add(sid);
+      return next;
+    });
+  }, []);
+
+  // Limpa sids que pararam de ser assistidos (parou de assistir, ou a pessoa parou de
+  // compartilhar de vez) - senao "modo teatro" ficava "lembrado" preso pra um sid morto.
   useEffect(() => {
-    if (!anyScreenShareWatched) setTheaterMode(false);
-  }, [anyScreenShareWatched]);
+    setTheaterSids((prev) => {
+      if (prev.size === 0) return prev;
+      const watchedSids = new Set(screenShares.filter((s) => s.watching).map((s) => s.sid));
+      let changed = false;
+      const next = new Set();
+      prev.forEach((sid) => {
+        if (watchedSids.has(sid)) next.add(sid);
+        else changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [screenShares]);
 
   function handleScreenshareFullscreen() {
     const videoEl = screenshareSectionRef.current?.querySelector(".screenshare-tile-default video, .screenshare-tile-theater video");
@@ -327,20 +354,10 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
           <div className="voice-section-header">
             <p className="voice-section-title">COMPARTILHAMENTO DE TELA</p>
             <div className="voice-section-header-actions">
-              {anyScreenShareWatched && (
-                <>
-                  <button
-                    type="button"
-                    className={"icon-btn" + (theaterMode ? " icon-btn-active" : "")}
-                    onClick={() => setTheaterMode((v) => !v)}
-                    title={theaterMode ? "Voltar ao tamanho normal" : "Modo teatro (bem maior, ocupa mais largura)"}
-                  >
-                    <WidenIcon size={15} />
-                  </button>
-                  <button type="button" className="icon-btn" onClick={handleScreenshareFullscreen} title="Tela cheia">
-                    <MaximizeIcon size={15} />
-                  </button>
-                </>
+              {screenShares.some((s) => s.watching) && (
+                <button type="button" className="icon-btn" onClick={handleScreenshareFullscreen} title="Tela cheia">
+                  <MaximizeIcon size={15} />
+                </button>
               )}
               <button
                 type="button"
@@ -367,13 +384,15 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
             // Um quadrado por transmissao - quem nao e' voce so' vira video de verdade depois
             // que voce clica pra entrar naquela transmissao especifica (ver ScreenShareTile
             // acima); os que ja estao sendo assistidos (inclusive a sua propria, se estiver
-            // compartilhando) usam o tamanho normal ou o de "modo teatro" - sem zoom manual.
-            <div className={"camera-grid" + (theaterMode ? " theater" : "")} ref={screenshareSectionRef}>
+            // compartilhando) usam o tamanho normal ou o de "modo teatro" (POR TELA, ver
+            // theaterSids acima) - sem zoom manual.
+            <div className="camera-grid" ref={screenshareSectionRef}>
               {screenShares.map((s) => (
                 <ScreenShareTile
                   key={s.sid}
                   share={s}
-                  theaterMode={theaterMode}
+                  theaterMode={theaterSids.has(s.sid)}
+                  onToggleTheater={() => toggleTheater(s.sid)}
                   onToggleWatch={toggleWatchScreenShare}
                   onVolumeMenu={openVolumeMenu}
                 />
