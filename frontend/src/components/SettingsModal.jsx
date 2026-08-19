@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMicLevel } from "../utils/useMicLevel";
 import {
   getNoiseSuppressionEnabled,
@@ -27,7 +28,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import api from "../api/client";
 import Avatar from "./Avatar.jsx";
 import StatusDropdown from "./StatusDropdown.jsx";
-import { BellIcon, KeyboardIcon, MicIcon, UserIcon, XIcon } from "./icons.jsx";
+import { BellIcon, KeyboardIcon, MicIcon, ShieldIcon, UserIcon, XIcon } from "./icons.jsx";
 
 /** Abas da tela de configuracoes - cada uma so' renderiza o seu pedaco (ver SettingsModal). */
 const TABS = [
@@ -36,6 +37,9 @@ const TABS = [
   { id: "atalhos", label: "Atalhos", Icon: KeyboardIcon },
   { id: "notificacoes", label: "Notificações", Icon: BellIcon },
 ];
+// So' aparece pra admin (ver isAdmin abaixo) - fica separada das abas normais porque nao
+// renderiza conteudo aqui dentro, so' leva pro /admin (ver handleTabClick).
+const ADMIN_TAB = { id: "administracao", label: "Administração", Icon: ShieldIcon };
 
 /** Campo de "gravar atalho": clica em Alterar, aperta a combinacao desejada, pronto. */
 function ShortcutRecorder({ value, onChange }) {
@@ -79,8 +83,22 @@ function ShortcutRecorder({ value, onChange }) {
  * Tudo fica salvo no localStorage e vale a partir da proxima call (ver VoiceCallContext.jsx).
  */
 export default function SettingsModal({ onClose }) {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("perfil");
+  const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
+
+  // A aba de administracao nao mostra conteudo aqui dentro - so' fecha as configuracoes e
+  // leva pro painel de verdade (gerenciar contas/usuarios, ver AdminPage.jsx), que ja existe
+  // e e' uma pagina inteira (nao cabe dentro do modal).
+  function handleTabClick(tabId) {
+    if (tabId === "administracao") {
+      onClose();
+      navigate("/admin");
+      return;
+    }
+    setActiveTab(tabId);
+  }
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState("");
   const avatarInputRef = useRef(null);
@@ -310,12 +328,12 @@ export default function SettingsModal({ onClose }) {
 
         <div className="settings-modal-body">
           <nav className="settings-nav">
-            {TABS.map((tab) => (
+            {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 className={"settings-nav-item" + (activeTab === tab.id ? " active" : "")}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabClick(tab.id)}
               >
                 <tab.Icon size={16} />
                 {tab.label}
