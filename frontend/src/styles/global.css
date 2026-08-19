@@ -1505,7 +1505,7 @@ img.chat-header-avatar { object-fit: cover; }
 .screenshare-tile-default { width: 560px; height: 315px; max-width: 100%; }
 /* .camera-grid.theater forca coluna unica (ver abaixo) - o tile de teatro ocupa quase toda a
    largura disponivel em vez de uma largura fixa, pra acompanhar o tamanho real da area central. */
-.screenshare-tile-theater { width: 100%; max-width: 1100px; aspect-ratio: 16 / 9; height: auto; }
+.screenshare-tile-theater { width: 100%; max-width: 1600px; aspect-ratio: 16 / 9; height: auto; }
 /* Modo teatro: os quadrados grandes empilham em coluna unica (lado a lado nao caberia mais de
    um) - o "clique pra assistir" (sempre pequeno) continua lado a lado normalmente entre eles. */
 .camera-grid.theater { flex-direction: column; align-items: flex-start; }
