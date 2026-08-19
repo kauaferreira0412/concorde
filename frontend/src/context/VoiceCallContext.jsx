@@ -571,8 +571,29 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         setSpeakingIds(new Set(speakers.map((p) => p.identity)));
       });
       // Mostra o icone de "mudo" pra QUALQUER participante (nao so voce mesmo).
-      newRoom.on(RoomEvent.TrackMuted, () => refreshParticipants(newRoom));
-      newRoom.on(RoomEvent.TrackUnmuted, () => refreshParticipants(newRoom));
+      newRoom.on(RoomEvent.TrackMuted, (pub, participant) => {
+        refreshParticipants(newRoom);
+        // setCameraEnabled(false) NAO despublica o track (diferente de tela compartilhada) -
+        // so' muta ele, mantendo a publicacao viva (ver toggleCamera). Sem isso aqui, o tile
+        // da camera continuava na tela mostrando um quadrado preto congelado depois de
+        // desligar a camera, porque LocalTrackUnpublished/TrackUnsubscribed nunca disparava.
+        if (pub.source === Track.Source.Camera) {
+          cameraTracksRef.current.delete(participant.identity);
+          syncCameraTracks();
+        }
+      });
+      newRoom.on(RoomEvent.TrackUnmuted, (pub, participant) => {
+        refreshParticipants(newRoom);
+        if (pub.source === Track.Source.Camera && pub.track) {
+          const isLocal = participant.identity === newRoom.localParticipant.identity;
+          cameraTracksRef.current.set(participant.identity, {
+            track: pub.track,
+            name: isLocal ? `${participant.name || participant.identity} (você)` : participant.name || participant.identity,
+            isLocal,
+          });
+          syncCameraTracks();
+        }
+      });
 
       try {
         await newRoom.connect(data.wsUrl, data.token);
@@ -631,6 +652,29 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     await disconnectInternal();
   }
 
+  /**
+   * Restaura o volume de voz/transmissao de tela de todo mundo pro que estava configurado
+   * antes de ensurdecer (ou 100% por padrao). Importante: precisa ser via track.setVolume(),
+   * nao "el.muted" - com webAudioMix ligado (ver joinChannel) o LiveKit toca o audio por fora
+   * do elemento <audio>, direto pelo Web Audio API, entao mutar o elemento sozinho nao
+   * restaura nada de verdade (esse era o bug: "desmutar enquanto ensurdecido" continuava
+   * sem tocar nada ate' clicar de novo no icone de ensurdecer, que ai' sim passava por aqui).
+   */
+  function restoreListenVolumes(room) {
+    micAudioTracksRef.current.forEach((track, identity) => {
+      track.setVolume((participantVolumesRef.current.get(identity) ?? 100) / 100);
+    });
+    screenAudioTracksRef.current.forEach((track, identity) => {
+      track.setVolume((streamVolumesRef.current.get(identity) ?? 100) / 100);
+    });
+    // Reforco pro caso raro de webAudioMix nao estar disponivel (cai pro elemento nativo).
+    room.remoteParticipants.forEach((participant) => {
+      participant.audioTrackPublications.forEach((pub) => {
+        pub.track?.attachedElements.forEach((el) => (el.muted = false));
+      });
+    });
+  }
+
   /** Tira o ensurdecido sem mexer no microfone (isso quem chama decide) - reaproveitado tanto
    *  pelo botao de ensurdecer/reativar quanto por "desmutar enquanto ensurdecido" (ver toggleMic). */
   function clearDeafened(room) {
@@ -638,11 +682,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     if (activeChannelRef.current && stompClientRef.current && stompConnectedRef.current) {
       publishVoiceDeafenState(stompClientRef.current, activeChannelRef.current.id, false);
     }
-    room.remoteParticipants.forEach((participant) => {
-      participant.audioTrackPublications.forEach((pub) => {
-        pub.track?.attachedElements.forEach((el) => (el.muted = false));
-      });
-    });
+    restoreListenVolumes(room);
   }
 
   async function toggleMic() {
@@ -684,28 +724,19 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
 
     // Ensurdecer zera o volume de TODO audio que voce ouve - voz e audio de transmissao de
     // tela - e, como no Discord, tambem desliga seu proprio microfone; ao reativar, volta
-    // pro estado de mic anterior. Importante: precisa ser via track.setVolume(), nao
-    // "el.muted" - com webAudioMix ligado (ver joinChannel) o LiveKit toca o audio por fora
-    // do elemento <audio>, direto pelo Web Audio API, entao mutar o elemento nao silencia
-    // nada de verdade (era esse o bug: dava pra continuar ouvindo todo mundo ensurdecido).
+    // pro estado de mic anterior. Ver restoreListenVolumes (mesma logica usada quando voce
+    // "desmuta enquanto ensurdecido" pelo botao de microfone, ver clearDeafened/toggleMic).
     if (next) {
       micAudioTracksRef.current.forEach((track) => track.setVolume(0));
       screenAudioTracksRef.current.forEach((track) => track.setVolume(0));
+      room.remoteParticipants.forEach((participant) => {
+        participant.audioTrackPublications.forEach((pub) => {
+          pub.track?.attachedElements.forEach((el) => (el.muted = true));
+        });
+      });
     } else {
-      micAudioTracksRef.current.forEach((track, identity) => {
-        track.setVolume((participantVolumesRef.current.get(identity) ?? 100) / 100);
-      });
-      screenAudioTracksRef.current.forEach((track, identity) => {
-        track.setVolume((streamVolumesRef.current.get(identity) ?? 100) / 100);
-      });
+      restoreListenVolumes(room);
     }
-    // Reforco pro caso raro de webAudioMix nao estar disponivel (cai pro elemento nativo) -
-    // o controle de verdade e' o setVolume() acima.
-    room.remoteParticipants.forEach((participant) => {
-      participant.audioTrackPublications.forEach((pub) => {
-        pub.track?.attachedElements.forEach((el) => (el.muted = next));
-      });
-    });
 
     if (next) {
       micEnabledBeforeDeafenRef.current = micEnabledRef.current;
