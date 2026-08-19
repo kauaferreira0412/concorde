@@ -328,12 +328,28 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
    acontecia antes: sem isso, o tamanho intrinseco da imagem as vezes vencia o 100% dentro
    do flexbox e ela aparecia enorme, cobrindo o resto da tela). */
 .server-icon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.server-icon.active {
+/* Servidor selecionado: SEM borda/glow azul em volta do icone (ficava horrivel por cima de
+   uma foto de verdade, ver feedback do usuario) - so' os sem foto (iniciais) ganham o fundo
+   azul; quem tem foto so' e' indicado pela pilula ao lado (.server-icon-pill), igual Discord. */
+.server-icon.active:not(.has-icon) {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
-  box-shadow: 0 0 0 3px var(--accent-soft);
 }
+.server-icon-wrap { position: relative; }
+.server-icon-pill {
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 0;
+  border-radius: 0 4px 4px 0;
+  background: #fff;
+  transition: height 0.15s ease;
+  pointer-events: none;
+}
+.server-icon-pill.active { height: 22px; }
 .server-icon.add {
   background: transparent;
   border: 1px dashed var(--border);
