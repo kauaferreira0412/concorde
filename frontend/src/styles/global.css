@@ -712,6 +712,9 @@ img.chat-header-avatar { object-fit: cover; }
 .chat-author:hover { text-decoration: underline; }
 .chat-time { font-size: 11px; color: var(--text-muted); }
 .chat-message p { margin: 3px 0 0; font-size: 14.5px; line-height: 1.45; color: var(--text-primary); word-break: break-word; }
+/* Botao "invisivel" so' pra dar clique na imagem (ver ImageLightbox.jsx) - reseta todo o
+   visual padrao de <button> (fundo, borda, padding), sobra so' a imagem em si. */
+.chat-image-btn { background: none; border: none; padding: 0; display: block; }
 .chat-image {
   display: block;
   max-width: min(100%, 360px);
@@ -1390,6 +1393,40 @@ img.chat-header-avatar { object-fit: cover; }
 @media (hover: none) {
   .camera-tile-maximize { opacity: 1; }
 }
+
+/* ============================================================
+   Lightbox (visualizador de imagem em tela cheia - ver ImageLightbox.jsx)
+   ============================================================ */
+.lightbox-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(4, 5, 8, 0.9);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 60px 20px 20px;
+  cursor: zoom-out;
+}
+.lightbox-image {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  cursor: default;
+}
+.lightbox-toolbar {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+.lightbox-toolbar .icon-btn { color: var(--text-secondary); }
+.lightbox-toolbar .icon-btn:hover { color: var(--text-primary); }
 
 /* ============================================================
    Modal

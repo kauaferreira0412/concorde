@@ -7,6 +7,7 @@ import { useServerMembers } from "../utils/useServerMembers";
 import { applyMention, getMentionQuery, mentionsUser, splitMentions } from "../utils/mentions";
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
+import ImageLightbox from "./ImageLightbox.jsx";
 import { CheckIcon, PencilIcon, PlusIcon, ReplyIcon, TrashIcon, XIcon } from "./icons.jsx";
 
 /** @username -> vira um "pill" destacado (mais forte se for voce mesmo) - so reconhece
@@ -45,6 +46,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
   const [editingId, setEditingId] = useState(null);
   const [editingText, setEditingText] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [lightboxImage, setLightboxImage] = useState(null); // url da imagem em tela cheia, null = fechado
   const [replyingTo, setReplyingTo] = useState(null);
   const [mentionQuery, setMentionQuery] = useState(null); // string | null - null = autocomplete fechado
   const [mentionIndex, setMentionIndex] = useState(0);
@@ -328,9 +330,9 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                 <>
                   <MessageText content={m.content} memberUsernames={memberUsernames} myUsername={user?.username} />
                   {m.imageUrl && (
-                    <a href={m.imageUrl} target="_blank" rel="noreferrer">
+                    <button type="button" className="chat-image-btn" onClick={() => setLightboxImage(m.imageUrl)}>
                       <img src={m.imageUrl} alt="Imagem enviada no chat" className="chat-image" />
-                    </a>
+                    </button>
                   )}
                 </>
               )}
@@ -453,6 +455,10 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
           onClose={() => setDeleteTarget(null)}
           onConfirm={() => deleteChatMessage(stompClient, channel.id, deleteTarget.id)}
         />
+      )}
+
+      {lightboxImage && (
+        <ImageLightbox src={lightboxImage} alt="Imagem enviada no chat" onClose={() => setLightboxImage(null)} />
       )}
     </div>
   );
