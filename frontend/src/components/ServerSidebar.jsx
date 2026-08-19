@@ -11,7 +11,7 @@ export default function ServerSidebar({ servers, selectedServerId, onSelect, onC
           title={s.name}
           onClick={() => onSelect(s.id)}
         >
-          {s.name.slice(0, 2).toUpperCase()}
+          {s.iconUrl ? <img src={s.iconUrl} alt="" className="server-icon-img" /> : s.name.slice(0, 2).toUpperCase()}
         </button>
       ))}
       {/* Criar servidor e' exclusivo do administrador */}

@@ -320,6 +320,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   transition: all 0.14s ease;
 }
 .server-icon:hover { border-color: var(--accent); color: var(--text-primary); }
+.server-icon-img { width: 100%; height: 100%; object-fit: cover; border-radius: calc(var(--radius-md) - 1px); }
 .server-icon.active {
   background: var(--accent);
   border-color: var(--accent);
