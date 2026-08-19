@@ -75,12 +75,17 @@ public class VoicePresenceService {
                 current.micEnabled(), deafened, current.forceMuted(), current.forceDeafened()));
     }
 
-    /** Um moderador (ver VoiceModerationController) mutando/desmutando outro membro a força -
-     * ao ligar, tambem reflete micEnabled=false na hora (a presenca bate com a realidade). */
+    /**
+     * Um moderador (ver VoiceModerationController) mutando/desmutando outro membro a força -
+     * micEnabled reflete o resultado final NA HORA (!forceMuted), sem depender do cliente-alvo
+     * mandar de volta um /voice.mic separado confirmando isso. Esse segundo aviso ainda chega
+     * (ver applyForceMute no frontend, que tambem precisa desligar o microfone de verdade no
+     * LiveKit) mas so' repete o mesmo valor - aqui a presenca ja fica correta assim que o
+     * MODERADOR agiu, sem essa segunda viagem de rede no meio pra todo mundo enxergar certo.
+     */
     public void setForceMuted(Long channelId, Long targetUserId, boolean forceMuted) {
         update(channelId, targetUserId, current -> new VoiceParticipantInfo(targetUserId, current.username(),
-                current.avatarUrl(), forceMuted ? false : current.micEnabled(), current.deafened(), forceMuted,
-                current.forceDeafened()));
+                current.avatarUrl(), !forceMuted, current.deafened(), forceMuted, current.forceDeafened()));
     }
 
     public void setForceDeafened(Long channelId, Long targetUserId, boolean forceDeafened) {

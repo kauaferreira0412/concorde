@@ -361,13 +361,16 @@ export default function ChannelSidebar({
                               onContextMenu={(e) => {
                                 if (!canAdjustVolume && !canModerate) return;
                                 e.preventDefault();
+                                // So' guarda a "localizacao" (quem/onde/posicao do clique) - NAO guarda
+                                // forceMuted/forceDeafened aqui: isso e' lido AO VIVO de
+                                // presenceByChannel na hora de renderizar (ver mais abaixo), senao
+                                // o menu ficava com o rotulo "Mutar"/"Desmutar" desatualizado assim
+                                // que o estado mudava (inclusive pela sua propria acao no menu).
                                 setParticipantMenu({
                                   channelId: c.id,
                                   userId: p.userId,
                                   identity,
                                   username: p.username,
-                                  forceMuted: p.forceMuted,
-                                  forceDeafened: p.forceDeafened,
                                   x: e.clientX,
                                   y: e.clientY,
                                 });
@@ -503,6 +506,14 @@ export default function ChannelSidebar({
           const p = participants.find((pp) => pp.identity === participantMenu.identity);
           const canAdjustVolume = !!p && activeChannel?.id === participantMenu.channelId;
           const otherVoiceChannels = voiceChannels.filter((vc) => vc.id !== participantMenu.channelId);
+          // Lido AO VIVO de presenceByChannel (a MESMA fonte que alimenta o icone de mudo na
+          // lista) - nunca de um snapshot antigo, senao o rotulo "Mutar"/"Desmutar" ficava
+          // preso no que era verdade quando o menu abriu, nao no que e' verdade agora.
+          const presenceEntry = (presenceByChannel[participantMenu.channelId] || []).find(
+            (pp) => pp.userId === participantMenu.userId
+          );
+          const isForceMuted = presenceEntry?.forceMuted || false;
+          const isForceDeafened = presenceEntry?.forceDeafened || false;
           if (!canAdjustVolume && !hasAnyModPermission) return null;
           return (
             <div
@@ -530,12 +541,12 @@ export default function ChannelSidebar({
                       type="button"
                       className="participant-mod-btn"
                       onClick={() => {
-                        forceMuteParticipant(participantMenu.channelId, participantMenu.userId, !participantMenu.forceMuted);
+                        forceMuteParticipant(participantMenu.channelId, participantMenu.userId, !isForceMuted);
                         setParticipantMenu(null);
                       }}
                     >
-                      {participantMenu.forceMuted ? <MicIcon size={14} /> : <MicOffIcon size={14} />}
-                      {participantMenu.forceMuted ? "Desmutar" : "Mutar"}
+                      {isForceMuted ? <MicIcon size={14} /> : <MicOffIcon size={14} />}
+                      {isForceMuted ? "Desmutar" : "Mutar"}
                     </button>
                   )}
                   {myServerPermissions.has("DEAFEN_MEMBERS") && (
@@ -543,16 +554,12 @@ export default function ChannelSidebar({
                       type="button"
                       className="participant-mod-btn"
                       onClick={() => {
-                        forceDeafenParticipant(
-                          participantMenu.channelId,
-                          participantMenu.userId,
-                          !participantMenu.forceDeafened
-                        );
+                        forceDeafenParticipant(participantMenu.channelId, participantMenu.userId, !isForceDeafened);
                         setParticipantMenu(null);
                       }}
                     >
-                      {participantMenu.forceDeafened ? <HeadphonesIcon size={14} /> : <HeadphonesOffIcon size={14} />}
-                      {participantMenu.forceDeafened ? "Reativar áudio" : "Ensurdecer"}
+                      {isForceDeafened ? <HeadphonesIcon size={14} /> : <HeadphonesOffIcon size={14} />}
+                      {isForceDeafened ? "Reativar áudio" : "Ensurdecer"}
                     </button>
                   )}
                   {canMove && otherVoiceChannels.length > 0 && (
