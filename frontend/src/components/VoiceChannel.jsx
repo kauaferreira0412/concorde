@@ -15,7 +15,6 @@ import {
   ZoomOutIcon,
 } from "./icons.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
-import Avatar from "./Avatar.jsx";
 import { MemberRow } from "./MemberList.jsx";
 
 // Tamanhos disponiveis pro tile de webcam - "size" vira uma classe CSS (.camera-tile-<size>,
@@ -35,11 +34,9 @@ function formatDuration(totalSeconds) {
 }
 
 /** Cabecalho do canal de voz - nome, subtitulo "Canal de voz · Servidor", badge de "TEMPO
- *  REAL" enquanto conectado, e um "facepile" de quem esta na call (ate' 4, +N o resto). */
-function VoiceHeader({ channel, serverName, live, participants }) {
-  const list = participants || [];
-  const visible = list.slice(0, 4);
-  const extra = list.length - visible.length;
+ *  REAL" enquanto conectado. Sem "facepile" de iniciais aqui (pedido do usuario pra tirar) -
+ *  quem esta na call ja aparece na lista de participantes logo abaixo. */
+function VoiceHeader({ channel, serverName, live }) {
   return (
     <div className="chat-header chat-header-voice">
       <span className="chat-header-icon">
@@ -54,18 +51,10 @@ function VoiceHeader({ channel, serverName, live, participants }) {
           <span className="live-badge-dot" /> TEMPO REAL
         </span>
       )}
-      {live && list.length > 0 && (
-        <div className="chat-header-avatars">
-          {visible.map((p) => (
-            <Avatar key={p.identity} name={p.name} url={p.avatarUrl} className="chat-header-avatar" />
-          ))}
-          {extra > 0 && <span className="chat-header-avatar chat-header-avatar-more">+{extra}</span>}
-        </div>
-      )}
       <button
         type="button"
         className="icon-btn"
-        style={list.length === 0 ? { marginLeft: "auto" } : undefined}
+        style={{ marginLeft: "auto" }}
         title="Ver membros com acesso a esse canal"
         onClick={() => document.getElementById("voice-members-section")?.scrollIntoView({ behavior: "smooth", block: "start" })}
       >
@@ -198,7 +187,7 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
   if (!isThisChannelActive) {
     return (
       <div className="voice-channel">
-        <VoiceHeader channel={channel} serverName={serverName} live={false} participants={[]} />
+        <VoiceHeader channel={channel} serverName={serverName} live={false} />
         <div className="voice-join">
           {activeChannel && activeChannel.id !== channel.id ? (
             <div style={{ textAlign: "center" }}>
@@ -220,7 +209,7 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
 
   return (
     <div className="voice-channel">
-      <VoiceHeader channel={channel} serverName={serverName} live participants={participants} />
+      <VoiceHeader channel={channel} serverName={serverName} live />
 
       <div className="voice-body">
         <section className="voice-section">
