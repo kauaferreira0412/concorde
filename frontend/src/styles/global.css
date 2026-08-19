@@ -556,24 +556,27 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 }
 
 /* Barra de status de voz - so aparece quando conectado a uma call, persiste entre canais.
-   Empilhada (info em cima, botoes embaixo ocupando a largura toda) em vez de tudo numa
-   linha so' - da mais espaco pro nome do canal + nivel do mic e deixa os botoes maiores. */
+   Cartao flutuante com cantos arredondados e borda propria (em vez de uma faixa reta colada
+   na sidebar) + botoes de acao circulares - pra bater com o modelo feito no Figma pelo
+   usuario (mesmos icones/estilo/cores). */
 .voice-status-bar {
+  margin: 8px 8px 0;
   padding: 12px;
   background: var(--bg-elevated);
-  border-top: 1px solid var(--border-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 .voice-status-top { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .voice-status-dot {
   width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex-shrink: 0;
   box-shadow: 0 0 0 3px var(--success-soft);
 }
-.voice-status-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.voice-status-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
 .voice-status-label {
-  font-size: 13.5px; font-weight: 700; color: var(--text-primary);
+  font-size: 13.5px; font-weight: 700; color: var(--success);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .voice-status-channel {
@@ -582,12 +585,34 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 }
 .voice-status-level { color: var(--success); font-weight: 700; }
 .voice-status-level.muted { color: var(--danger); }
-.voice-status-icons { display: flex; align-items: center; gap: 6px; }
-.voice-status-icons .icon-btn { flex: 1; width: auto; }
-/* Botao de sair da call e' sempre vermelho solido (nao so' no hover, como os outros
-   .icon-btn-danger) - e' uma acao permanente/destacada na barra, nao um estado de alternancia. */
-.icon-btn-leave { background: var(--danger); color: #fff; }
-.icon-btn-leave:hover { background: #ff5c6c; }
+/* Ping em ms (ver pingMs no VoiceCallContext, lido de room.engine.client.rtt) - mesma cor
+   verde do "Voz conectada" no modelo do Figma. */
+.voice-status-ping { font-size: 11.5px; font-weight: 700; color: var(--success); flex-shrink: 0; }
+
+.voice-status-icons { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+/* Botoes circulares preenchidos (nao mais quadrados/transparentes como o .icon-btn padrao) -
+   cada um com uma cor de repouso propria, igual ao modelo: microfone/fone ficam num cinza-
+   -azulado neutro ate' entrar em estado de alerta (mutado = vermelho), compartilhar tela ja'
+   nasce destacado em azul (acao "ligada" por natureza), e sair da call e' sempre vermelho solido. */
+.voice-status-icon-btn {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+.voice-status-icon-btn:hover { background: var(--border-soft); color: var(--text-primary); }
+.voice-status-icon-btn.accent { background: var(--accent); color: #fff; }
+.voice-status-icon-btn.accent:hover { background: #4c80ff; }
+.voice-status-icon-btn.active { background: var(--accent); color: #fff; }
+.voice-status-icon-btn.active:hover { background: #4c80ff; }
+.voice-status-icon-btn.danger, .voice-status-icon-btn.leave { background: var(--danger); color: #fff; }
+.voice-status-icon-btn.danger:hover, .voice-status-icon-btn.leave:hover { background: #ff5c6c; }
 
 .user-bar {
   padding: 12px 14px;
@@ -614,7 +639,10 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-preview, img.profile-avatar { object-fit: cover; }
 .user-bar-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .user-bar-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.user-bar-role { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+.user-bar-role {
+  font-size: 10.5px; font-weight: 700; color: var(--success);
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
 .user-bar .admin-badge { flex-shrink: 0; }
 .user-bar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
 

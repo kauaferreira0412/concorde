@@ -52,6 +52,7 @@ export default function ChannelSidebar({
     activeChannel,
     micEnabled,
     micLevel,
+    pingMs,
     deafened,
     screenSharing,
     cameraEnabled,
@@ -430,31 +431,32 @@ export default function ChannelSidebar({
                 </span>
               </span>
             </span>
+            {pingMs != null && <span className="voice-status-ping">{pingMs} ms</span>}
           </div>
           <div className="voice-status-icons">
             <button
-              className={"icon-btn" + (!micEnabled ? " icon-btn-danger" : "")}
+              className={"voice-status-icon-btn" + (!micEnabled ? " danger" : "")}
               onClick={toggleMic}
               title={micEnabled ? "Mutar microfone" : "Desmutar microfone"}
             >
               {micEnabled ? <MicIcon /> : <MicOffIcon />}
             </button>
             <button
-              className={"icon-btn" + (deafened ? " icon-btn-danger" : "")}
+              className={"voice-status-icon-btn" + (deafened ? " danger" : "")}
               onClick={toggleDeafen}
               title={deafened ? "Reativar áudio" : "Ensurdecer (não ouvir ninguém)"}
             >
               {deafened ? <HeadphonesOffIcon /> : <HeadphonesIcon />}
             </button>
             <button
-              className={"icon-btn" + (cameraEnabled ? " icon-btn-active" : "")}
+              className={"voice-status-icon-btn" + (cameraEnabled ? " active" : "")}
               onClick={toggleCamera}
               title={cameraEnabled ? "Desligar câmera" : "Ligar câmera"}
             >
               {cameraEnabled ? <CameraIcon /> : <CameraOffIcon />}
             </button>
             <button
-              className={"icon-btn" + (screenSharing ? " icon-btn-active" : "")}
+              className={"voice-status-icon-btn accent" + (screenSharing ? " active" : "")}
               onClick={toggleScreenShare}
               title={
                 screenSharing
@@ -464,7 +466,7 @@ export default function ChannelSidebar({
             >
               <ScreenShareIcon />
             </button>
-            <button className="icon-btn icon-btn-leave" onClick={leaveChannel} title="Sair da call">
+            <button className="voice-status-icon-btn leave" onClick={leaveChannel} title="Sair da call">
               <PhoneOffIcon />
             </button>
           </div>

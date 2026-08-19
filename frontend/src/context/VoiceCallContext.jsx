@@ -97,6 +97,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   // forceMute/forceDeafen aplicado em mim pode ser revertido por mim mesmo (ver toggleMic/
   // toggleDeafen abaixo).
   const [myPermissions, setMyPermissions] = useState([]);
+  // Ping da conexao de voz (ida-e-volta do sinal ate' o LiveKit, em ms) - mostrado na barra de
+  // status (ver ChannelSidebar.jsx), igual ao print de referencia do usuario. Vem de
+  // room.engine.client.rtt (medido internamente pelo proprio SDK do LiveKit via ping/pong do
+  // canal de sinalizacao), so' fica lendo de novo em intervalo (ver startPingMeter abaixo).
+  const [pingMs, setPingMs] = useState(null);
   const { level: micLevel, start: startMicMeter, stop: stopMicMeter } = useMicLevel();
 
   const roomRef = useRef(null);
@@ -133,6 +138,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   // (regra pedida explicitamente: "o alvo so' pode se livrar se tiver permissao tambem").
   const forceMutedRef = useRef(false);
   const forceDeafenedRef = useRef(false);
+  const pingIntervalRef = useRef(null);
 
   // "Fonte da verdade" pras funcoes assincronas - sempre atualizados junto com o setState
   // correspondente, nunca via useEffect (evita qualquer janela de tempo desatualizada).
@@ -183,6 +189,25 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     setCameraEnabledState(value);
   }
 
+  /** Le room.engine.client.rtt a cada 2s (API interna do SDK, mas estavel - o proprio LiveKit
+   *  ja mede isso via ping/pong do canal de sinalizacao, nao precisamos reinventar). */
+  function startPingMeter(room) {
+    stopPingMeter();
+    const read = () => {
+      const rtt = room?.engine?.client?.rtt;
+      setPingMs(typeof rtt === "number" && rtt > 0 ? rtt : null);
+    };
+    read();
+    pingIntervalRef.current = setInterval(read, 2000);
+  }
+  function stopPingMeter() {
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
+    }
+    setPingMs(null);
+  }
+
   function syncCameraTracks() {
     setCameraTracks(
       [...cameraTracksRef.current.entries()].map(([identity, v]) => ({ identity, ...v }))
@@ -208,6 +233,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     return () => {
       roomRef.current?.disconnect();
       stopMicMeter();
+      stopPingMeter();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -476,6 +502,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     setCameraTracks([]);
     setCameraEnabled(false);
     stopMicMeter();
+    stopPingMeter();
     setConnected(false);
     setActiveChannel(null);
     setParticipants([]);
@@ -674,6 +701,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       setActiveChannel(channel);
       saveActiveChannel(channel);
       setConnected(true);
+      startPingMeter(newRoom);
       // Punicao GRAVADA (ver Membership no backend) - se voce ja' estava mutado/ensurdecido a
       // força antes de sair, entra de novo na call ja' assim, ate' alguem com permissao tirar
       // (pedido explicito do usuario: sair/entrar nao pode "resetar" isso).
@@ -1114,6 +1142,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         participants,
         speakingIds,
         micLevel,
+        pingMs,
         screenShares,
         selectedScreenShareSid,
         selectScreenShare,
