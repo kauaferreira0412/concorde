@@ -1,6 +1,10 @@
 package com.codagis.discordclone.controller;
 
+import com.codagis.discordclone.domain.Channel;
+import com.codagis.discordclone.domain.Membership;
 import com.codagis.discordclone.dto.VoiceDtos.VoiceTokenResponse;
+import com.codagis.discordclone.repository.ChannelRepository;
+import com.codagis.discordclone.repository.MembershipRepository;
 import com.codagis.discordclone.repository.UserRepository;
 import com.codagis.discordclone.security.CurrentUser;
 import com.codagis.discordclone.service.DisplayNameService;
@@ -18,14 +22,19 @@ public class VoiceController {
     private final LiveKitService liveKitService;
     private final CurrentUser currentUser;
     private final UserRepository userRepository;
+    private final ChannelRepository channelRepository;
+    private final MembershipRepository membershipRepository;
     private final VoicePresenceService voicePresenceService;
     private final DisplayNameService displayNameService;
 
     public VoiceController(LiveKitService liveKitService, CurrentUser currentUser, UserRepository userRepository,
+                            ChannelRepository channelRepository, MembershipRepository membershipRepository,
                             VoicePresenceService voicePresenceService, DisplayNameService displayNameService) {
         this.liveKitService = liveKitService;
         this.currentUser = currentUser;
         this.userRepository = userRepository;
+        this.channelRepository = channelRepository;
+        this.membershipRepository = membershipRepository;
         this.voicePresenceService = voicePresenceService;
         this.displayNameService = displayNameService;
     }
@@ -51,6 +60,20 @@ public class VoiceController {
         String identity = "user-" + userId;
         String token = liveKitService.generateAccessToken(room, identity, displayName, avatarUrl);
 
-        return new VoiceTokenResponse(token, liveKitService.getWsUrl(), room, identity);
+        // Punicao GRAVADA (ver Membership.forceMuted/forceDeafened) - continua valendo mesmo
+        // entrando de novo na call, ate' alguem com permissao tirar (pedido explicito do
+        // usuario: sair/entrar nao pode "resetar" isso).
+        Channel channel = channelRepository.findById(channelId).orElse(null);
+        boolean forceMuted = false;
+        boolean forceDeafened = false;
+        if (channel != null) {
+            Membership membership = membershipRepository.findByServerIdAndUserId(channel.getServerId(), userId).orElse(null);
+            if (membership != null) {
+                forceMuted = membership.isForceMuted();
+                forceDeafened = membership.isForceDeafened();
+            }
+        }
+
+        return new VoiceTokenResponse(token, liveKitService.getWsUrl(), room, identity, forceMuted, forceDeafened);
     }
 }

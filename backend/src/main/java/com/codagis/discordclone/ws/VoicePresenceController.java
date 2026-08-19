@@ -1,8 +1,10 @@
 package com.codagis.discordclone.ws;
 
 import com.codagis.discordclone.domain.Channel;
+import com.codagis.discordclone.domain.Membership;
 import com.codagis.discordclone.domain.ServerPermission;
 import com.codagis.discordclone.repository.ChannelRepository;
+import com.codagis.discordclone.repository.MembershipRepository;
 import com.codagis.discordclone.repository.UserRepository;
 import com.codagis.discordclone.service.DisplayNameService;
 import com.codagis.discordclone.service.PermissionService;
@@ -26,15 +28,17 @@ public class VoicePresenceController {
     private final VoicePresenceService presenceService;
     private final UserRepository userRepository;
     private final ChannelRepository channelRepository;
+    private final MembershipRepository membershipRepository;
     private final DisplayNameService displayNameService;
     private final PermissionService permissionService;
 
     public VoicePresenceController(VoicePresenceService presenceService, UserRepository userRepository,
-                                    ChannelRepository channelRepository, DisplayNameService displayNameService,
-                                    PermissionService permissionService) {
+                                    ChannelRepository channelRepository, MembershipRepository membershipRepository,
+                                    DisplayNameService displayNameService, PermissionService permissionService) {
         this.presenceService = presenceService;
         this.userRepository = userRepository;
         this.channelRepository = channelRepository;
+        this.membershipRepository = membershipRepository;
         this.displayNameService = displayNameService;
         this.permissionService = permissionService;
     }
@@ -52,7 +56,20 @@ public class VoicePresenceController {
         // dentro da call.
         String displayName = displayNameService.resolveForChannel(channelId, userId);
         String avatarUrl = user.map(u -> u.getAvatarUrl()).orElse(null);
-        presenceService.join(channelId, sessionId, userId, displayName, avatarUrl);
+        // Punicao GRAVADA (ver Membership.forceMuted/forceDeafened) - entra na call ja'
+        // refletindo isso, em vez de sempre comecar "limpo" (o que deixava sair/entrar
+        // "resetar" a punicao - pedido explicito do usuario pra isso NAO acontecer).
+        boolean forceMuted = false;
+        boolean forceDeafened = false;
+        Channel channel = channelRepository.findById(channelId).orElse(null);
+        if (channel != null) {
+            Membership membership = membershipRepository.findByServerIdAndUserId(channel.getServerId(), userId).orElse(null);
+            if (membership != null) {
+                forceMuted = membership.isForceMuted();
+                forceDeafened = membership.isForceDeafened();
+            }
+        }
+        presenceService.join(channelId, sessionId, userId, displayName, avatarUrl, forceMuted, forceDeafened);
     }
 
     @MessageMapping("/channel.{channelId}.voice.leave")

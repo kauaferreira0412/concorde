@@ -12,8 +12,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * Registro em memoria de "quem esta em qual canal de voz agora", para TODOS os membros
  * do servidor verem isso na barra lateral (nao so quem ja entrou na call, como no LiveKit).
  * Nao precisa de banco - e' presenca efemera, some quando o processo reinicia ou o usuario
- * desconecta o WebSocket (isso inclui forceMuted/forceDeafened: sao "por sessao de call",
- * nao ficam gravados - sair e entrar de novo no canal reseta, igual mic/deafen normais).
+ * desconecta o WebSocket. forceMuted/forceDeafened aqui sao so' o REFLEXO em memoria, pra
+ * broadcast rapido - a punicao em si e' GRAVADA em Membership (ver VoiceModerationController/
+ * VoicePresenceController.join) e sobrevive a sair/entrar de novo na call, so' essa copia
+ * aqui e' que se perde e e' recarregada do banco a cada join().
  */
 @Service
 public class VoicePresenceService {
@@ -30,9 +32,18 @@ public class VoicePresenceService {
         this.messagingTemplate = messagingTemplate;
     }
 
-    public void join(Long channelId, String sessionId, Long userId, String username, String avatarUrl) {
+    /**
+     * forceMuted/forceDeafened aqui vem de uma punicao GRAVADA (ver Membership no
+     * VoicePresenceController.join) - se a pessoa ja' estava mutada/ensurdecida a força antes
+     * de sair, entra na call ja' assim, em vez de sempre "limpo". Ensurdecer implica mutado
+     * (mesma regra usada em VoicePresenceService.setForceDeafened).
+     */
+    public void join(Long channelId, String sessionId, Long userId, String username, String avatarUrl,
+                      boolean forceMuted, boolean forceDeafened) {
+        boolean effectiveForceMuted = forceMuted || forceDeafened;
         byChannel.computeIfAbsent(channelId, k -> new ConcurrentHashMap<>())
-                .put(userId, new VoiceParticipantInfo(userId, username, avatarUrl, true, false, false, false));
+                .put(userId, new VoiceParticipantInfo(userId, username, avatarUrl, !effectiveForceMuted, forceDeafened,
+                        effectiveForceMuted, forceDeafened));
         sessionChannel.put(sessionId, channelId);
         sessionUser.put(sessionId, userId);
         broadcast(channelId);

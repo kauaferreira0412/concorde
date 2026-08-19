@@ -242,7 +242,7 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
             <span className="mic-meter-value">{micEnabled ? `${micLevel}%` : "—"}</span>
           </div>
           <p className="voice-hint">
-            Fale perto do microfone — a barra acima deve se mexer instantaneamente. Use os ícones 🎤/🎧 na barra
+            Fale perto do microfone — a barra acima deve se mexer instantaneamente. Use os ícones na barra
             inferior esquerda para mutar ou ensurdecer.
           </p>
         </section>

@@ -2,6 +2,7 @@ package com.codagis.discordclone.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -41,6 +42,25 @@ public class Membership {
     @Column(name = "role_id")
     @Builder.Default
     private Set<Long> roleIds = new HashSet<>();
+
+    /** Mutado/ensurdecido a força NESSE servidor por um moderador (ver ServerPermission.
+     * MUTE_MEMBERS/DEAFEN_MEMBERS) - diferente do mic/deafen "normais" (esses sao efemeros,
+     * por sessao de call, ver VoicePresenceService). Isso aqui e' GRAVADO: continua valendo
+     * mesmo se a pessoa sair da call e entrar de novo, ate' alguem com permissao tirar -
+     * pedido explicito do usuario ("ele deve sair e entrar e o efeito deve ficar do mesmo
+     * jeito"). Ensurdecer a força tambem seta forceMuted=true junto (ver
+     * VoiceModerationController) - a pessoa nao fala nem ouve enquanto isso estiver ligado.
+     * @ColumnDefault e' essencial aqui pelo mesmo motivo de User.status: a tabela ja tem
+     * linhas em producao, Postgres nao aceita ALTER TABLE ADD COLUMN NOT NULL sem um DEFAULT. */
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean forceMuted = false;
+
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean forceDeafened = false;
 
     @Builder.Default
     private Instant joinedAt = Instant.now();

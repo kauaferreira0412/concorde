@@ -1,14 +1,17 @@
 package com.codagis.discordclone.ws;
 
 import com.codagis.discordclone.domain.Channel;
+import com.codagis.discordclone.domain.Membership;
 import com.codagis.discordclone.domain.ServerPermission;
 import com.codagis.discordclone.repository.ChannelRepository;
+import com.codagis.discordclone.repository.MembershipRepository;
 import com.codagis.discordclone.service.PermissionService;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.Principal;
 
@@ -25,13 +28,16 @@ import java.security.Principal;
 public class VoiceModerationController {
 
     private final ChannelRepository channelRepository;
+    private final MembershipRepository membershipRepository;
     private final PermissionService permissionService;
     private final VoicePresenceService presenceService;
     private final SimpMessagingTemplate messagingTemplate;
 
-    public VoiceModerationController(ChannelRepository channelRepository, PermissionService permissionService,
-                                      VoicePresenceService presenceService, SimpMessagingTemplate messagingTemplate) {
+    public VoiceModerationController(ChannelRepository channelRepository, MembershipRepository membershipRepository,
+                                      PermissionService permissionService, VoicePresenceService presenceService,
+                                      SimpMessagingTemplate messagingTemplate) {
         this.channelRepository = channelRepository;
+        this.membershipRepository = membershipRepository;
         this.permissionService = permissionService;
         this.presenceService = presenceService;
         this.messagingTemplate = messagingTemplate;
@@ -68,28 +74,49 @@ public class VoiceModerationController {
         broadcast(channelId, new VoiceControlEvent("KICK", payload.targetUserId(), null, null, null, null));
     }
 
+    /** Punicao GRAVADA (Membership) - continua valendo mesmo se a pessoa sair e entrar de
+     *  novo na call, ate' alguem com permissao tirar (pedido explicito do usuario). */
+    @Transactional
     @MessageMapping("/channel.{channelId}.voice.force-mute")
     public void forceMute(@DestinationVariable Long channelId, ForceMutePayload payload, Principal principal) {
         Channel channel = requireChannel(channelId);
         permissionService.assertHas(channel.getServerId(), userIdOf(principal), ServerPermission.MUTE_MEMBERS);
+        persistForceState(channel.getServerId(), payload.targetUserId(), payload.muted(), null);
         if (!presenceService.isPresent(channelId, payload.targetUserId())) {
-            return;
+            return; // gravado mesmo assim - so' nao tem ninguem pra avisar agora
         }
         presenceService.setForceMuted(channelId, payload.targetUserId(), payload.muted());
         broadcast(channelId, new VoiceControlEvent("FORCE_MUTE", payload.targetUserId(), null, null, payload.muted(), null));
     }
 
     /** Ensurdecer a força tambem muta o microfone junto (ver VoicePresenceService.setForceDeafened -
-     *  DEAFEN_MEMBERS e' a unica permissao exigida aqui, mesmo mutando tambem). */
+     *  DEAFEN_MEMBERS e' a unica permissao exigida aqui, mesmo mutando tambem). Tambem gravado
+     *  (Membership), mesmo motivo do forceMute acima. */
+    @Transactional
     @MessageMapping("/channel.{channelId}.voice.force-deafen")
     public void forceDeafen(@DestinationVariable Long channelId, ForceDeafenPayload payload, Principal principal) {
         Channel channel = requireChannel(channelId);
         permissionService.assertHas(channel.getServerId(), userIdOf(principal), ServerPermission.DEAFEN_MEMBERS);
+        persistForceState(channel.getServerId(), payload.targetUserId(), payload.deafened(), payload.deafened());
         if (!presenceService.isPresent(channelId, payload.targetUserId())) {
             return;
         }
         presenceService.setForceDeafened(channelId, payload.targetUserId(), payload.deafened());
         broadcast(channelId, new VoiceControlEvent("FORCE_DEAFEN", payload.targetUserId(), null, null, null, payload.deafened()));
+    }
+
+    /** forceDeafened == null quando e' so' um mute independente (nao mexe no ensurdecido
+     *  gravado); != null quando vem do force-deafen (seta os dois - ensurdecer implica mudo). */
+    private void persistForceState(Long serverId, Long targetUserId, boolean forceMuted, Boolean forceDeafened) {
+        Membership membership = membershipRepository.findByServerIdAndUserId(serverId, targetUserId).orElse(null);
+        if (membership == null) {
+            return; // nao e' mais membro desse servidor - nada pra gravar
+        }
+        membership.setForceMuted(forceMuted);
+        if (forceDeafened != null) {
+            membership.setForceDeafened(forceDeafened);
+        }
+        membershipRepository.save(membership);
     }
 
     private Channel requireChannel(Long channelId) {

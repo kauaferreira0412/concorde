@@ -674,9 +674,12 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       setActiveChannel(channel);
       saveActiveChannel(channel);
       setConnected(true);
-      setDeafened(false);
-      forceMutedRef.current = false;
-      forceDeafenedRef.current = false;
+      // Punicao GRAVADA (ver Membership no backend) - se voce ja' estava mutado/ensurdecido a
+      // força antes de sair, entra de novo na call ja' assim, ate' alguem com permissao tirar
+      // (pedido explicito do usuario: sair/entrar nao pode "resetar" isso).
+      forceMutedRef.current = data.forceMuted;
+      forceDeafenedRef.current = data.forceDeafened;
+      setDeafened(data.forceDeafened);
       if (channel.serverId) fetchMyPermissions(channel.serverId);
       if (stompClientRef.current && stompConnectedRef.current) {
         publishVoiceJoin(stompClientRef.current, channel.id);
@@ -688,17 +691,23 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       }
       playJoinSound(); // voce tambem ouve quando VOCE entra numa call, nao so quando os outros entram
 
-      try {
-        await newRoom.localParticipant.setMicrophoneEnabled(true);
-        setMicEnabled(true);
-        const micPub = newRoom.localParticipant.getTrackPublication(Track.Source.Microphone);
-        if (micPub?.track?.mediaStreamTrack) startMicMeter(micPub.track.mediaStreamTrack);
-      } catch (err) {
+      if (data.forceMuted || data.forceDeafened) {
+        // Mutado/ensurdecido a força - nem tenta ligar o microfone (fica sem publicar audio
+        // nenhum, nao so' "ligado e desligado de novo em seguida").
         setMicEnabled(false);
-        showAlert(
-          "Conectado, mas não consegui acessar seu microfone (permissão negada ou nenhum dispositivo encontrado): " +
-            err.message
-        );
+      } else {
+        try {
+          await newRoom.localParticipant.setMicrophoneEnabled(true);
+          setMicEnabled(true);
+          const micPub = newRoom.localParticipant.getTrackPublication(Track.Source.Microphone);
+          if (micPub?.track?.mediaStreamTrack) startMicMeter(micPub.track.mediaStreamTrack);
+        } catch (err) {
+          setMicEnabled(false);
+          showAlert(
+            "Conectado, mas não consegui acessar seu microfone (permissão negada ou nenhum dispositivo encontrado): " +
+              err.message
+          );
+        }
       }
       // So agora (depois do microfone ja ter sido ligado/negado de verdade) que a lista de
       // participantes reflete o estado real - antes disso ela mostrava "mudo" por engano,
