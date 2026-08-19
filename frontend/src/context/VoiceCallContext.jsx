@@ -779,9 +779,16 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     }
   }
 
-  /** Mesma ideia pro ensurdecido a força - libera/aplica de verdade nos dois sentidos. */
+  /**
+   * Mesma ideia pro ensurdecido a força - libera/aplica de verdade nos dois sentidos.
+   * Ensurdecer TAMBEM tranca o microfone (forceMutedRef junto) - enquanto isso estiver
+   * ligado, a pessoa nao fala nem ouve, e nem consegue se desmutar sozinha so' porque o
+   * "Ensurdecer" e o "Mutar" sao botoes diferentes (pedido explicito do usuario). Libera os
+   * dois juntos tambem, ja que o mute nesse caso e' so' consequencia do ensurdecido.
+   */
   async function applyForceDeafen(deafened) {
     forceDeafenedRef.current = deafened;
+    forceMutedRef.current = deafened;
     if (roomRef.current && deafenedRef.current !== deafened) {
       await toggleDeafen();
     }
@@ -791,8 +798,15 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     const room = roomRef.current;
     if (!room) return;
     const next = !micEnabledRef.current;
-    // Um moderador te mutou a força (ver applyForceMute) - so' consegue se desmutar sozinho
-    // se voce TAMBEM tiver permissao de mutar gente (regra pedida explicitamente pelo usuario).
+    // Um moderador te mutou a força (ver applyForceMute), OU te ensurdeceu (que tranca o mic
+    // junto, ver applyForceDeafen) - so' consegue se desmutar sozinho se voce TAMBEM tiver a
+    // permissao correspondente (regra pedida explicitamente pelo usuario).
+    if (next && forceDeafenedRef.current && !myPermissionsRef.current.has("DEAFEN_MEMBERS")) {
+      showAlert(
+        "Você foi ensurdecido por um moderador - isso também tranca seu microfone. Só quem também tem permissão de ensurdecer membros consegue reverter."
+      );
+      return;
+    }
     if (next && forceMutedRef.current && !myPermissionsRef.current.has("MUTE_MEMBERS")) {
       showAlert("Você foi mutado por um moderador - só quem também tem permissão de mutar membros consegue reverter isso.");
       return;

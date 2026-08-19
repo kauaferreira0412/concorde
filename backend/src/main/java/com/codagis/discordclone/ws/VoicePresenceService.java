@@ -88,10 +88,17 @@ public class VoicePresenceService {
                 current.avatarUrl(), !forceMuted, current.deafened(), forceMuted, current.forceDeafened()));
     }
 
+    /**
+     * Ensurdecer a força TAMBEM muta o microfone - enquanto estiver ligado, a pessoa nao fala
+     * nem ouve (pedido explicito do usuario: "se eu ensurdecer ele direto, ele tambem nao vai
+     * conseguir se desmutar" - igual o Discord de verdade). Liberar libera os dois juntos.
+     * deafened/micEnabled/forceMuted refletem o resultado final NA HORA (mesmo motivo do
+     * setForceMuted acima - nao espera nenhuma mensagem de volta do cliente-alvo pra ficar
+     * certo em todo lugar que mostra isso).
+     */
     public void setForceDeafened(Long channelId, Long targetUserId, boolean forceDeafened) {
         update(channelId, targetUserId, current -> new VoiceParticipantInfo(targetUserId, current.username(),
-                current.avatarUrl(), current.micEnabled(), forceDeafened ? true : current.deafened(),
-                current.forceMuted(), forceDeafened));
+                current.avatarUrl(), !forceDeafened, forceDeafened, forceDeafened, forceDeafened));
     }
 
     public boolean isForceMuted(Long channelId, Long userId) {

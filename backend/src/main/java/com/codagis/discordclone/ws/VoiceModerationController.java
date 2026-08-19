@@ -79,6 +79,8 @@ public class VoiceModerationController {
         broadcast(channelId, new VoiceControlEvent("FORCE_MUTE", payload.targetUserId(), null, null, payload.muted(), null));
     }
 
+    /** Ensurdecer a força tambem muta o microfone junto (ver VoicePresenceService.setForceDeafened -
+     *  DEAFEN_MEMBERS e' a unica permissao exigida aqui, mesmo mutando tambem). */
     @MessageMapping("/channel.{channelId}.voice.force-deafen")
     public void forceDeafen(@DestinationVariable Long channelId, ForceDeafenPayload payload, Principal principal) {
         Channel channel = requireChannel(channelId);
