@@ -9,6 +9,7 @@ import {
   MicOffIcon,
   ScreenShareIcon,
   VolumeIcon,
+  WidenIcon,
   ZoomInIcon,
   ZoomOutIcon,
 } from "./icons.jsx";
@@ -18,12 +19,6 @@ import { MemberRow } from "./MemberList.jsx";
 // ver global.css). Comeca em "md" (tamanho de antes), dá pra aumentar/diminuir pelos botoes
 // no cabecalho da secao (afeta TODOS os tiles de uma vez, ver CAMERA_SIZES/cameraSize abaixo).
 const CAMERA_SIZES = ["sm", "md", "lg", "xl"];
-
-// Mesma ideia, so' que pra tela compartilhada (.screenshare-tile-<size>, ver global.css) - bem
-// maior que os tamanhos de camera, porque texto/detalhe numa tela precisa de mais espaco pra
-// dar pra ler (antes ficava do mesmo tamanho fixo do tile de camera, reportado como "minusculo"
-// e sem como aumentar). Comeca em "lg".
-const SCREEN_SIZES = ["md", "lg", "xl", "xxl"];
 
 // Quantidade de barrinhas do medidor de microfone (estilo equalizador) - puramente visual,
 // so' controla a resolucao do "preenchimento" (ver mic-meter-segments em VoiceChannel).
@@ -94,15 +89,15 @@ function CameraTile({ track, name, isLocal, size }) {
 
 /**
  * Um quadrado por transmissao de tela ativa. Enquanto ninguem escolheu assistir aquela
- * transmissao especifica (isLocal e' sempre "assistida", e' a sua propria), o quadrado fica
- * num tamanho pequeno e fixo (so' um "escolher" clicavel, com o nome de quem compartilha no
- * centro - print de referencia do usuario) - clicar nele e' o unico jeito de comecar a baixar
- * aquele video (ver toggleWatchScreenShare/watchedShareIdentitiesRef no VoiceCallContext).
- * Assistindo (ou e' a sua propria tela), o tile usa "size" (ver SCREEN_SIZES em VoiceChannel -
- * bem maior que o de camera, tela precisa de mais espaco pra dar pra ler) e ganha zoom
- * proprio nos botoes +/- do cabecalho da secao.
+ * transmissao especifica (isLocal e' sempre "assistida", e' a sua propria - quem compartilha
+ * ve a propria previa do MESMO jeito que quem esta assistindo, pedido explicito do usuario),
+ * o quadrado fica num tamanho pequeno e fixo (so' um "escolher" clicavel, com o nome de quem
+ * compartilha no centro) - clicar nele e' o unico jeito de comecar a baixar aquele video (ver
+ * toggleWatchScreenShare/watchedShareIdentitiesRef no VoiceCallContext). Assistindo, o tile usa
+ * um tamanho fixo (bem maior que o de camera) OU o tamanho de "modo teatro" (ver theaterMode em
+ * VoiceChannel) - sem zoom manual, so' esses dois estados.
  */
-function ScreenShareTile({ share, size, onToggleWatch }) {
+function ScreenShareTile({ share, theaterMode, onToggleWatch }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -134,7 +129,7 @@ function ScreenShareTile({ share, size, onToggleWatch }) {
   }
 
   return (
-    <div className={"camera-tile screenshare-tile-" + size}>
+    <div className={"camera-tile " + (theaterMode ? "screenshare-tile-theater" : "screenshare-tile-default")}>
       <video ref={videoRef} autoPlay playsInline muted={share.isLocal} onDoubleClick={handleMaximize} />
       <span className="camera-tile-name">{share.name}</span>
       <button type="button" className="camera-tile-maximize" onClick={handleMaximize} title="Tela cheia">
@@ -184,11 +179,23 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
   const [cameraSizeIdx, setCameraSizeIdx] = useState(1);
   const cameraSize = CAMERA_SIZES[cameraSizeIdx];
 
-  // Indice em SCREEN_SIZES - comeca em "lg" (index 1), maior que o tamanho inicial de camera
-  // (tela precisa de mais espaco). Afeta so' os tiles que estao sendo ASSISTIDOS de verdade -
-  // o quadrado "clique pra assistir" continua sempre pequeno (ver ScreenShareTile).
-  const [screenSizeIdx, setScreenSizeIdx] = useState(1);
-  const screenSize = SCREEN_SIZES[screenSizeIdx];
+  // "Modo teatro" - so' dois estados (tamanho fixo normal ou bem maior), sem zoom manual
+  // (pedido explicito do usuario). Afeta todos os tiles que estao sendo ASSISTIDOS de verdade
+  // de uma vez (incluindo a sua propria tela, se estiver compartilhando) - o quadrado "clique
+  // pra assistir" continua sempre pequeno (ver ScreenShareTile).
+  const [theaterMode, setTheaterMode] = useState(false);
+  const screenshareSectionRef = useRef(null);
+  const anyScreenShareWatched = screenShares.some((s) => s.watching);
+
+  useEffect(() => {
+    if (!anyScreenShareWatched) setTheaterMode(false);
+  }, [anyScreenShareWatched]);
+
+  function handleScreenshareFullscreen() {
+    const videoEl = screenshareSectionRef.current?.querySelector(".screenshare-tile-default video, .screenshare-tile-theater video");
+    const request = videoEl?.requestFullscreen || videoEl?.webkitRequestFullscreen;
+    request?.call(videoEl);
+  }
 
   if (!isThisChannelActive) {
     return (
@@ -279,25 +286,18 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
           <div className="voice-section-header">
             <p className="voice-section-title">COMPARTILHAMENTO DE TELA</p>
             <div className="voice-section-header-actions">
-              {screenShares.some((s) => s.watching) && (
+              {anyScreenShareWatched && (
                 <>
                   <button
                     type="button"
-                    className="icon-btn"
-                    onClick={() => setScreenSizeIdx((i) => Math.max(0, i - 1))}
-                    disabled={screenSizeIdx === 0}
-                    title="Diminuir"
+                    className={"icon-btn" + (theaterMode ? " icon-btn-active" : "")}
+                    onClick={() => setTheaterMode((v) => !v)}
+                    title={theaterMode ? "Voltar ao tamanho normal" : "Modo teatro (bem maior, ocupa mais largura)"}
                   >
-                    <ZoomOutIcon size={15} />
+                    <WidenIcon size={15} />
                   </button>
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    onClick={() => setScreenSizeIdx((i) => Math.min(SCREEN_SIZES.length - 1, i + 1))}
-                    disabled={screenSizeIdx === SCREEN_SIZES.length - 1}
-                    title="Aumentar"
-                  >
-                    <ZoomInIcon size={15} />
+                  <button type="button" className="icon-btn" onClick={handleScreenshareFullscreen} title="Tela cheia">
+                    <MaximizeIcon size={15} />
                   </button>
                 </>
               )}
@@ -323,13 +323,13 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
               <p>Ninguém está compartilhando a tela agora.</p>
             </div>
           ) : (
-            // Um quadrado por transmissao (lado a lado) - quem nao e' voce so' vira video de
-            // verdade depois que voce clica pra entrar naquela transmissao especifica (ver
-            // ScreenShareTile acima); os que ja estao sendo assistidos usam "screenSize"
-            // (zoom proprio, maior que o de camera).
-            <div className="camera-grid">
+            // Um quadrado por transmissao - quem nao e' voce so' vira video de verdade depois
+            // que voce clica pra entrar naquela transmissao especifica (ver ScreenShareTile
+            // acima); os que ja estao sendo assistidos (inclusive a sua propria, se estiver
+            // compartilhando) usam o tamanho normal ou o de "modo teatro" - sem zoom manual.
+            <div className={"camera-grid" + (theaterMode ? " theater" : "")} ref={screenshareSectionRef}>
               {screenShares.map((s) => (
-                <ScreenShareTile key={s.sid} share={s} size={screenSize} onToggleWatch={toggleWatchScreenShare} />
+                <ScreenShareTile key={s.sid} share={s} theaterMode={theaterMode} onToggleWatch={toggleWatchScreenShare} />
               ))}
             </div>
           )}
