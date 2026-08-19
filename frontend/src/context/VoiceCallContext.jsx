@@ -643,6 +643,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       });
       // Toca so quando OUTRA pessoa entra/sai enquanto voce ja esta na call - o efeito de
       // voce mesmo entrando/saindo e' tocado explicitamente logo abaixo, uma vez so.
+      // Reconexao completa depois de uma queda de rede/PC hibernado/aba muito tempo em
+      // segundo plano - ver resyncFromRoom acima pra detalhe do que isso corrige.
+      newRoom.on(RoomEvent.Reconnected, () => {
+        resyncFromRoom(newRoom);
+      });
       newRoom.on(RoomEvent.ParticipantConnected, () => {
         refreshParticipants(newRoom);
         playJoinSound();
@@ -773,6 +778,55 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         pub.track?.attachedElements.forEach((el) => (el.muted = false));
       });
     });
+  }
+
+  /**
+   * Depois de ficar muito tempo sem mexer no app (PC hibernou, rede caiu, aba ficou muito
+   * tempo em segundo plano), o LiveKit as vezes precisa fazer uma reconexao completa por
+   * baixo dos panos (ver RoomEvent.Reconnected abaixo) - e nessa hora os eventos incrementais
+   * que a gente escuta pra manter cameraTracksRef/micAudioTracksRef em dia (TrackMuted/
+   * Unmuted/Subscribed/Unsubscribed) podem se perder ou chegar fora de ordem. Isso deixava:
+   * (1) alguem aparecendo com a camera "aberta" sem estar (tile fantasma que nunca foi limpo),
+   * (2) voce ensurdecido voltando a OUVIR todo mundo sozinho (volume resetado pro padrao no
+   * reconnect, sem reaplicar o setVolume(0) do ensurdecido), e (3) seu proprio microfone
+   * ficando preso "publicado" internamente mesmo mutado, fazendo ninguem te ouvir depois de
+   * desmutar (so' saindo e entrando de novo na call "consertava"). Aqui a gente reconstroi
+   * TUDO a partir do estado real e atual do LiveKit (nao confia mais no que foi acumulado
+   * incrementalmente) e reaplica mic/ensurdecido - sem precisar sair da call.
+   */
+  function resyncFromRoom(room) {
+    cameraTracksRef.current.clear();
+    micAudioTracksRef.current.clear();
+    screenAudioTracksRef.current.clear();
+    const silenced = deafenedRef.current;
+    room.remoteParticipants.forEach((participant) => {
+      participant.trackPublications.forEach((pub) => {
+        if (!pub.isSubscribed || !pub.track) return;
+        if (pub.source === Track.Source.Camera) {
+          cameraTracksRef.current.set(participant.identity, {
+            track: pub.track,
+            name: participant.name || participant.identity,
+            isLocal: false,
+          });
+        } else if (pub.source === Track.Source.Microphone) {
+          micAudioTracksRef.current.set(participant.identity, pub.track);
+          pub.track.setVolume(silenced ? 0 : (participantVolumesRef.current.get(participant.identity) ?? 100) / 100);
+          pub.track.attachedElements.forEach((el) => (el.muted = silenced));
+        } else if (pub.source === Track.Source.ScreenShareAudio) {
+          screenAudioTracksRef.current.set(participant.identity, pub.track);
+          pub.track.setVolume(silenced ? 0 : (streamVolumesRef.current.get(participant.identity) ?? 100) / 100);
+          pub.track.attachedElements.forEach((el) => (el.muted = silenced));
+        }
+      });
+    });
+    syncCameraTracks();
+    refreshParticipants(room);
+
+    // Reaplica seu proprio mic: so' fica publicado se voce quer mic ligado E nao tem
+    // nenhuma trava (ensurdecido, mutado/ensurdecido a força) ativa agora.
+    const shouldPublishMic =
+      micEnabledRef.current && !deafenedRef.current && !forceMutedRef.current && !forceDeafenedRef.current;
+    room.localParticipant.setMicrophoneEnabled(shouldPublishMic).catch(() => {});
   }
 
   /** Tira o ensurdecido sem mexer no microfone (isso quem chama decide) - reaproveitado tanto
