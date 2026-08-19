@@ -375,7 +375,11 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .collapse-toggle { flex-shrink: 0; }
 .channel-sidebar-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .channel-sidebar-header strong { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.channel-sidebar-subtitle { font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.channel-sidebar-subtitle {
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.03em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .channel-list { flex: 1; overflow-y: auto; padding: 14px 10px; }
 .channel-group-title {
   font-size: 10.5px;
@@ -402,7 +406,13 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 }
 .channel-item:hover { background: var(--bg-hover); color: var(--text-primary); }
 .channel-item.active { background: var(--accent-soft); color: var(--accent-text); border-color: rgba(47,107,255,0.35); }
-.channel-item.add { color: var(--text-muted); font-size: 12.5px; font-weight: 600; }
+.channel-item.add {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px dashed var(--border);
+}
+.channel-item.add:hover { border-color: var(--border-strong); color: var(--text-primary); }
 .channel-item-icon { flex-shrink: 0; margin-right: 8px; color: var(--text-muted); }
 .channel-item.active .channel-item-icon { color: var(--accent-text); }
 /* Canal de voz que voce esta REALMENTE conectado agora (nao so' selecionado/olhando) -
@@ -542,9 +552,11 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .voice-status-channel {
-  font-size: 11.5px; font-weight: 600; color: var(--success);
+  font-size: 11.5px; font-weight: 600; color: var(--text-muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.voice-status-level { color: var(--success); font-weight: 700; }
+.voice-status-level.muted { color: var(--danger); }
 .voice-status-icons { display: flex; align-items: center; gap: 6px; }
 .voice-status-icons .icon-btn { flex: 1; width: auto; }
 /* Botao de sair da call e' sempre vermelho solido (nao so' no hover, como os outros
