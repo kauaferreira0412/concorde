@@ -89,3 +89,43 @@ export function subscribeToPresence(client, onEvent) {
     onEvent(JSON.parse(frame.body));
   });
 }
+
+/**
+ * Moderacao de voz (mover/expulsar/mutar/ensurdecer OUTRO membro a força - ver
+ * VoiceModerationController no backend, exige permissao). Todo mundo olhando o canal recebe
+ * o evento (mesmo padrao da presenca), mas so' o cliente cujo userId bate com targetUserId
+ * age de verdade (ver VoiceCallContext.jsx) - os outros ignoram silenciosamente.
+ */
+export function subscribeToVoiceControl(client, channelId, onEvent) {
+  return client.subscribe(`/topic/channel.${channelId}.voice.control`, (frame) => {
+    onEvent(JSON.parse(frame.body));
+  });
+}
+
+export function publishVoiceMove(client, channelId, targetUserId, toChannelId) {
+  client.publish({
+    destination: `/app/channel.${channelId}.voice.move`,
+    body: JSON.stringify({ targetUserId, toChannelId }),
+  });
+}
+
+export function publishVoiceKick(client, channelId, targetUserId) {
+  client.publish({
+    destination: `/app/channel.${channelId}.voice.kick`,
+    body: JSON.stringify({ targetUserId }),
+  });
+}
+
+export function publishVoiceForceMute(client, channelId, targetUserId, muted) {
+  client.publish({
+    destination: `/app/channel.${channelId}.voice.force-mute`,
+    body: JSON.stringify({ targetUserId, muted }),
+  });
+}
+
+export function publishVoiceForceDeafen(client, channelId, targetUserId, deafened) {
+  client.publish({
+    destination: `/app/channel.${channelId}.voice.force-deafen`,
+    body: JSON.stringify({ targetUserId, deafened }),
+  });
+}

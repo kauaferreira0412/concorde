@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "memberships", uniqueConstraints = {
@@ -31,6 +33,14 @@ public class Membership {
      * ver MemberResponse). Independente do "Apelido" global do usuario (User.nickname). */
     @Column(length = 32)
     private String nickname;
+
+    /** Perfis (ServerRole) atribuidos a esse membro NESSE servidor - a uniao das permissoes
+     * de todos eles e' o que ele pode fazer (ver PermissionService). */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "membership_roles", joinColumns = @JoinColumn(name = "membership_id"))
+    @Column(name = "role_id")
+    @Builder.Default
+    private Set<Long> roleIds = new HashSet<>();
 
     @Builder.Default
     private Instant joinedAt = Instant.now();

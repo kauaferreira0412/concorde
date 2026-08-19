@@ -2,6 +2,7 @@ package com.codagis.discordclone.service;
 
 import com.codagis.discordclone.domain.*;
 import com.codagis.discordclone.dto.ServerDtos.*;
+import com.codagis.discordclone.dto.ServerRoleDtos.*;
 import com.codagis.discordclone.repository.*;
 import com.codagis.discordclone.security.AdminGuard;
 import com.codagis.discordclone.ws.OnlinePresenceService;
@@ -10,7 +11,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class ServerService {
@@ -19,18 +22,23 @@ public class ServerService {
     private final ChannelRepository channelRepository;
     private final MembershipRepository membershipRepository;
     private final UserRepository userRepository;
+    private final ServerRoleRepository serverRoleRepository;
     private final AdminGuard adminGuard;
     private final OnlinePresenceService presenceService;
+    private final PermissionService permissionService;
 
     public ServerService(ServerRepository serverRepository, ChannelRepository channelRepository,
                           MembershipRepository membershipRepository, UserRepository userRepository,
-                          AdminGuard adminGuard, OnlinePresenceService presenceService) {
+                          ServerRoleRepository serverRoleRepository, AdminGuard adminGuard,
+                          OnlinePresenceService presenceService, PermissionService permissionService) {
         this.serverRepository = serverRepository;
         this.channelRepository = channelRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
+        this.serverRoleRepository = serverRoleRepository;
         this.adminGuard = adminGuard;
         this.presenceService = presenceService;
+        this.permissionService = permissionService;
     }
 
     /** So o ADMIN pode criar servidores. */
@@ -91,11 +99,15 @@ public class ServerService {
         // por baixo dos panos e explode com NullPointerException assim que algum apelido
         // (o caso comum) estiver em branco. Um HashMap comum aceita valor null numa boa.
         var nicknameByUserId = new java.util.HashMap<Long, String>();
-        memberships.forEach(m -> nicknameByUserId.put(m.getUserId(), m.getNickname()));
+        var roleIdsByUserId = new java.util.HashMap<Long, Set<Long>>();
+        memberships.forEach(m -> {
+            nicknameByUserId.put(m.getUserId(), m.getNickname());
+            roleIdsByUserId.put(m.getUserId(), m.getRoleIds());
+        });
         var statusById = presenceService.effectiveStatusOf(userIds);
         return userRepository.findAllById(userIds).stream()
                 .map(u -> new MemberResponse(u.getId(), u.getUsername(), nicknameByUserId.get(u.getId()),
-                        u.getAvatarUrl(), statusById.get(u.getId()), u.getRole()))
+                        u.getAvatarUrl(), statusById.get(u.getId()), u.getRole(), roleIdsByUserId.get(u.getId())))
                 .sorted((a, b) -> {
                     boolean aOffline = a.status() == PresenceStatus.OFFLINE;
                     boolean bOffline = b.status() == PresenceStatus.OFFLINE;
@@ -156,12 +168,127 @@ public class ServerService {
     @Transactional
     public ChannelResponse createChannel(Long serverId, Long userId, CreateChannelRequest req) {
         assertMember(serverId, userId);
+        permissionService.assertHas(serverId, userId, ServerPermission.MANAGE_CHANNELS);
         Channel channel = channelRepository.save(Channel.builder()
                 .serverId(serverId)
                 .name(req.name())
                 .type(req.type() == null ? ChannelType.TEXT : req.type())
                 .build());
         return toResponse(channel);
+    }
+
+    // ============================================================
+    // Moderacao de membros (MANAGE_MEMBERS)
+    // ============================================================
+
+    /** Tira o acesso de alguem ao servidor (nao e' banimento da conta - so' desse servidor).
+     * Nao forca desconexao de uma call em andamento (ver nota em VoiceModerationController -
+     * o proximo acesso ja falha, mas a call atual so termina quando a pessoa sair sozinha
+     * ou for expulsa da call separadamente com KICK_VOICE). */
+    @Transactional
+    public void removeMember(Long requesterId, Long serverId, Long targetUserId) {
+        permissionService.assertHas(serverId, requesterId, ServerPermission.MANAGE_MEMBERS);
+        Server server = serverRepository.findById(serverId)
+                .orElseThrow(() -> new IllegalArgumentException("Servidor nao encontrado"));
+        if (server.getOwnerId().equals(targetUserId)) {
+            throw new IllegalStateException("Não dá pra remover o dono do servidor");
+        }
+        membershipRepository.findByServerIdAndUserId(serverId, targetUserId)
+                .ifPresent(membershipRepository::delete);
+    }
+
+    /** Edita o apelido de OUTRO membro nesse servidor - diferente de setMyNickname (que e'
+     * cada um mexendo no proprio). Precisa de MANAGE_MEMBERS. */
+    @Transactional
+    public void setMemberNickname(Long requesterId, Long serverId, Long targetUserId, String nickname) {
+        permissionService.assertHas(serverId, requesterId, ServerPermission.MANAGE_MEMBERS);
+        Membership membership = membershipRepository.findByServerIdAndUserId(serverId, targetUserId)
+                .orElseThrow(() -> new IllegalStateException("Usuario nao pertence a esse servidor"));
+        membership.setNickname(blankToNull(nickname));
+        membershipRepository.save(membership);
+    }
+
+    // ============================================================
+    // Perfis / permissoes (MANAGE_ROLES)
+    // ============================================================
+
+    public Set<ServerPermission> getMyPermissions(Long serverId, Long userId) {
+        assertMember(serverId, userId);
+        return permissionService.effectivePermissions(serverId, userId);
+    }
+
+    /** Qualquer membro pode VER os perfis que existem (pra saber o que cada um significa) -
+     * so' criar/editar/apagar/atribuir precisa de MANAGE_ROLES. */
+    public List<RoleResponse> listRoles(Long serverId, Long userId) {
+        assertMember(serverId, userId);
+        return serverRoleRepository.findByServerId(serverId).stream().map(this::toResponse).toList();
+    }
+
+    @Transactional
+    public RoleResponse createRole(Long requesterId, Long serverId, CreateRoleRequest req) {
+        permissionService.assertHas(serverId, requesterId, ServerPermission.MANAGE_ROLES);
+        ServerRole role = ServerRole.builder()
+                .serverId(serverId)
+                .name(req.name())
+                .color(blankToNull(req.color()))
+                .permissions(req.permissions() == null ? new HashSet<>() : new HashSet<>(req.permissions()))
+                .build();
+        return toResponse(serverRoleRepository.save(role));
+    }
+
+    @Transactional
+    public RoleResponse updateRole(Long requesterId, Long serverId, Long roleId, UpdateRoleRequest req) {
+        permissionService.assertHas(serverId, requesterId, ServerPermission.MANAGE_ROLES);
+        ServerRole role = requireRoleOfServer(serverId, roleId);
+        role.setName(req.name());
+        role.setColor(blankToNull(req.color()));
+        role.setPermissions(req.permissions() == null ? new HashSet<>() : new HashSet<>(req.permissions()));
+        return toResponse(serverRoleRepository.save(role));
+    }
+
+    @Transactional
+    public void deleteRole(Long requesterId, Long serverId, Long roleId) {
+        permissionService.assertHas(serverId, requesterId, ServerPermission.MANAGE_ROLES);
+        ServerRole role = requireRoleOfServer(serverId, roleId);
+        // Tira o perfil apagado de todo mundo que tinha ele atribuido, senao fica um id
+        // fantasma preso em Membership.roleIds pra sempre.
+        membershipRepository.findByServerId(serverId).forEach(m -> {
+            if (m.getRoleIds().remove(roleId)) {
+                membershipRepository.save(m);
+            }
+        });
+        serverRoleRepository.delete(role);
+    }
+
+    /** Substitui os perfis atribuidos a um membro pelos informados (nao e' incremental). */
+    @Transactional
+    public void setMemberRoles(Long requesterId, Long serverId, Long targetUserId, Set<Long> roleIds) {
+        permissionService.assertHas(serverId, requesterId, ServerPermission.MANAGE_ROLES);
+        Membership membership = membershipRepository.findByServerIdAndUserId(serverId, targetUserId)
+                .orElseThrow(() -> new IllegalStateException("Usuario nao pertence a esse servidor"));
+        Set<Long> validIds = roleIds == null ? Set.of() : roleIds;
+        // So aceita ids de perfis que realmente existem NESSE servidor - ignora o resto em
+        // vez de deixar Membership.roleIds acumular lixo.
+        Set<Long> existingIdsOfServer = serverRoleRepository.findByServerId(serverId).stream()
+                .map(ServerRole::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<Long> filtered = new HashSet<>(validIds);
+        filtered.retainAll(existingIdsOfServer);
+        membership.setRoleIds(filtered);
+        membershipRepository.save(membership);
+    }
+
+    private ServerRole requireRoleOfServer(Long serverId, Long roleId) {
+        ServerRole role = serverRoleRepository.findById(roleId)
+                .orElseThrow(() -> new IllegalArgumentException("Perfil não encontrado"));
+        if (!role.getServerId().equals(serverId)) {
+            throw new IllegalArgumentException("Esse perfil não é desse servidor");
+        }
+        return role;
+    }
+
+    private RoleResponse toResponse(ServerRole role) {
+        return new RoleResponse(role.getId(), role.getServerId(), role.getName(), role.getColor(), role.getPermissions());
     }
 
     private ServerResponse toResponse(Server server) {

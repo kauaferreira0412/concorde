@@ -40,6 +40,7 @@ export default function ChannelSidebar({
   onCreateChannel,
   onOpenSettings,
   onEditServer,
+  onOpenRoles,
   stompClient,
   stompConnected,
   user,
@@ -63,6 +64,10 @@ export default function ChannelSidebar({
     toggleScreenShare,
     toggleCamera,
     leaveChannel,
+    moveParticipant,
+    kickParticipant,
+    forceMuteParticipant,
+    forceDeafenParticipant,
   } = useVoiceCall();
   const textChannels = channels.filter((c) => c.type === "TEXT");
   const voiceChannels = channels.filter((c) => c.type === "VOICE");
@@ -83,19 +88,50 @@ export default function ChannelSidebar({
   const [textExpanded, setTextExpanded] = useState(true);
   const [voiceExpanded, setVoiceExpanded] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  // Popover de volume individual - abre no botao direito em cima do avatar de alguem na
-  // lista de "quem esta na call", aninhada sob o canal de voz (so' faz sentido pra quem
-  // esta na MESMA call que voce, ja que e' o LiveKit que sabe controlar esse volume).
-  const [volumeMenu, setVolumeMenu] = useState(null); // { identity, x, y }
-  const volumeMenuRef = useRef(null);
+  // Popover em cima do avatar de alguem na lista de "quem esta na call" (aninhada sob o
+  // canal de voz) - volume (so' se voce estiver na MESMA call, e' o LiveKit que controla
+  // isso) e/ou moderacao (mover/mutar/ensurdecer/expulsar, funciona mesmo sem voce estar
+  // na call, so' depende de permissao - ver ServerPermission no backend).
+  const [participantMenu, setParticipantMenu] = useState(null); // { channelId, userId, identity, username, x, y }
+  const participantMenuRef = useRef(null);
+  const [myServerPermissions, setMyServerPermissions] = useState(new Set());
+  const canMove = myServerPermissions.has("MOVE_MEMBERS");
+  const hasAnyModPermission =
+    canMove ||
+    myServerPermissions.has("MUTE_MEMBERS") ||
+    myServerPermissions.has("DEAFEN_MEMBERS") ||
+    myServerPermissions.has("KICK_VOICE");
+  // Arrastar alguem da lista de "quem esta na call" pra outro canal de voz (ver
+  // draggable/onDrop abaixo) - so' existe enquanto o arraste esta rolando.
+  const [draggingParticipant, setDraggingParticipant] = useState(null); // { channelId, userId }
+  const [dragOverChannelId, setDragOverChannelId] = useState(null);
 
   useEffect(() => {
-    if (!volumeMenu) return;
+    if (!server?.id) {
+      setMyServerPermissions(new Set());
+      return;
+    }
+    let cancelled = false;
+    api
+      .get(`/api/servers/${server.id}/me/permissions`)
+      .then(({ data }) => {
+        if (!cancelled) setMyServerPermissions(new Set(data));
+      })
+      .catch(() => {
+        if (!cancelled) setMyServerPermissions(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [server?.id]);
+
+  useEffect(() => {
+    if (!participantMenu) return;
     function handlePointerDown(e) {
-      if (volumeMenuRef.current && !volumeMenuRef.current.contains(e.target)) setVolumeMenu(null);
+      if (participantMenuRef.current && !participantMenuRef.current.contains(e.target)) setParticipantMenu(null);
     }
     function handleKeyDown(e) {
-      if (e.key === "Escape") setVolumeMenu(null);
+      if (e.key === "Escape") setParticipantMenu(null);
     }
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
@@ -103,12 +139,8 @@ export default function ChannelSidebar({
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [volumeMenu]);
+  }, [participantMenu]);
 
-  // Fecha sozinho se a pessoa sair da call enquanto o popover estava aberto.
-  useEffect(() => {
-    if (volumeMenu && !participants.some((p) => p.identity === volumeMenu.identity)) setVolumeMenu(null);
-  }, [participants, volumeMenu]);
   // Painel inteiro (canais, call, icones) pode recolher pra dar mais espaco pro chat -
   // fica lembrado entre sessoes.
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("channelSidebarCollapsed") === "true");
@@ -161,6 +193,19 @@ export default function ChannelSidebar({
 
   const connectedList = voiceChannels.flatMap((c) => (presenceByChannel[c.id] || []).map((p) => ({ ...p, channelName: c.name })));
 
+  // Fecha o popover sozinho se a pessoa sair da call enquanto ele estava aberto - moderacao
+  // continua fazendo sentido mesmo sem ela estar mais lá (o backend so' ignora nesse caso),
+  // entao so' fecha se ela sumiu das DUAS fontes (LiveKit e presenca).
+  useEffect(() => {
+    if (
+      participantMenu &&
+      !participants.some((p) => p.identity === participantMenu.identity) &&
+      !(presenceByChannel[participantMenu.channelId] || []).some((p) => p.userId === participantMenu.userId)
+    ) {
+      setParticipantMenu(null);
+    }
+  }, [participants, participantMenu, presenceByChannel]);
+
   return (
     <div className={"channel-sidebar" + (collapsed ? " collapsed" : "")}>
       <div className="channel-sidebar-header">
@@ -175,6 +220,11 @@ export default function ChannelSidebar({
           </div>
         )}
         <div className="channel-sidebar-header-actions">
+          {!collapsed && server && (isAdmin || myServerPermissions.has("MANAGE_ROLES")) && (
+            <button className="icon-btn" onClick={() => onOpenRoles(server)} title="Perfis e permissões">
+              <ShieldIcon size={15} />
+            </button>
+          )}
           {!collapsed && server && isAdmin && (
             <button className="icon-btn" onClick={() => onEditServer(server)} title="Editar servidor">
               <PencilIcon size={15} />
@@ -247,9 +297,11 @@ export default function ChannelSidebar({
                     )}
                   </button>
                 ))}
-                <button className="channel-item add" onClick={() => onCreateChannel("TEXT")}>
-                  + canal de texto
-                </button>
+                {(isAdmin || myServerPermissions.has("MANAGE_CHANNELS")) && (
+                  <button className="channel-item add" onClick={() => onCreateChannel("TEXT")}>
+                    + canal de texto
+                  </button>
+                )}
               </>
             )}
 
@@ -265,9 +317,25 @@ export default function ChannelSidebar({
                       className={
                         "channel-item" +
                         (c.id === selectedChannelId ? " active" : "") +
-                        (activeChannel?.id === c.id ? " connected-active" : "")
+                        (activeChannel?.id === c.id ? " connected-active" : "") +
+                        (dragOverChannelId === c.id ? " drop-target" : "")
                       }
                       onClick={() => onSelectChannel(c)}
+                      // Arrastar alguem da lista de "quem esta na call" (abaixo) e soltar aqui
+                      // move essa pessoa pra este canal - so' aceita o drop se voce tiver
+                      // permissao de mover gente (ver canMove/handleDropMove).
+                      onDragOver={(e) => {
+                        if (!canMove || !draggingParticipant || draggingParticipant.channelId === c.id) return;
+                        e.preventDefault();
+                        setDragOverChannelId(c.id);
+                      }}
+                      onDragLeave={() => setDragOverChannelId((prev) => (prev === c.id ? null : prev))}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOverChannelId(null);
+                        if (!canMove || !draggingParticipant || draggingParticipant.channelId === c.id) return;
+                        moveParticipant(draggingParticipant.channelId, draggingParticipant.userId, c.id);
+                      }}
                     >
                       <VolumeIcon size={16} className="channel-item-icon" />
                       {c.name}
@@ -277,19 +345,40 @@ export default function ChannelSidebar({
                       <div className="channel-voice-participants">
                         {presenceByChannel[c.id].map((p) => {
                           const identity = `user-${p.userId}`;
+                          const isMe = p.userId === user?.id;
                           // Volume so' da pra ajustar de dentro da MESMA call (e' o LiveKit
-                          // que controla isso) e nunca pra voce mesmo.
-                          const canAdjustVolume = activeChannel?.id === c.id && p.userId !== user?.id;
+                          // que controla isso) e nunca pra voce mesmo. Moderacao funciona sem
+                          // voce estar na call, so' precisa de permissao - nunca em voce mesmo.
+                          const canAdjustVolume = activeChannel?.id === c.id && !isMe;
+                          const canModerate = !isMe && hasAnyModPermission;
                           return (
                             <div
                               key={p.userId}
                               className="channel-voice-participant"
+                              draggable={canMove && !isMe}
+                              onDragStart={() => setDraggingParticipant({ channelId: c.id, userId: p.userId })}
+                              onDragEnd={() => setDraggingParticipant(null)}
                               onContextMenu={(e) => {
-                                if (!canAdjustVolume) return;
+                                if (!canAdjustVolume && !canModerate) return;
                                 e.preventDefault();
-                                setVolumeMenu({ identity, x: e.clientX, y: e.clientY });
+                                setParticipantMenu({
+                                  channelId: c.id,
+                                  userId: p.userId,
+                                  identity,
+                                  username: p.username,
+                                  forceMuted: p.forceMuted,
+                                  forceDeafened: p.forceDeafened,
+                                  x: e.clientX,
+                                  y: e.clientY,
+                                });
                               }}
-                              title={canAdjustVolume ? "Clique com o botão direito pra ajustar o volume" : undefined}
+                              title={
+                                canAdjustVolume || canModerate
+                                  ? "Clique com o botão direito pra ver as opções"
+                                  : canMove && !isMe
+                                  ? "Arraste pra outro canal de voz pra mover"
+                                  : undefined
+                              }
                             >
                               <Avatar
                                 name={p.username}
@@ -312,9 +401,11 @@ export default function ChannelSidebar({
                     )}
                   </div>
                 ))}
-                <button className="channel-item add" onClick={() => onCreateChannel("VOICE")}>
-                  + canal de voz
-                </button>
+                {(isAdmin || myServerPermissions.has("MANAGE_CHANNELS")) && (
+                  <button className="channel-item add" onClick={() => onCreateChannel("VOICE")}>
+                    + canal de voz
+                  </button>
+                )}
               </>
             )}
           </>
@@ -407,25 +498,95 @@ export default function ChannelSidebar({
       </div>
       </div>
 
-      {volumeMenu &&
+      {participantMenu &&
         (() => {
-          const p = participants.find((pp) => pp.identity === volumeMenu.identity);
-          if (!p) return null;
+          const p = participants.find((pp) => pp.identity === participantMenu.identity);
+          const canAdjustVolume = !!p && activeChannel?.id === participantMenu.channelId;
+          const otherVoiceChannels = voiceChannels.filter((vc) => vc.id !== participantMenu.channelId);
+          if (!canAdjustVolume && !hasAnyModPermission) return null;
           return (
             <div
               className="volume-popover"
-              ref={volumeMenuRef}
+              ref={participantMenuRef}
               style={{
-                left: Math.min(volumeMenu.x, window.innerWidth - 232),
-                top: Math.min(volumeMenu.y, window.innerHeight - 70),
+                left: Math.min(participantMenu.x, window.innerWidth - 232),
+                top: Math.min(participantMenu.y, window.innerHeight - 70),
               }}
             >
-              <p className="volume-popover-title">Volume de {p.name}</p>
-              <VolumeSlider
-                value={participantVolumes[p.identity] ?? 100}
-                onChange={(v) => setParticipantVolume(p.identity, v)}
-                label={`Volume de ${p.name} (padrão 100%, pode passar de 100%)`}
-              />
+              <p className="volume-popover-title">{p?.name || participantMenu.username}</p>
+
+              {canAdjustVolume && (
+                <VolumeSlider
+                  value={participantVolumes[p.identity] ?? 100}
+                  onChange={(v) => setParticipantVolume(p.identity, v)}
+                  label={`Volume de ${p.name} (padrão 100%, pode passar de 100%)`}
+                />
+              )}
+
+              {hasAnyModPermission && (
+                <div className="participant-mod-actions">
+                  {myServerPermissions.has("MUTE_MEMBERS") && (
+                    <button
+                      type="button"
+                      className="participant-mod-btn"
+                      onClick={() => {
+                        forceMuteParticipant(participantMenu.channelId, participantMenu.userId, !participantMenu.forceMuted);
+                        setParticipantMenu(null);
+                      }}
+                    >
+                      {participantMenu.forceMuted ? <MicIcon size={14} /> : <MicOffIcon size={14} />}
+                      {participantMenu.forceMuted ? "Desmutar" : "Mutar"}
+                    </button>
+                  )}
+                  {myServerPermissions.has("DEAFEN_MEMBERS") && (
+                    <button
+                      type="button"
+                      className="participant-mod-btn"
+                      onClick={() => {
+                        forceDeafenParticipant(
+                          participantMenu.channelId,
+                          participantMenu.userId,
+                          !participantMenu.forceDeafened
+                        );
+                        setParticipantMenu(null);
+                      }}
+                    >
+                      {participantMenu.forceDeafened ? <HeadphonesIcon size={14} /> : <HeadphonesOffIcon size={14} />}
+                      {participantMenu.forceDeafened ? "Reativar áudio" : "Ensurdecer"}
+                    </button>
+                  )}
+                  {canMove && otherVoiceChannels.length > 0 && (
+                    <>
+                      <p className="participant-mod-submenu-label">Mover para</p>
+                      {otherVoiceChannels.map((vc) => (
+                        <button
+                          type="button"
+                          key={vc.id}
+                          className="participant-mod-btn"
+                          onClick={() => {
+                            moveParticipant(participantMenu.channelId, participantMenu.userId, vc.id);
+                            setParticipantMenu(null);
+                          }}
+                        >
+                          <VolumeIcon size={14} /> {vc.name}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  {myServerPermissions.has("KICK_VOICE") && (
+                    <button
+                      type="button"
+                      className="participant-mod-btn danger"
+                      onClick={() => {
+                        kickParticipant(participantMenu.channelId, participantMenu.userId);
+                        setParticipantMenu(null);
+                      }}
+                    >
+                      <PhoneOffIcon size={14} /> Expulsar da call
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           );
         })()}

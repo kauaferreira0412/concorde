@@ -1089,6 +1089,45 @@ img.chat-header-avatar { object-fit: cover; }
   white-space: nowrap;
 }
 
+/* Acoes de moderacao (mover/mutar/ensurdecer/expulsar) dentro do mesmo popover - ver
+   participantMenu em ChannelSidebar.jsx. Cada botao e' uma linha de menu, nao um botao
+   "normal" (largura total, alinhado a esquerda, sem preenchimento solido). */
+.participant-mod-actions { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.participant-mod-actions:not(:first-child) { padding-top: 8px; border-top: 1px solid var(--border-soft); }
+.participant-mod-submenu-label {
+  margin: 4px 0 0;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.participant-mod-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+}
+.participant-mod-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.participant-mod-btn.danger { color: var(--danger); }
+.participant-mod-btn.danger:hover { background: var(--danger-soft); }
+
+/* Canal de voz recebendo um arraste de participante (ver draggable/onDrop em
+   ChannelSidebar.jsx) - destaca pra indicar que soltar ali move a pessoa pra esse canal. */
+.channel-item.drop-target {
+  border-color: var(--accent) !important;
+  background: var(--accent-soft) !important;
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
 /* Controle de volume 0-200% - reaproveitado pra voz de cada participante e pro audio da
    transmissao de tela selecionada. Acima de 100% (boosted) o preenchimento fica laranja,
    pra deixar claro visualmente que aquilo esta sendo amplificado alem do normal. */
@@ -1624,6 +1663,19 @@ img.chat-header-avatar { object-fit: cover; }
   border-radius: var(--radius-sm);
   background: var(--bg-panel-2);
 }
+
+/* Perfis do servidor (ServerRolesModal.jsx). */
+.role-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.role-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+}
+.role-row-name { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+.role-row-count { font-size: 11.5px; color: var(--text-muted); margin-right: auto; }
+.role-permission-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .settings-checkbox-row {
   display: flex; align-items: center; gap: 8px;
   font-size: 13px; font-weight: 500; color: var(--text-secondary);

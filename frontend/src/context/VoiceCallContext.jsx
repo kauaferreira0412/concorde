@@ -15,9 +15,14 @@ import {
 import { getDeafenShortcut, getMuteShortcut, shortcutFromEvent } from "../utils/keyboardShortcuts";
 import {
   publishVoiceDeafenState,
+  publishVoiceForceDeafen,
+  publishVoiceForceMute,
   publishVoiceJoin,
+  publishVoiceKick,
   publishVoiceLeave,
   publishVoiceMicState,
+  publishVoiceMove,
+  subscribeToVoiceControl,
   subscribeToVoicePresence,
 } from "../ws/chatSocket";
 import ScreenSharePicker from "../components/ScreenSharePicker.jsx";
@@ -85,6 +90,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   // So' usado no app desktop (Electron) - true enquanto o seletor customizado de tela/janela
   // esta aberto, esperando o usuario escolher o que compartilhar (ver ScreenSharePicker.jsx).
   const [screenPickerOpen, setScreenPickerOpen] = useState(false);
+  // O que EU posso fazer no servidor do canal em que estou agora (ver ServerPermission no
+  // backend) - controla o que os menus de moderacao mostram (ChannelSidebar.jsx) e se um
+  // forceMute/forceDeafen aplicado em mim pode ser revertido por mim mesmo (ver toggleMic/
+  // toggleDeafen abaixo).
+  const [myPermissions, setMyPermissions] = useState([]);
   const { level: micLevel, start: startMicMeter, stop: stopMicMeter } = useMicLevel();
 
   const roomRef = useRef(null);
@@ -115,6 +125,13 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   // de quem so mutou o microfone.
   const presenceDeafenedRef = useRef(new Map()); // userId (string) -> deafened
   const presenceSubRef = useRef(null);
+  const controlSubRef = useRef(null); // ver subscribeToVoiceControl - comandos de moderacao endereçados a mim
+  const myPermissionsRef = useRef(new Set());
+  // Um moderador aplicou isso em MIM (ver VoiceModerationController no backend) - enquanto
+  // for true, so' consigo reverter sozinho se eu TAMBEM tiver a permissao correspondente
+  // (regra pedida explicitamente: "o alvo so' pode se livrar se tiver permissao tambem").
+  const forceMutedRef = useRef(false);
+  const forceDeafenedRef = useRef(false);
 
   // "Fonte da verdade" pras funcoes assincronas - sempre atualizados junto com o setState
   // correspondente, nunca via useEffect (evita qualquer janela de tempo desatualizada).
@@ -155,6 +172,21 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     setCameraTracks(
       [...cameraTracksRef.current.entries()].map(([identity, v]) => ({ identity, ...v }))
     );
+  }
+
+  /** Busca o que eu posso fazer nesse servidor (ver ServerPermission) - chamado ao entrar
+   *  num canal de voz. Falha em silencio (fica sem nenhuma permissao) se der erro de rede,
+   *  nunca trava a entrada na call por causa disso. */
+  async function fetchMyPermissions(serverId) {
+    try {
+      const { data } = await api.get(`/api/servers/${serverId}/me/permissions`);
+      myPermissionsRef.current = new Set(data || []);
+      setMyPermissions(data || []);
+    } catch (err) {
+      console.warn("Não foi possível carregar suas permissões nesse servidor:", err);
+      myPermissionsRef.current = new Set();
+      setMyPermissions([]);
+    }
   }
 
   useEffect(() => {
@@ -200,6 +232,12 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       presenceDeafenedRef.current = new Map(list.map((p) => [String(p.userId), p.deafened]));
       if (roomRef.current) refreshParticipants(roomRef.current);
     });
+    try {
+      controlSubRef.current?.unsubscribe();
+    } catch {
+      /* idem */
+    }
+    controlSubRef.current = subscribeToVoiceControl(stompClientRef.current, channelId, handleVoiceControlEvent);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stompConnected]);
 
@@ -396,7 +434,13 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     }
     presenceSubRef.current?.unsubscribe();
     presenceSubRef.current = null;
+    controlSubRef.current?.unsubscribe();
+    controlSubRef.current = null;
     presenceDeafenedRef.current = new Map();
+    forceMutedRef.current = false;
+    forceDeafenedRef.current = false;
+    myPermissionsRef.current = new Set();
+    setMyPermissions([]);
     clearActiveChannel();
     await roomRef.current?.disconnect();
     roomRef.current = null;
@@ -616,12 +660,16 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       saveActiveChannel(channel);
       setConnected(true);
       setDeafened(false);
+      forceMutedRef.current = false;
+      forceDeafenedRef.current = false;
+      if (channel.serverId) fetchMyPermissions(channel.serverId);
       if (stompClientRef.current && stompConnectedRef.current) {
         publishVoiceJoin(stompClientRef.current, channel.id);
         presenceSubRef.current = subscribeToVoicePresence(stompClientRef.current, channel.id, (list) => {
           presenceDeafenedRef.current = new Map(list.map((p) => [String(p.userId), p.deafened]));
           if (roomRef.current) refreshParticipants(roomRef.current);
         });
+        controlSubRef.current = subscribeToVoiceControl(stompClientRef.current, channel.id, handleVoiceControlEvent);
       }
       playJoinSound(); // voce tambem ouve quando VOCE entra numa call, nao so quando os outros entram
 
@@ -685,10 +733,52 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     restoreListenVolumes(room);
   }
 
+  /**
+   * Reage a um comando de moderacao (mover/expulsar/mutar/ensurdecer) endereçado a MIM - ver
+   * VoiceModerationController no backend. O broadcast vai pra todo mundo olhando o canal
+   * (mesmo padrao da presenca), cada cliente filtra e ignora o que nao e' pra ele.
+   */
+  function handleVoiceControlEvent(event) {
+    if (!event || String(event.targetUserId) !== String(userRef.current?.id)) return;
+    if (event.type === "MOVE") {
+      joinChannel({ id: event.toChannelId, name: event.toChannelName, serverId: activeChannelRef.current?.serverId });
+    } else if (event.type === "KICK") {
+      leaveChannel();
+    } else if (event.type === "FORCE_MUTE") {
+      applyForceMute(event.muted);
+    } else if (event.type === "FORCE_DEAFEN") {
+      applyForceDeafen(event.deafened);
+    }
+  }
+
+  /** Um moderador me mutou a força - desliga o microfone de verdade na hora (nao so' um
+   *  aviso visual). Tirar a restricao so' libera pra eu conseguir desmutar sozinho de novo -
+   *  nao reativa o microfone sozinho, pra nao "assustar" ligando o mic sem eu ter pedido. */
+  async function applyForceMute(muted) {
+    forceMutedRef.current = muted;
+    if (muted && roomRef.current && micEnabledRef.current) {
+      await toggleMic();
+    }
+  }
+
+  /** Mesma ideia pro ensurdecido a força. */
+  async function applyForceDeafen(deafened) {
+    forceDeafenedRef.current = deafened;
+    if (deafened && roomRef.current && !deafenedRef.current) {
+      await toggleDeafen();
+    }
+  }
+
   async function toggleMic() {
     const room = roomRef.current;
     if (!room) return;
     const next = !micEnabledRef.current;
+    // Um moderador te mutou a força (ver applyForceMute) - so' consegue se desmutar sozinho
+    // se voce TAMBEM tiver permissao de mutar gente (regra pedida explicitamente pelo usuario).
+    if (next && forceMutedRef.current && !myPermissionsRef.current.has("MUTE_MEMBERS")) {
+      alert("Você foi mutado por um moderador - só quem também tem permissão de mutar membros consegue reverter isso.");
+      return;
+    }
     // "Desmutar enquanto ensurdecido" nao faz sentido sozinho (voce continuaria sem ouvir
     // ninguem, so' emudo de novo na proxima fala) - igual ao Discord, clicar em desmutar
     // aqui tambem tira o ensurdecido.
@@ -712,6 +802,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     const room = roomRef.current;
     if (!room) return;
     const next = !deafenedRef.current;
+    // Um moderador te ensurdeceu a força (ver applyForceDeafen) - mesma regra do mic acima.
+    if (!next && forceDeafenedRef.current && !myPermissionsRef.current.has("DEAFEN_MEMBERS")) {
+      alert("Você foi ensurdecido por um moderador - só quem também tem permissão de ensurdecer membros consegue reverter isso.");
+      return;
+    }
     setDeafened(next);
     if (next) playMuteSound();
     else playUnmuteSound();
@@ -918,6 +1013,34 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     electronScreenTracksRef.current = { video: null, audio: null };
   }
 
+  /**
+   * Acoes de moderacao (mover/expulsar/mutar/ensurdecer OUTRO membro) - ver
+   * VoiceModerationController no backend, que confere a permissao de verdade (essas funcoes
+   * aqui so' publicam o pedido, nao fazem nada sozinhas se a permissao faltar). Funcionam
+   * mesmo se EU nao estiver em nenhuma call - channelId e' o canal onde o ALVO esta agora
+   * (ver ChannelSidebar.jsx), nao precisa ser o meu activeChannel.
+   */
+  function moveParticipant(channelId, targetUserId, toChannelId) {
+    if (stompClientRef.current && stompConnectedRef.current) {
+      publishVoiceMove(stompClientRef.current, channelId, targetUserId, toChannelId);
+    }
+  }
+  function kickParticipant(channelId, targetUserId) {
+    if (stompClientRef.current && stompConnectedRef.current) {
+      publishVoiceKick(stompClientRef.current, channelId, targetUserId);
+    }
+  }
+  function forceMuteParticipant(channelId, targetUserId, muted) {
+    if (stompClientRef.current && stompConnectedRef.current) {
+      publishVoiceForceMute(stompClientRef.current, channelId, targetUserId, muted);
+    }
+  }
+  function forceDeafenParticipant(channelId, targetUserId, deafened) {
+    if (stompClientRef.current && stompConnectedRef.current) {
+      publishVoiceForceDeafen(stompClientRef.current, channelId, targetUserId, deafened);
+    }
+  }
+
   /** Chamado pelo VoiceChannel quando monta/desmonta, para anexar/soltar o video no container certo. */
   const registerVideoContainer = useCallback((el) => {
     videoContainerElRef.current = el;
@@ -952,6 +1075,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         toggleScreenShare,
         toggleCamera,
         registerVideoContainer,
+        myPermissions,
+        moveParticipant,
+        kickParticipant,
+        forceMuteParticipant,
+        forceDeafenParticipant,
       }}
     >
       {children}

@@ -6,6 +6,7 @@ import com.codagis.discordclone.ws.PresenceStatus;
 import jakarta.validation.constraints.NotBlank;
 
 import java.util.List;
+import java.util.Set;
 
 public class ServerDtos {
 
@@ -25,5 +26,6 @@ public class ServerDtos {
 
     public record ServerWithChannels(ServerResponse server, List<ChannelResponse> channels) {}
 
-    public record MemberResponse(Long userId, String username, String nickname, String avatarUrl, PresenceStatus status, Role role) {}
+    public record MemberResponse(Long userId, String username, String nickname, String avatarUrl, PresenceStatus status,
+                                  Role role, Set<Long> roleIds) {}
 }

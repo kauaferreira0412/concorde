@@ -1,6 +1,8 @@
 package com.codagis.discordclone.controller;
 
+import com.codagis.discordclone.domain.ServerPermission;
 import com.codagis.discordclone.dto.ServerDtos.*;
+import com.codagis.discordclone.dto.ServerRoleDtos.*;
 import com.codagis.discordclone.security.CurrentUser;
 import com.codagis.discordclone.service.GcsService;
 import com.codagis.discordclone.service.ServerService;
@@ -9,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/servers")
@@ -74,5 +77,57 @@ public class ServerController {
     @PostMapping("/{serverId}/channels")
     public ChannelResponse createChannel(@PathVariable Long serverId, @Valid @RequestBody CreateChannelRequest req) {
         return serverService.createChannel(serverId, currentUser.id(), req);
+    }
+
+    // ============================================================
+    // Moderacao de membros (MANAGE_MEMBERS)
+    // ============================================================
+
+    /** Tira o acesso de alguem a esse servidor. */
+    @DeleteMapping("/{serverId}/members/{userId}")
+    public void removeMember(@PathVariable Long serverId, @PathVariable Long userId) {
+        serverService.removeMember(currentUser.id(), serverId, userId);
+    }
+
+    /** Edita o apelido de OUTRO membro nesse servidor - diferente de PUT .../me/nickname. */
+    @PutMapping("/{serverId}/members/{userId}/nickname")
+    public void setMemberNickname(@PathVariable Long serverId, @PathVariable Long userId, @RequestBody SetNicknameRequest req) {
+        serverService.setMemberNickname(currentUser.id(), serverId, userId, req.nickname());
+    }
+
+    // ============================================================
+    // Perfis / permissoes (MANAGE_ROLES)
+    // ============================================================
+
+    /** O que EU posso fazer nesse servidor - usado pelo frontend pra decidir o que mostrar. */
+    @GetMapping("/{serverId}/me/permissions")
+    public Set<ServerPermission> getMyPermissions(@PathVariable Long serverId) {
+        return serverService.getMyPermissions(serverId, currentUser.id());
+    }
+
+    @GetMapping("/{serverId}/roles")
+    public List<RoleResponse> listRoles(@PathVariable Long serverId) {
+        return serverService.listRoles(serverId, currentUser.id());
+    }
+
+    @PostMapping("/{serverId}/roles")
+    public RoleResponse createRole(@PathVariable Long serverId, @Valid @RequestBody CreateRoleRequest req) {
+        return serverService.createRole(currentUser.id(), serverId, req);
+    }
+
+    @PutMapping("/{serverId}/roles/{roleId}")
+    public RoleResponse updateRole(@PathVariable Long serverId, @PathVariable Long roleId, @Valid @RequestBody UpdateRoleRequest req) {
+        return serverService.updateRole(currentUser.id(), serverId, roleId, req);
+    }
+
+    @DeleteMapping("/{serverId}/roles/{roleId}")
+    public void deleteRole(@PathVariable Long serverId, @PathVariable Long roleId) {
+        serverService.deleteRole(currentUser.id(), serverId, roleId);
+    }
+
+    /** Substitui os perfis atribuidos a um membro (lista inteira, nao incremental). */
+    @PutMapping("/{serverId}/members/{userId}/roles")
+    public void setMemberRoles(@PathVariable Long serverId, @PathVariable Long userId, @RequestBody SetMemberRolesRequest req) {
+        serverService.setMemberRoles(currentUser.id(), serverId, userId, req.roleIds());
     }
 }

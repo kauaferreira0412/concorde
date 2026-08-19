@@ -1,7 +1,11 @@
 package com.codagis.discordclone.ws;
 
+import com.codagis.discordclone.domain.Channel;
+import com.codagis.discordclone.domain.ServerPermission;
+import com.codagis.discordclone.repository.ChannelRepository;
 import com.codagis.discordclone.repository.UserRepository;
 import com.codagis.discordclone.service.DisplayNameService;
+import com.codagis.discordclone.service.PermissionService;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -21,13 +25,18 @@ public class VoicePresenceController {
 
     private final VoicePresenceService presenceService;
     private final UserRepository userRepository;
+    private final ChannelRepository channelRepository;
     private final DisplayNameService displayNameService;
+    private final PermissionService permissionService;
 
     public VoicePresenceController(VoicePresenceService presenceService, UserRepository userRepository,
-                                    DisplayNameService displayNameService) {
+                                    ChannelRepository channelRepository, DisplayNameService displayNameService,
+                                    PermissionService permissionService) {
         this.presenceService = presenceService;
         this.userRepository = userRepository;
+        this.channelRepository = channelRepository;
         this.displayNameService = displayNameService;
+        this.permissionService = permissionService;
     }
 
     public record MicStatePayload(boolean micEnabled) {}
@@ -52,12 +61,35 @@ public class VoicePresenceController {
     }
 
     @MessageMapping("/channel.{channelId}.voice.mic")
-    public void mic(@DestinationVariable Long channelId, MicStatePayload payload, @Header("simpSessionId") String sessionId) {
+    public void mic(@DestinationVariable Long channelId, MicStatePayload payload, @Header("simpSessionId") String sessionId,
+                     Principal principal) {
+        // Se um moderador te mutou a força (forceMuted), voce so' consegue se desmutar
+        // sozinho se TAMBEM tiver a permissao de mutar gente (ver ServerPermission.MUTE_MEMBERS)
+        // - regra pedida explicitamente pelo usuario: "o alvo so' pode se livrar se tiver
+        // permissao tambem". Mutar a SI MESMO (payload.micEnabled()==false) sempre e' permitido.
+        if (payload.micEnabled() && presenceService.isForceMuted(channelId, userIdOf(principal))
+                && !hasPermission(channelId, userIdOf(principal), ServerPermission.MUTE_MEMBERS)) {
+            return;
+        }
         presenceService.setMicEnabled(sessionId, payload.micEnabled());
     }
 
     @MessageMapping("/channel.{channelId}.voice.deafen")
-    public void deafen(@DestinationVariable Long channelId, DeafenStatePayload payload, @Header("simpSessionId") String sessionId) {
+    public void deafen(@DestinationVariable Long channelId, DeafenStatePayload payload, @Header("simpSessionId") String sessionId,
+                        Principal principal) {
+        if (!payload.deafened() && presenceService.isForceDeafened(channelId, userIdOf(principal))
+                && !hasPermission(channelId, userIdOf(principal), ServerPermission.DEAFEN_MEMBERS)) {
+            return;
+        }
         presenceService.setDeafened(sessionId, payload.deafened());
+    }
+
+    private Long userIdOf(Principal principal) {
+        return (Long) ((Authentication) principal).getPrincipal();
+    }
+
+    private boolean hasPermission(Long channelId, Long userId, ServerPermission permission) {
+        Channel channel = channelRepository.findById(channelId).orElse(null);
+        return channel != null && permissionService.has(channel.getServerId(), userId, permission);
     }
 }

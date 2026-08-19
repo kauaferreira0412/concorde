@@ -11,6 +11,7 @@ import MemberList from "../components/MemberList.jsx";
 import CreateServerModal from "../components/CreateServerModal.jsx";
 import CreateChannelModal from "../components/CreateChannelModal.jsx";
 import EditServerModal from "../components/EditServerModal.jsx";
+import ServerRolesModal from "../components/ServerRolesModal.jsx";
 import SettingsModal from "../components/SettingsModal.jsx";
 import { VoiceCallProvider } from "../context/VoiceCallContext.jsx";
 
@@ -24,6 +25,7 @@ export default function ServerPage() {
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [showCreateServer, setShowCreateServer] = useState(false);
   const [editingServer, setEditingServer] = useState(null); // server sendo editado, null = fechado
+  const [rolesServer, setRolesServer] = useState(null); // server com o modal de Perfis aberto, null = fechado
   const [createChannelType, setCreateChannelType] = useState(null); // null | "TEXT" | "VOICE"
   const [showSettings, setShowSettings] = useState(false);
   const [stompClient, setStompClient] = useState(null);
@@ -129,6 +131,7 @@ export default function ServerPage() {
           onCreateChannel={openCreateChannel}
           onOpenSettings={() => setShowSettings(true)}
           onEditServer={setEditingServer}
+          onOpenRoles={setRolesServer}
           stompClient={stompClient}
           stompConnected={stompConnected}
           user={user}
@@ -165,6 +168,14 @@ export default function ServerPage() {
         )}
         {editingServer && (
           <EditServerModal server={editingServer} onClose={() => setEditingServer(null)} onUpdate={handleUpdateServer} />
+        )}
+        {rolesServer && (
+          <ServerRolesModal
+            server={rolesServer}
+            stompClient={stompClient}
+            stompConnected={stompConnected}
+            onClose={() => setRolesServer(null)}
+          />
         )}
         {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       </div>

@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import api from "../api/client";
 import { useServerMembers } from "../utils/useServerMembers";
 import { useProfile } from "../context/ProfileContext.jsx";
-import { ChevronsLeftIcon, ChevronsRightIcon, UsersIcon } from "./icons.jsx";
+import { ChevronsLeftIcon, ChevronsRightIcon, PencilIcon, TrashIcon, UsersIcon } from "./icons.jsx";
 import Avatar from "./Avatar.jsx";
+import ConfirmModal from "./ConfirmModal.jsx";
 
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", OFFLINE: "Offline" };
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
@@ -16,6 +18,29 @@ const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: 
 export default function MemberList({ serverId, stompClient, stompConnected }) {
   const members = useServerMembers(serverId, stompClient, stompConnected);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("memberListCollapsed") === "true");
+  // MANAGE_MEMBERS - controla se "Remover do servidor"/"Editar apelido" aparecem no clique
+  // direito de cada membro (ver MemberRow). O backend confere a permissao de novo em cada
+  // chamada, entao mesmo sem os botoes aparecerem ninguem sem permissao consegue nada.
+  const [myServerPermissions, setMyServerPermissions] = useState(new Set());
+
+  useEffect(() => {
+    if (!serverId) {
+      setMyServerPermissions(new Set());
+      return;
+    }
+    let cancelled = false;
+    api
+      .get(`/api/servers/${serverId}/me/permissions`)
+      .then(({ data }) => {
+        if (!cancelled) setMyServerPermissions(new Set(data));
+      })
+      .catch(() => {
+        if (!cancelled) setMyServerPermissions(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [serverId]);
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -27,6 +52,7 @@ export default function MemberList({ serverId, stompClient, stompConnected }) {
 
   if (!serverId) return null;
 
+  const canManage = myServerPermissions.has("MANAGE_MEMBERS");
   const online = members.filter((m) => m.status !== "OFFLINE");
   const offline = members.filter((m) => m.status === "OFFLINE");
 
@@ -49,7 +75,7 @@ export default function MemberList({ serverId, stompClient, stompConnected }) {
             <>
               <p className="channel-group-title member-list-group">ONLINE — {online.length}</p>
               {online.map((m) => (
-                <MemberRow key={m.userId} member={m} />
+                <MemberRow key={m.userId} member={m} serverId={serverId} canManage={canManage} />
               ))}
             </>
           )}
@@ -57,7 +83,7 @@ export default function MemberList({ serverId, stompClient, stompConnected }) {
             <>
               <p className="channel-group-title member-list-group">OFFLINE — {offline.length}</p>
               {offline.map((m) => (
-                <MemberRow key={m.userId} member={m} />
+                <MemberRow key={m.userId} member={m} serverId={serverId} canManage={canManage} />
               ))}
             </>
           )}
@@ -73,23 +99,157 @@ export default function MemberList({ serverId, stompClient, stompConnected }) {
   );
 }
 
-export function MemberRow({ member }) {
+/**
+ * `serverId`/`canManage` sao opcionais - so' passados por MemberList (onde faz sentido
+ * gerenciar). Em outros lugares que reaproveitam esse componente (ex: VoiceChannel.jsx,
+ * "Membros com acesso a esse canal") o clique direito simplesmente nao faz nada.
+ */
+export function MemberRow({ member, serverId, canManage }) {
   const { openProfile } = useProfile();
+  const [menu, setMenu] = useState(null); // { x, y }
+  const [editingNickname, setEditingNickname] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState(member.nickname || "");
+  const [nicknameSaving, setNicknameSaving] = useState(false);
+  const [nicknameError, setNicknameError] = useState("");
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removed, setRemoved] = useState(false); // otimista - some da lista sem esperar recarregar tudo
+  const [nicknameOverride, setNicknameOverride] = useState(undefined); // otimista - ver handleSaveNickname
+  const menuRef = useRef(null);
+  const displayNickname = nicknameOverride !== undefined ? nicknameOverride : member.nickname;
+
+  useEffect(() => {
+    if (!menu) return;
+    function handlePointerDown(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenu(null);
+    }
+    function handleKeyDown(e) {
+      if (e.key === "Escape") setMenu(null);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menu]);
+
+  async function handleSaveNickname() {
+    setNicknameSaving(true);
+    setNicknameError("");
+    try {
+      await api.put(`/api/servers/${serverId}/members/${member.userId}/nickname`, { nickname: nicknameDraft.trim() });
+      setNicknameOverride(nicknameDraft.trim() || null); // ajuste otimista - a lista de verdade so' atualiza no proximo fetch
+      setEditingNickname(false);
+    } catch (err) {
+      setNicknameError(err.response?.data?.error || "Não foi possível salvar o apelido");
+    } finally {
+      setNicknameSaving(false);
+    }
+  }
+
+  async function handleRemove() {
+    try {
+      await api.delete(`/api/servers/${serverId}/members/${member.userId}`);
+      setRemoved(true);
+    } catch (err) {
+      alert(err.response?.data?.error || "Não foi possível remover esse membro");
+    }
+  }
+
+  if (removed) return null;
+
   return (
-    <button
-      type="button"
-      className={"member-row" + (member.status === "OFFLINE" ? " offline" : "")}
-      onClick={() => openProfile(member.userId)}
-      title={`Ver perfil de ${member.username}`}
-    >
-      <div className="member-avatar-wrap">
-        <Avatar name={member.username} url={member.avatarUrl} className="voice-avatar small" />
-        <span className={"status-dot " + STATUS_DOT_CLASS[member.status]} title={STATUS_LABEL[member.status]} />
-      </div>
-      {/* Apelido DESSE servidor (ver Configurações > Perfil) tem prioridade sobre o username -
-          mesma logica do Discord: e' local aquele servidor, so' quem esta nele ve. */}
-      <span className="member-row-name">{member.nickname || member.username}</span>
-      {member.role === "ADMIN" && <span className="admin-badge">ADMIN</span>}
-    </button>
+    <>
+      <button
+        type="button"
+        className={"member-row" + (member.status === "OFFLINE" ? " offline" : "")}
+        onClick={() => openProfile(member.userId)}
+        onContextMenu={(e) => {
+          if (!canManage || !serverId) return;
+          e.preventDefault();
+          setMenu({ x: e.clientX, y: e.clientY });
+        }}
+        title={
+          canManage ? `Ver perfil de ${member.username} (botão direito pra gerenciar)` : `Ver perfil de ${member.username}`
+        }
+      >
+        <div className="member-avatar-wrap">
+          <Avatar name={member.username} url={member.avatarUrl} className="voice-avatar small" />
+          <span className={"status-dot " + STATUS_DOT_CLASS[member.status]} title={STATUS_LABEL[member.status]} />
+        </div>
+        {/* Apelido DESSE servidor (ver Configurações > Perfil) tem prioridade sobre o username -
+            mesma logica do Discord: e' local aquele servidor, so' quem esta nele ve. */}
+        <span className="member-row-name">{displayNickname || member.username}</span>
+        {member.role === "ADMIN" && <span className="admin-badge">ADMIN</span>}
+      </button>
+
+      {menu && (
+        <div className="volume-popover" ref={menuRef} style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
+          <p className="volume-popover-title">{displayNickname || member.username}</p>
+          <div className="participant-mod-actions" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
+            <button
+              type="button"
+              className="participant-mod-btn"
+              onClick={() => {
+                setMenu(null);
+                setEditingNickname(true);
+              }}
+            >
+              <PencilIcon size={14} /> Editar apelido aqui
+            </button>
+            <button
+              type="button"
+              className="participant-mod-btn danger"
+              onClick={() => {
+                setMenu(null);
+                setConfirmRemove(true);
+              }}
+            >
+              <TrashIcon size={14} /> Remover do servidor
+            </button>
+          </div>
+        </div>
+      )}
+
+      {editingNickname && (
+        <div className="modal-backdrop" onClick={() => setEditingNickname(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Apelido de {member.username} nesse servidor</h2>
+            <div className="settings-field">
+              <input
+                autoFocus
+                value={nicknameDraft}
+                onChange={(e) => setNicknameDraft(e.target.value)}
+                maxLength={32}
+                placeholder={member.username}
+              />
+              <p className="admin-hint" style={{ margin: 0 }}>
+                Em branco = volta a mostrar o apelido global/username dessa pessoa.
+              </p>
+            </div>
+            {nicknameError && <p className="auth-error">{nicknameError}</p>}
+            <div className="settings-actions">
+              <button type="button" className="link-btn" onClick={() => setEditingNickname(false)} disabled={nicknameSaving}>
+                Cancelar
+              </button>
+              <button type="button" onClick={handleSaveNickname} disabled={nicknameSaving}>
+                {nicknameSaving ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmRemove && (
+        <ConfirmModal
+          title="Remover do servidor"
+          message={`Tem certeza que quer remover ${member.username} desse servidor? A conta continua existindo, só perde o acesso a esse servidor.`}
+          confirmLabel="Remover"
+          danger
+          onClose={() => setConfirmRemove(false)}
+          onConfirm={handleRemove}
+        />
+      )}
+    </>
   );
 }
