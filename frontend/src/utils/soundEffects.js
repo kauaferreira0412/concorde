@@ -1,11 +1,25 @@
 import { getSoundEffectsEnabled } from "./audioSettings";
 
 /**
- * Efeitos sonoros da call (entrar/sair, mutar/desmutar, compartilhar tela), sintetizados
- * via Web Audio API - sem depender de nenhum arquivo .mp3 externo, funciona offline, sem
- * licenciamento, sem CORS. Todos respeitam o toggle "Tocar som..." de Configuracoes.
+ * Efeitos sonoros da call (entrar/sair, mutar/desmutar, compartilhar tela). A maioria e'
+ * sintetizada via Web Audio API - sem depender de arquivo .mp3 externo, funciona offline,
+ * sem licenciamento, sem CORS. O de "entrar na call" e' um .mp3 de verdade (ver
+ * public/sounds/join.mp3) - todos respeitam o toggle "Tocar som..." de Configuracoes.
  */
 let audioCtx = null;
+
+// import.meta.env.BASE_URL: "/" no site, "./" no app desktop empacotado (ver vite.config.js) -
+// precisa disso em vez de "/sounds/join.mp3" direto pro caminho funcionar dentro do .exe
+// tambem (que serve os arquivos via app://, nao file:// na raiz).
+let joinAudioEl = null;
+function getJoinAudioEl() {
+  if (!joinAudioEl) {
+    joinAudioEl = new Audio(`${import.meta.env.BASE_URL}sounds/join.mp3`);
+    joinAudioEl.preload = "auto";
+    joinAudioEl.volume = 0.55;
+  }
+  return joinAudioEl;
+}
 
 function getAudioContext() {
   if (!audioCtx) {
@@ -38,10 +52,14 @@ function playTone(freq, startOffset, duration, gainPeak = 0.16) {
 export function playJoinSound() {
   if (!getSoundEffectsEnabled()) return;
   try {
-    playTone(587.33, 0, 0.12); // D5
-    playTone(880, 0.07, 0.18); // A5 - subindo, sensacao de "chegou"
+    const el = getJoinAudioEl();
+    el.currentTime = 0; // permite tocar de novo mesmo se o anterior ainda nao tinha acabado
+    el.play().catch(() => {
+      // Navegador pode bloquear play() antes de qualquer interacao do usuario na pagina -
+      // sem problema, so nao toca dessa vez.
+    });
   } catch {
-    // Web Audio pode falhar antes de qualquer interacao do usuario na pagina - sem problema, so nao toca.
+    // idem
   }
 }
 
