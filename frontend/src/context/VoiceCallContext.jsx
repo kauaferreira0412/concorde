@@ -157,13 +157,27 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     activeChannelRef.current = channel;
     setActiveChannelState(channel);
   }
+  // Sempre republica pra presenca (o que alimenta "Conectados agora"/a lista aninhada sob
+  // cada canal - ver ChannelSidebar.jsx) junto com a mudanca local, direto aqui no setter -
+  // antes cada lugar que mudava o mic/deafen local tinha que lembrar de chamar
+  // publishVoiceMicState/publishVoiceDeafenState por conta propria, e um lugar (o catch de
+  // falha ao ligar o microfone dentro de joinChannel) esquecia disso: o mic ficava desligado
+  // localmente mas a presenca continuava dizendo que estava ligado (ou vice-versa depois),
+  // deixando a lista errada PRA SEMPRE (nada mais corrigia sozinho depois). Botando aqui no
+  // setter, nenhum lugar (atual ou futuro) consegue esquecer.
   function setMicEnabled(value) {
     micEnabledRef.current = value;
     setMicEnabledState(value);
+    if (activeChannelRef.current && stompClientRef.current && stompConnectedRef.current) {
+      publishVoiceMicState(stompClientRef.current, activeChannelRef.current.id, value);
+    }
   }
   function setDeafened(value) {
     deafenedRef.current = value;
     setDeafenedState(value);
+    if (activeChannelRef.current && stompClientRef.current && stompConnectedRef.current) {
+      publishVoiceDeafenState(stompClientRef.current, activeChannelRef.current.id, value);
+    }
   }
   function setCameraEnabled(value) {
     cameraEnabledRef.current = value;
