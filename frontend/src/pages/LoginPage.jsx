@@ -81,8 +81,6 @@ export default function LoginPage() {
         <button type="submit" disabled={submitting}>
           {submitting ? "Entrando..." : "Entrar"}
         </button>
-
-        <p className="auth-note">Não há cadastro público — peça acesso ao administrador.</p>
       </form>
 
       {!isElectronDesktop && (
