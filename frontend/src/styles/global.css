@@ -597,6 +597,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .voice-status-icon-btn {
   width: 36px;
   height: 36px;
+  padding: 0;
   flex: 0 0 auto;
   border: none;
   border-radius: 50%;
@@ -606,6 +607,10 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   background: var(--bg-hover);
   color: var(--text-secondary);
 }
+/* O button{} global tem padding:9px 16px - sem zerar acima, isso "comia" quase todo o
+   circulo de 36px e deixava o SVG (18px) espremido/cortado, sumindo visualmente
+   (o bug que o usuario reportou: "os icones sumiram"). */
+.voice-status-icon-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 .voice-status-icon-btn:hover { background: var(--border-soft); color: var(--text-primary); }
 .voice-status-icon-btn.accent { background: var(--accent); color: #fff; }
 .voice-status-icon-btn.accent:hover { background: #4c80ff; }
@@ -614,13 +619,17 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .voice-status-icon-btn.danger, .voice-status-icon-btn.leave { background: var(--danger); color: #fff; }
 .voice-status-icon-btn.danger:hover, .voice-status-icon-btn.leave:hover { background: #ff5c6c; }
 
+/* Uma linha so' (avatar+nome+cargo a esquerda, engrenagem/sair a direita) - igual o
+   modelo do Figma do usuario. Antes era flex-direction:column, empilhando os icones
+   numa segunda linha embaixo a direita, bem diferente do print. */
 .user-bar {
   padding: 12px 14px;
   background: var(--bg-panel-2);
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 13.5px;
   font-weight: 600;
 }
