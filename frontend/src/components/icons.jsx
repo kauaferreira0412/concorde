@@ -290,6 +290,30 @@ export function UserIcon(props) {
   );
 }
 
+export function KeyboardIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <line x1="6" y1="9" x2="6" y2="9" />
+      <line x1="10" y1="9" x2="10" y2="9" />
+      <line x1="14" y1="9" x2="14" y2="9" />
+      <line x1="18" y1="9" x2="18" y2="9" />
+      <line x1="6" y1="13" x2="6" y2="13" />
+      <line x1="18" y1="13" x2="18" y2="13" />
+      <line x1="8" y1="16" x2="16" y2="16" />
+    </svg>
+  );
+}
+
+export function BellIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6" />
+      <path d="M10.5 20a1.5 1.5 0 0 0 3 0" />
+    </svg>
+  );
+}
+
 export function LockIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>

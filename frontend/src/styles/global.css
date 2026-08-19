@@ -790,8 +790,17 @@ img.chat-header-avatar { object-fit: cover; }
 }
 .chat-message:hover .chat-message-actions { display: flex; }
 
-.chat-edit-row { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
-.chat-edit-row input { flex: 1; padding: 7px 10px; font-size: 14px; }
+.chat-edit-row { display: flex; align-items: flex-end; gap: 6px; margin-top: 3px; }
+.chat-edit-row textarea {
+  flex: 1;
+  padding: 7px 10px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: none;
+  max-height: 160px;
+  overflow-y: auto;
+  line-height: 1.45;
+}
 
 .chat-pending-attachment {
   display: flex;
@@ -808,11 +817,24 @@ img.chat-header-avatar { object-fit: cover; }
 .chat-pending-attachment strong { font-size: 13.5px; }
 .chat-pending-attachment .icon-btn { margin-left: auto; flex-shrink: 0; }
 
-.chat-input { display: flex; align-items: center; gap: 8px; padding: 16px 20px 20px; }
-.chat-attach-btn { flex-shrink: 0; }
+.chat-input { display: flex; align-items: flex-end; gap: 8px; padding: 16px 20px 20px; }
+.chat-attach-btn { flex-shrink: 0; margin-bottom: 1px; }
 .chat-input-field { position: relative; flex: 1; min-width: 0; }
-.chat-input-field input { width: 100%; padding: 12px 16px; border-radius: var(--radius-md); }
-.chat-input button[type="submit"] { background: var(--accent); color: #fff; padding: 0 20px; border-radius: var(--radius-md); box-shadow: var(--glow-accent); }
+.chat-input-field textarea {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  resize: none;
+  max-height: 160px;
+  overflow-y: auto;
+  line-height: 1.45;
+}
+.chat-input button[type="submit"] {
+  background: var(--accent); color: #fff; padding: 0 20px; height: 46px;
+  border-radius: var(--radius-md); box-shadow: var(--glow-accent); flex-shrink: 0;
+}
 .chat-input button[type="submit"]:hover:not(:disabled) { background: var(--accent-hover); }
 
 /* Autocomplete de @mencao - abre PRA CIMA (o input fica embaixo, colado na barra inferior). */
@@ -1389,10 +1411,10 @@ img.chat-header-avatar { object-fit: cover; }
   gap: 14px;
 }
 .modal h2 { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
-.modal button:not(.link-btn):not(.status-dropdown-trigger):not(.status-option):not(.screen-picker-tab):not(.screen-picker-card) {
+.modal button:not(.link-btn):not(.status-dropdown-trigger):not(.status-option):not(.screen-picker-tab):not(.screen-picker-card):not(.icon-btn):not(.settings-nav-item) {
   background: var(--accent); color: #fff; width: 100%; padding: 11px; margin-top: 4px; box-shadow: var(--glow-accent);
 }
-.modal button:not(.link-btn):not(.status-dropdown-trigger):not(.status-option):not(.screen-picker-tab):not(.screen-picker-card):hover {
+.modal button:not(.link-btn):not(.status-dropdown-trigger):not(.status-option):not(.screen-picker-tab):not(.screen-picker-card):not(.icon-btn):not(.settings-nav-item):hover {
   background: var(--accent-hover);
 }
 .modal button.danger { background: var(--danger-soft); color: var(--danger); }
@@ -1450,7 +1472,67 @@ img.chat-header-avatar { object-fit: cover; }
 .invite-link-row input { flex: 1; }
 .invite-link-row button { width: auto; margin-top: 0; white-space: nowrap; }
 
-.settings-modal { width: 480px; max-height: 85vh; overflow-y: auto; }
+/* Modal de configuracoes: cabecalho fixo + navegacao lateral por abas (esquerda) + conteudo
+   da aba selecionada (direita, com scroll proprio) + rodape de acoes fixo - bem mais largo
+   que o modal padrao (era uma lista unica, comprida, de tudo empilhado - "muito feio, mal
+   ordenado" no feedback do usuario). */
+.settings-modal {
+  width: 760px;
+  max-width: calc(100vw - 40px);
+  height: 620px;
+  max-height: 80vh;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.settings-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+.settings-modal-header h2 { margin: 0; }
+.settings-modal-body { display: flex; flex: 1; min-height: 0; }
+.settings-nav {
+  width: 200px;
+  flex-shrink: 0;
+  padding: 14px 10px;
+  border-right: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+.settings-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+  width: 100%;
+}
+.settings-nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.settings-nav-item.active { background: var(--accent-soft); color: var(--accent-text); }
+.settings-content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 22px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.settings-content .settings-section-title:first-child { margin-top: 0; }
+.settings-modal .settings-actions {
+  flex-shrink: 0;
+  padding: 14px 22px;
+  border-top: 1px solid var(--border-soft);
+  margin-top: 0;
+}
 .avatar-picker { display: flex; align-items: center; gap: 14px; }
 .avatar-picker-preview { width: 64px; height: 64px; border-radius: 50%; font-size: 20px; flex-shrink: 0; }
 .avatar-picker button { width: auto; }

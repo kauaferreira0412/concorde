@@ -27,6 +27,15 @@ import { useAuth } from "../context/AuthContext.jsx";
 import api from "../api/client";
 import Avatar from "./Avatar.jsx";
 import StatusDropdown from "./StatusDropdown.jsx";
+import { BellIcon, KeyboardIcon, MicIcon, UserIcon, XIcon } from "./icons.jsx";
+
+/** Abas da tela de configuracoes - cada uma so' renderiza o seu pedaco (ver SettingsModal). */
+const TABS = [
+  { id: "perfil", label: "Perfil", Icon: UserIcon },
+  { id: "audio", label: "Áudio e vídeo", Icon: MicIcon },
+  { id: "atalhos", label: "Atalhos", Icon: KeyboardIcon },
+  { id: "notificacoes", label: "Notificações", Icon: BellIcon },
+];
 
 /** Campo de "gravar atalho": clica em Alterar, aperta a combinacao desejada, pronto. */
 function ShortcutRecorder({ value, onChange }) {
@@ -71,6 +80,7 @@ function ShortcutRecorder({ value, onChange }) {
  */
 export default function SettingsModal({ onClose }) {
   const { user, updateUser } = useAuth();
+  const [activeTab, setActiveTab] = useState("perfil");
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState("");
   const avatarInputRef = useRef(null);
@@ -227,172 +237,211 @@ export default function SettingsModal({ onClose }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Foto de perfil</h2>
-        <div className="avatar-picker">
-          <Avatar name={user?.username} url={user?.avatarUrl} className="avatar-picker-preview" />
-          <div>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              ref={avatarInputRef}
-              onChange={handleAvatarChange}
-              hidden
-            />
-            <button type="button" onClick={() => avatarInputRef.current?.click()} disabled={avatarUploading}>
-              {avatarUploading ? "Enviando..." : "Trocar foto"}
-            </button>
-            <p className="admin-hint" style={{ margin: "6px 0 0" }}>
-              PNG, JPG, GIF ou WEBP, até 8MB.
-            </p>
-          </div>
-        </div>
-        {avatarError && <p className="auth-error">{avatarError}</p>}
-
-        <div className="settings-divider" />
-
-        <p className="settings-section-title">Status</p>
-        <StatusDropdown value={user?.status || "ONLINE"} onChange={handleStatusChange} disabled={visibilitySaving} />
-        {visibilityError && <p className="auth-error">{visibilityError}</p>}
-
-        <div className="settings-divider" />
-
-        <p className="settings-section-title">Dispositivos de áudio e vídeo</p>
-        <p className="admin-hint">A escolha aqui vale para a próxima vez que você entrar em uma call de voz.</p>
-
-        {permissionError && <p className="auth-error">{permissionError}</p>}
-
-        <div className="settings-field">
-          <label className="settings-label">Microfone (entrada)</label>
-          <select value={selectedInput} onChange={(e) => setSelectedInput(e.target.value)}>
-            <option value="">Padrão do sistema</option>
-            {inputDevices.map((d) => (
-              <option key={d.deviceId} value={d.deviceId}>
-                {d.label || `Microfone ${d.deviceId.slice(0, 6)}`}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="settings-field">
-          <label className="settings-label">Alto-falante / fone (saída)</label>
-          <select value={selectedOutput} onChange={(e) => setSelectedOutput(e.target.value)} disabled={!outputSupported}>
-            <option value="">Padrão do sistema</option>
-            {outputDevices.map((d) => (
-              <option key={d.deviceId} value={d.deviceId}>
-                {d.label || `Saída ${d.deviceId.slice(0, 6)}`}
-              </option>
-            ))}
-          </select>
-          {!outputSupported && (
-            <p className="admin-hint" style={{ margin: 0 }}>
-              Seu navegador não permite escolher a saída de áudio por código (comum no Firefox) — vai usar sempre o
-              dispositivo padrão do sistema.
-            </p>
-          )}
-        </div>
-
-        <div className="settings-field">
-          <label className="settings-label">Câmera</label>
-          <select value={selectedVideoInput} onChange={(e) => setSelectedVideoInput(e.target.value)}>
-            <option value="">Padrão do sistema</option>
-            {videoDevices.map((d) => (
-              <option key={d.deviceId} value={d.deviceId}>
-                {d.label || `Câmera ${d.deviceId.slice(0, 6)}`}
-              </option>
-            ))}
-          </select>
-          <p className="admin-hint" style={{ margin: 0 }}>
-            Vale a partir da próxima vez que você ligar a câmera (ícone 📷 na barra de voz).
-          </p>
-        </div>
-
-        <div className="settings-test-row">
-          {!testing ? (
-            <button type="button" onClick={startTest}>
-              🎙️ Testar microfone (ouvir a si mesmo)
-            </button>
-          ) : (
-            <button type="button" className="danger" onClick={stopTest}>
-              Parar teste
-            </button>
-          )}
-        </div>
-
-        {testing && (
-          <div className="settings-field">
-            <div className="mic-meter-row">
-              <span>Nível captado:</span>
-              <div className="mic-meter-track">
-                <div className="mic-meter-fill" style={{ width: `${level}%` }} />
-              </div>
-              <span className="mic-meter-value">{level}%</span>
-            </div>
-            <p className="admin-hint" style={{ margin: 0 }}>
-              Fale algo — você deve ouvir sua própria voz (com um pequeno atraso) pelo dispositivo de saída
-              escolhido, e a barra deve se mexer. Use fone de ouvido para evitar eco.
-            </p>
-          </div>
-        )}
-
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-        <audio ref={audioElRef} autoPlay />
-
-        <label className="settings-checkbox-row">
-          <input
-            type="checkbox"
-            checked={noiseSuppression}
-            onChange={(e) => setNoiseSuppression(e.target.checked)}
-          />
-          Supressão de ruído no microfone
-        </label>
-        <p className="admin-hint" style={{ margin: "4px 0 0" }}>
-          Filtra ruído de fundo (ventilador, teclado, etc). Desative se seu microfone soar
-          estranho ou abafado com ela ligada (comum em microfones de estúdio/instrumentos).
-        </p>
-
-        <div className="settings-divider" />
-
-        <p className="settings-section-title">Atalhos de teclado</p>
-        <p className="admin-hint">Funcionam de qualquer tela do app, desde que você esteja numa call.</p>
-
-        <div className="settings-field">
-          <label className="settings-label">Mutar / desmutar microfone</label>
-          <ShortcutRecorder value={muteShortcut} onChange={setMuteShortcutState} />
-        </div>
-        <div className="settings-field">
-          <label className="settings-label">Ensurdecer / reativar áudio</label>
-          <ShortcutRecorder value={deafenShortcut} onChange={setDeafenShortcutState} />
-        </div>
-
-        <div className="settings-divider" />
-
-        <label className="settings-checkbox-row">
-          <input type="checkbox" checked={soundEffects} onChange={(e) => setSoundEffects(e.target.checked)} />
-          Tocar som quando alguém entrar ou sair de uma call
-          <button type="button" className="link-btn" onClick={playJoinSound} style={{ marginLeft: "auto" }}>
-            Testar som
+        <div className="settings-modal-header">
+          <h2>Configurações</h2>
+          <button type="button" className="icon-btn" onClick={onClose} title="Fechar">
+            <XIcon size={18} />
           </button>
-        </label>
+        </div>
 
-        <label className="settings-checkbox-row">
-          <input
-            type="checkbox"
-            checked={desktopNotifications}
-            disabled={notificationsBlocked}
-            onChange={(e) => {
-              setNotificationError("");
-              setDesktopNotifications(e.target.checked);
-            }}
-          />
-          Notificações no PC quando chegar mensagem nova
-        </label>
-        {notificationsBlocked && (
-          <p className="admin-hint" style={{ margin: 0 }}>
-            Seu navegador tem notificações bloqueadas pra esse site. Libere nas configurações
-            do navegador (ícone de cadeado na barra de endereço) pra poder ligar isso.
-          </p>
-        )}
-        {notificationError && <p className="auth-error">{notificationError}</p>}
+        <div className="settings-modal-body">
+          <nav className="settings-nav">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={"settings-nav-item" + (activeTab === tab.id ? " active" : "")}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                <tab.Icon size={16} />
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="settings-content">
+            {activeTab === "perfil" && (
+              <>
+                <p className="settings-section-title">Foto de perfil</p>
+                <div className="avatar-picker">
+                  <Avatar name={user?.username} url={user?.avatarUrl} className="avatar-picker-preview" />
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif,image/webp"
+                      ref={avatarInputRef}
+                      onChange={handleAvatarChange}
+                      hidden
+                    />
+                    <button type="button" onClick={() => avatarInputRef.current?.click()} disabled={avatarUploading}>
+                      {avatarUploading ? "Enviando..." : "Trocar foto"}
+                    </button>
+                    <p className="admin-hint" style={{ margin: "6px 0 0" }}>
+                      PNG, JPG, GIF ou WEBP, até 8MB.
+                    </p>
+                  </div>
+                </div>
+                {avatarError && <p className="auth-error">{avatarError}</p>}
+
+                <div className="settings-divider" />
+
+                <p className="settings-section-title">Status</p>
+                <StatusDropdown value={user?.status || "ONLINE"} onChange={handleStatusChange} disabled={visibilitySaving} />
+                {visibilityError && <p className="auth-error">{visibilityError}</p>}
+              </>
+            )}
+
+            {activeTab === "audio" && (
+              <>
+                <p className="settings-section-title">Dispositivos de áudio e vídeo</p>
+                <p className="admin-hint">A escolha aqui vale para a próxima vez que você entrar em uma call de voz.</p>
+
+                {permissionError && <p className="auth-error">{permissionError}</p>}
+
+                <div className="settings-field">
+                  <label className="settings-label">Microfone (entrada)</label>
+                  <select value={selectedInput} onChange={(e) => setSelectedInput(e.target.value)}>
+                    <option value="">Padrão do sistema</option>
+                    {inputDevices.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Microfone ${d.deviceId.slice(0, 6)}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="settings-field">
+                  <label className="settings-label">Alto-falante / fone (saída)</label>
+                  <select value={selectedOutput} onChange={(e) => setSelectedOutput(e.target.value)} disabled={!outputSupported}>
+                    <option value="">Padrão do sistema</option>
+                    {outputDevices.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Saída ${d.deviceId.slice(0, 6)}`}
+                      </option>
+                    ))}
+                  </select>
+                  {!outputSupported && (
+                    <p className="admin-hint" style={{ margin: 0 }}>
+                      Seu navegador não permite escolher a saída de áudio por código (comum no Firefox) — vai usar
+                      sempre o dispositivo padrão do sistema.
+                    </p>
+                  )}
+                </div>
+
+                <div className="settings-field">
+                  <label className="settings-label">Câmera</label>
+                  <select value={selectedVideoInput} onChange={(e) => setSelectedVideoInput(e.target.value)}>
+                    <option value="">Padrão do sistema</option>
+                    {videoDevices.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label || `Câmera ${d.deviceId.slice(0, 6)}`}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="admin-hint" style={{ margin: 0 }}>
+                    Vale a partir da próxima vez que você ligar a câmera (ícone 📷 na barra de voz).
+                  </p>
+                </div>
+
+                <div className="settings-test-row">
+                  {!testing ? (
+                    <button type="button" onClick={startTest}>
+                      🎙️ Testar microfone (ouvir a si mesmo)
+                    </button>
+                  ) : (
+                    <button type="button" className="danger" onClick={stopTest}>
+                      Parar teste
+                    </button>
+                  )}
+                </div>
+
+                {testing && (
+                  <div className="settings-field">
+                    <div className="mic-meter-row">
+                      <span>Nível captado:</span>
+                      <div className="mic-meter-track">
+                        <div className="mic-meter-fill" style={{ width: `${level}%` }} />
+                      </div>
+                      <span className="mic-meter-value">{level}%</span>
+                    </div>
+                    <p className="admin-hint" style={{ margin: 0 }}>
+                      Fale algo — você deve ouvir sua própria voz (com um pequeno atraso) pelo dispositivo de saída
+                      escolhido, e a barra deve se mexer. Use fone de ouvido para evitar eco.
+                    </p>
+                  </div>
+                )}
+
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <audio ref={audioElRef} autoPlay />
+
+                <div className="settings-divider" />
+
+                <label className="settings-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={noiseSuppression}
+                    onChange={(e) => setNoiseSuppression(e.target.checked)}
+                  />
+                  Supressão de ruído no microfone
+                </label>
+                <p className="admin-hint" style={{ margin: "4px 0 0" }}>
+                  Filtra ruído de fundo (ventilador, teclado, etc). Desative se seu microfone soar
+                  estranho ou abafado com ela ligada (comum em microfones de estúdio/instrumentos).
+                </p>
+              </>
+            )}
+
+            {activeTab === "atalhos" && (
+              <>
+                <p className="settings-section-title">Atalhos de teclado</p>
+                <p className="admin-hint">Funcionam de qualquer tela do app, desde que você esteja numa call.</p>
+
+                <div className="settings-field">
+                  <label className="settings-label">Mutar / desmutar microfone</label>
+                  <ShortcutRecorder value={muteShortcut} onChange={setMuteShortcutState} />
+                </div>
+                <div className="settings-field">
+                  <label className="settings-label">Ensurdecer / reativar áudio</label>
+                  <ShortcutRecorder value={deafenShortcut} onChange={setDeafenShortcutState} />
+                </div>
+              </>
+            )}
+
+            {activeTab === "notificacoes" && (
+              <>
+                <p className="settings-section-title">Notificações</p>
+
+                <label className="settings-checkbox-row">
+                  <input type="checkbox" checked={soundEffects} onChange={(e) => setSoundEffects(e.target.checked)} />
+                  Tocar som quando alguém entrar ou sair de uma call
+                  <button type="button" className="link-btn" onClick={playJoinSound} style={{ marginLeft: "auto" }}>
+                    Testar som
+                  </button>
+                </label>
+
+                <label className="settings-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={desktopNotifications}
+                    disabled={notificationsBlocked}
+                    onChange={(e) => {
+                      setNotificationError("");
+                      setDesktopNotifications(e.target.checked);
+                    }}
+                  />
+                  Notificações no PC quando chegar mensagem nova
+                </label>
+                {notificationsBlocked && (
+                  <p className="admin-hint" style={{ margin: 0 }}>
+                    Seu navegador tem notificações bloqueadas pra esse site. Libere nas configurações
+                    do navegador (ícone de cadeado na barra de endereço) pra poder ligar isso.
+                  </p>
+                )}
+                {notificationError && <p className="auth-error">{notificationError}</p>}
+              </>
+            )}
+          </div>
+        </div>
 
         <div className="settings-actions">
           <button type="button" className="link-btn" onClick={onClose}>

@@ -86,6 +86,17 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Campo de mensagem e' um <textarea> que cresce sozinho conforme o texto (ate' um limite,
+  // depois rola por dentro) - roda a cada mudanca do rascunho, inclusive quando ele e' limpo
+  // programaticamente depois de enviar (por isso e' um efeito, nao so' um onInput: o reset
+  // pra 1 linha precisa acontecer mesmo sem o usuario ter digitado nada naquele momento).
+  useEffect(() => {
+    const el = draftInputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  }, [draft]);
+
   useEffect(() => {
     // Libera a memoria do preview quando o componente desmonta ou a imagem pendente muda
     return () => {
@@ -164,6 +175,13 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
         setMentionQuery(null);
         return;
       }
+    }
+    // Textarea de verdade insere quebra de linha no Enter por padrao (diferente do <input>
+    // de antes, que enviava sozinho) - Enter sozinho envia, Shift+Enter quebra linha, igual
+    // Discord/WhatsApp.
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend(e);
     }
   }
 
@@ -282,12 +300,20 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
 
               {editingId === m.id ? (
                 <div className="chat-edit-row">
-                  <input
+                  <textarea
                     autoFocus
+                    rows={1}
                     value={editingText}
                     onChange={(e) => setEditingText(e.target.value)}
+                    onInput={(e) => {
+                      e.target.style.height = "auto";
+                      e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+                    }}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") saveEdit(m);
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        saveEdit(m);
+                      }
                       if (e.key === "Escape") cancelEdit();
                     }}
                   />
@@ -396,8 +422,9 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
               ))}
             </div>
           )}
-          <input
+          <textarea
             ref={draftInputRef}
+            rows={1}
             value={draft}
             onChange={handleDraftChange}
             onKeyDown={handleDraftKeyDown}
@@ -407,7 +434,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                 ? "Adicionar legenda (opcional)..."
                 : sending
                 ? "Enviando..."
-                : `Conversar em #${channel.name} (@ pra mencionar, Ctrl+V cola imagem)`
+                : `Conversar em #${channel.name} (@ pra mencionar, Ctrl+V cola imagem, Shift+Enter quebra linha)`
             }
             disabled={!stompConnected || sending}
           />
