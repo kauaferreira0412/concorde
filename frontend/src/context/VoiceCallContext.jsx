@@ -548,7 +548,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           // registra que a transmissao existe (o quadrado clicavel aparece, sem baixar video
           // nenhum) - pedido explicito do usuario pra ninguem ver automaticamente.
           if (!watchedShareIdentitiesRef.current.has(participant.identity)) {
-            pub.setSubscribed(false).catch(() => {});
+            pub.setSubscribed(false);
             upsertScreenShare(pub.trackSid, {
               track: null,
               pub,
@@ -585,7 +585,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
             // Mesma trava do video acima (watchedShareIdentitiesRef) - o audio da transmissao
             // de quem voce nao escolheu assistir tambem nao toca sozinho.
             if (!watchedShareIdentitiesRef.current.has(participant.identity)) {
-              pub.setSubscribed(false).catch(() => {});
+              pub.setSubscribed(false);
               return;
             }
             screenAudioTracksRef.current.set(participant.identity, track);
@@ -643,7 +643,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       newRoom.on(RoomEvent.TrackPublished, (pub, participant) => {
         if (pub.source !== Track.Source.ScreenShare && pub.source !== Track.Source.ScreenShareAudio) return;
         const watching = watchedShareIdentitiesRef.current.has(participant.identity);
-        if (!watching) pub.setSubscribed(false).catch(() => {});
+        if (!watching) pub.setSubscribed(false);
         if (pub.source === Track.Source.ScreenShare) {
           upsertScreenShare(pub.trackSid, {
             track: watching ? pub.track : null,
@@ -858,7 +858,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           // assistir (mesma regra do watchedShareIdentitiesRef em TrackSubscribed), desfaz a
           // inscricao de novo - nao deve tocar sozinho so' porque reconectou.
           if (!watchedShareIdentitiesRef.current.has(participant.identity)) {
-            pub.setSubscribed(false).catch(() => {});
+            pub.setSubscribed(false);
             return;
           }
           screenAudioTracksRef.current.set(participant.identity, pub.track);
@@ -879,7 +879,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       const pub = participant.getTrackPublication(Track.Source.ScreenShare);
       if (!pub) return;
       const watching = watchedShareIdentitiesRef.current.has(participant.identity);
-      if (pub.isSubscribed !== watching) pub.setSubscribed(watching).catch(() => {});
+      if (pub.isSubscribed !== watching) pub.setSubscribed(watching);
       videoTracksRef.current.set(pub.trackSid, {
         track: watching ? pub.track : null,
         pub,
