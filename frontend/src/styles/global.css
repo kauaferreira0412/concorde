@@ -305,6 +305,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   overflow-y: auto;
 }
 .server-icon {
+  position: relative;
   width: 46px;
   height: 46px;
   border-radius: var(--radius-md);
@@ -318,9 +319,15 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   font-size: 13px;
   letter-spacing: 0.02em;
   transition: all 0.14s ease;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 .server-icon:hover { border-color: var(--accent); color: var(--text-primary); }
-.server-icon-img { width: 100%; height: 100%; object-fit: cover; border-radius: calc(var(--radius-md) - 1px); }
+/* position:absolute + inset:0 em vez de width/height:100% comum - imune a foto enviada em
+   resolucao gigante "vazando" pra fora da caixinha de 46x46 (era exatamente isso que
+   acontecia antes: sem isso, o tamanho intrinseco da imagem as vezes vencia o 100% dentro
+   do flexbox e ela aparecia enorme, cobrindo o resto da tela). */
+.server-icon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .server-icon.active {
   background: var(--accent);
   border-color: var(--accent);
