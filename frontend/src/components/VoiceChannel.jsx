@@ -14,6 +14,7 @@ import {
   ZoomOutIcon,
 } from "./icons.jsx";
 import { MemberRow } from "./MemberList.jsx";
+import VolumeSlider from "./VolumeSlider.jsx";
 
 // Tamanhos disponiveis pro tile de webcam - "size" vira uma classe CSS (.camera-tile-<size>,
 // ver global.css). Comeca em "md" (tamanho de antes), dá pra aumentar/diminuir pelos botoes
@@ -95,9 +96,11 @@ function CameraTile({ track, name, isLocal, size }) {
  * compartilha no centro) - clicar nele e' o unico jeito de comecar a baixar aquele video (ver
  * toggleWatchScreenShare/watchedShareIdentitiesRef no VoiceCallContext). Assistindo, o tile usa
  * um tamanho fixo (bem maior que o de camera) OU o tamanho de "modo teatro" (ver theaterMode em
- * VoiceChannel) - sem zoom manual, so' esses dois estados.
+ * VoiceChannel) - sem zoom manual, so' esses dois estados. Botao direito (so' em transmissao de
+ * outra pessoa que voce esta assistindo) abre o controle de volume do audio dela - mesmo padrao
+ * do botao direito num participante na sidebar (ver onVolumeMenu/VolumeSlider em VoiceChannel).
  */
-function ScreenShareTile({ share, theaterMode, onToggleWatch }) {
+function ScreenShareTile({ share, theaterMode, onToggleWatch, onVolumeMenu }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -129,7 +132,17 @@ function ScreenShareTile({ share, theaterMode, onToggleWatch }) {
   }
 
   return (
-    <div className={"camera-tile " + (theaterMode ? "screenshare-tile-theater" : "screenshare-tile-default")}>
+    <div
+      className={"camera-tile " + (theaterMode ? "screenshare-tile-theater" : "screenshare-tile-default")}
+      onContextMenu={
+        share.isLocal
+          ? undefined
+          : (e) => {
+              e.preventDefault();
+              onVolumeMenu(e, share);
+            }
+      }
+    >
       <video ref={videoRef} autoPlay playsInline muted={share.isLocal} onDoubleClick={handleMaximize} />
       <span className="camera-tile-name">{share.name}</span>
       <button type="button" className="camera-tile-maximize" onClick={handleMaximize} title="Tela cheia">
@@ -166,6 +179,8 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
     participants,
     toggleScreenShare,
     toggleWatchScreenShare,
+    streamVolumes,
+    setStreamVolume,
     joinChannel,
   } = useVoiceCall();
   // Hoje nao existe permissao por canal (todo membro do servidor ve todos os canais - ver
@@ -173,6 +188,32 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
   const members = useServerMembers(channel.serverId, stompClient, stompConnected);
 
   const isThisChannelActive = connected && activeChannel?.id === channel.id;
+
+  // Popover de volume do audio da transmissao de tela - abre no botao direito em cima de uma
+  // tela de OUTRA pessoa que voce esta assistindo (ver ScreenShareTile), mesmo padrao do botao
+  // direito num participante na sidebar (ver ChannelSidebar.jsx).
+  const [volumeMenu, setVolumeMenu] = useState(null); // { participantIdentity, name, x, y }
+  const volumeMenuRef = useRef(null);
+
+  function openVolumeMenu(e, share) {
+    setVolumeMenu({ participantIdentity: share.participantIdentity, name: share.name, x: e.clientX, y: e.clientY });
+  }
+
+  useEffect(() => {
+    if (!volumeMenu) return;
+    function handlePointerDown(e) {
+      if (volumeMenuRef.current && !volumeMenuRef.current.contains(e.target)) setVolumeMenu(null);
+    }
+    function handleKeyDown(e) {
+      if (e.key === "Escape") setVolumeMenu(null);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [volumeMenu]);
 
   // Indice em CAMERA_SIZES - comeca no "md" (index 1, tamanho de antes). Afeta todos os
   // tiles de webcam de uma vez (ver botoes +/- no cabecalho da secao CÂMERAS).
@@ -329,7 +370,13 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
             // compartilhando) usam o tamanho normal ou o de "modo teatro" - sem zoom manual.
             <div className={"camera-grid" + (theaterMode ? " theater" : "")} ref={screenshareSectionRef}>
               {screenShares.map((s) => (
-                <ScreenShareTile key={s.sid} share={s} theaterMode={theaterMode} onToggleWatch={toggleWatchScreenShare} />
+                <ScreenShareTile
+                  key={s.sid}
+                  share={s}
+                  theaterMode={theaterMode}
+                  onToggleWatch={toggleWatchScreenShare}
+                  onVolumeMenu={openVolumeMenu}
+                />
               ))}
             </div>
           )}
@@ -337,6 +384,24 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
 
         <ChannelAccessSection members={members} />
       </div>
+
+      {volumeMenu && (
+        <div
+          className="volume-popover"
+          ref={volumeMenuRef}
+          style={{
+            left: Math.min(volumeMenu.x, window.innerWidth - 232),
+            top: Math.min(volumeMenu.y, window.innerHeight - 70),
+          }}
+        >
+          <p className="volume-popover-title">{volumeMenu.name}</p>
+          <VolumeSlider
+            value={streamVolumes[volumeMenu.participantIdentity] ?? 100}
+            onChange={(v) => setStreamVolume(volumeMenu.participantIdentity, v)}
+            label={`Volume do áudio da transmissão de ${volumeMenu.name} (padrão 100%, pode passar de 100%)`}
+          />
+        </div>
+      )}
     </div>
   );
 }
