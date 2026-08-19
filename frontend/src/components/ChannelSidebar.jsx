@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
@@ -489,11 +488,8 @@ export default function ChannelSidebar({
           </span>
         </button>
         <div className="user-bar-actions">
-          {isAdmin && (
-            <Link to="/admin" className="icon-btn" title="Painel do administrador">
-              <ShieldIcon />
-            </Link>
-          )}
+          {/* Painel do admin agora mora dentro de Configuracoes (aba "Administração", ver
+              SettingsModal.jsx) - nao precisa mais desse atalho separado aqui. */}
           <button className="icon-btn" onClick={onOpenSettings} title="Configurações de áudio">
             <SettingsIcon />
           </button>
