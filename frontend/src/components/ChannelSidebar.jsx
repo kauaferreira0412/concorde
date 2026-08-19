@@ -262,7 +262,7 @@ export default function ChannelSidebar({
                     >
                       <VolumeIcon size={16} className="channel-item-icon" />
                       {c.name}
-                      {activeChannel?.id === c.id && <span className="channel-item-live">CONECTADO</span>}
+                      {activeChannel?.id === c.id && <span className="channel-item-live">AO VIVO</span>}
                     </button>
                     {(presenceByChannel[c.id] || []).length > 0 && (
                       <div className="channel-voice-participants">

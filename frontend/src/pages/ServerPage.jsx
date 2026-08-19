@@ -116,7 +116,12 @@ export default function ServerPage() {
         />
 
         {selectedChannel?.type === "VOICE" ? (
-          <VoiceChannel channel={selectedChannel} stompClient={stompClient} stompConnected={stompConnected} />
+          <VoiceChannel
+            channel={selectedChannel}
+            serverName={selectedServer?.name}
+            stompClient={stompClient}
+            stompConnected={stompConnected}
+          />
         ) : (
           <ChatWindow
             channel={selectedChannel}

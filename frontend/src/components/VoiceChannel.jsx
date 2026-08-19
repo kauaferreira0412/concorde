@@ -5,18 +5,75 @@ import {
   EyeIcon,
   EyeOffIcon,
   MaximizeIcon,
+  MenuIcon,
+  MicIcon,
+  MicOffIcon,
   ScreenShareIcon,
+  VolumeIcon,
   WidenIcon,
   ZoomInIcon,
   ZoomOutIcon,
 } from "./icons.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
+import Avatar from "./Avatar.jsx";
 import { MemberRow } from "./MemberList.jsx";
 
 // Tamanhos disponiveis pro tile de webcam - "size" vira uma classe CSS (.camera-tile-<size>,
 // ver global.css). Comeca em "md" (tamanho de antes), dá pra aumentar/diminuir pelos botoes
 // no cabecalho da secao (afeta TODOS os tiles de uma vez, ver CAMERA_SIZES/cameraSize abaixo).
 const CAMERA_SIZES = ["sm", "md", "lg", "xl"];
+
+// Quantidade de barrinhas do medidor de microfone (estilo equalizador) - puramente visual,
+// so' controla a resolucao do "preenchimento" (ver mic-meter-segments em VoiceChannel).
+const MIC_SEGMENT_COUNT = 40;
+const MIC_SEGMENTS = Array.from({ length: MIC_SEGMENT_COUNT }, (_, i) => i);
+
+function formatDuration(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+/** Cabecalho do canal de voz - nome, subtitulo "Canal de voz · Servidor", badge de "TEMPO
+ *  REAL" enquanto conectado, e um "facepile" de quem esta na call (ate' 4, +N o resto). */
+function VoiceHeader({ channel, serverName, live, participants }) {
+  const list = participants || [];
+  const visible = list.slice(0, 4);
+  const extra = list.length - visible.length;
+  return (
+    <div className="chat-header chat-header-voice">
+      <span className="chat-header-icon">
+        <VolumeIcon size={16} />
+      </span>
+      <div className="chat-header-info">
+        <p className="chat-header-title">{channel.name}</p>
+        <p className="chat-header-subtitle">Canal de voz{serverName ? ` · ${serverName}` : ""}</p>
+      </div>
+      {live && (
+        <span className="live-badge">
+          <span className="live-badge-dot" /> TEMPO REAL
+        </span>
+      )}
+      {live && list.length > 0 && (
+        <div className="chat-header-avatars">
+          {visible.map((p) => (
+            <Avatar key={p.identity} name={p.name} url={p.avatarUrl} className="chat-header-avatar" />
+          ))}
+          {extra > 0 && <span className="chat-header-avatar chat-header-avatar-more">+{extra}</span>}
+        </div>
+      )}
+      <button
+        type="button"
+        className="icon-btn"
+        style={list.length === 0 ? { marginLeft: "auto" } : undefined}
+        title="Ver membros com acesso a esse canal"
+        onClick={() => document.getElementById("voice-members-section")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+      >
+        <MenuIcon size={16} />
+      </button>
+    </div>
+  );
+}
 
 /** Um tile de webcam (sua ou de outro participante) - anexa/solta o track de video do
  *  LiveKit num <video> proprio conforme o componente monta/desmonta (mesmo padrao usado
@@ -54,7 +111,7 @@ function CameraTile({ track, name, isLocal, size }) {
  * ela sobrevive mesmo se voce sair desse canal para ler um canal de texto - igual ao
  * Discord, que te mantem na call enquanto voce navega pelo servidor.
  */
-export default function VoiceChannel({ channel, stompClient, stompConnected }) {
+export default function VoiceChannel({ channel, serverName, stompClient, stompConnected }) {
   const {
     activeChannel,
     connected,
@@ -63,6 +120,7 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
     screenSharing,
     screenShares,
     cameraTracks,
+    participants,
     selectedScreenShareSid,
     selectScreenShare,
     toggleScreenShare,
@@ -100,6 +158,36 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
     return () => registerVideoContainer(null);
   }, [isThisChannelActive, registerVideoContainer]);
 
+  // Estatisticas "ao vivo" da transmissao (resolucao/fps/duracao), mostradas no cabecalho da
+  // secao COMPARTILHAMENTO DE TELA - lidas direto do <video> atual (videoContainerRef), sem
+  // precisar que o VoiceCallContext exponha o track cru. Resolucao/fps vem de verdade do
+  // getSettings() da MediaStreamTrack por baixo; duracao e' contada localmente a partir do
+  // momento em que a primeira transmissao apareceu.
+  const [shareElapsed, setShareElapsed] = useState(0);
+  const [shareStats, setShareStats] = useState(null); // { width, height, frameRate }
+  const shareStartRef = useRef(null);
+
+  useEffect(() => {
+    if (screenShares.length === 0) {
+      shareStartRef.current = null;
+      setShareElapsed(0);
+      setShareStats(null);
+      return;
+    }
+    if (!shareStartRef.current) shareStartRef.current = Date.now();
+    function tick() {
+      setShareElapsed(Math.floor((Date.now() - shareStartRef.current) / 1000));
+      const videoEl = videoContainerRef.current?.querySelector("video");
+      const settings = videoEl?.srcObject?.getVideoTracks?.()[0]?.getSettings?.();
+      if (settings?.width) {
+        setShareStats({ width: settings.width, height: settings.height, frameRate: settings.frameRate });
+      }
+    }
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [screenShares.length]);
+
   function handleFullscreen() {
     const videoEl = videoContainerRef.current?.querySelector("video");
     if (!videoEl) return;
@@ -110,7 +198,7 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
   if (!isThisChannelActive) {
     return (
       <div className="voice-channel">
-        <div className="chat-header">🔊 {channel.name}</div>
+        <VoiceHeader channel={channel} serverName={serverName} live={false} participants={[]} />
         <div className="voice-join">
           {activeChannel && activeChannel.id !== channel.id ? (
             <div style={{ textAlign: "center" }}>
@@ -128,18 +216,30 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
     );
   }
 
+  const activeMicSegments = micEnabled ? Math.round((micLevel / 100) * MIC_SEGMENT_COUNT) : 0;
+
   return (
     <div className="voice-channel">
-      <div className="chat-header">🔊 {channel.name}</div>
+      <VoiceHeader channel={channel} serverName={serverName} live participants={participants} />
 
       <div className="voice-body">
         <section className="voice-section">
-          <p className="voice-section-title">SEU MICROFONE</p>
+          <div className="voice-section-header">
+            <p className="voice-section-title">SEU MICROFONE</p>
+            <span className={"mic-status-pill" + (micEnabled ? "" : " danger")}>
+              {micEnabled ? "Microfone ativo" : "Microfone mutado"}
+            </span>
+          </div>
           <div className="mic-meter-row">
-            <div className="mic-meter-track">
-              <div className="mic-meter-fill" style={{ width: `${micLevel}%` }} />
+            <span className={"mic-meter-icon" + (micEnabled ? "" : " danger")}>
+              {micEnabled ? <MicIcon size={15} /> : <MicOffIcon size={15} />}
+            </span>
+            <div className="mic-meter-segments">
+              {MIC_SEGMENTS.map((i) => (
+                <span key={i} className={"mic-meter-segment" + (i < activeMicSegments ? " active" : "")} />
+              ))}
             </div>
-            <span className="mic-meter-value">{micEnabled ? `${micLevel}%` : "mutado"}</span>
+            <span className="mic-meter-value">{micEnabled ? `${micLevel}%` : "—"}</span>
           </div>
           <p className="voice-hint">
             Fale perto do microfone — a barra acima deve se mexer instantaneamente. Use os ícones 🎤/🎧 na barra
@@ -182,7 +282,19 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
 
         <section className="voice-section">
           <div className="voice-section-header">
-            <p className="voice-section-title">COMPARTILHAMENTO DE TELA</p>
+            <div className="voice-section-title-group">
+              <p className="voice-section-title">COMPARTILHAMENTO DE TELA</p>
+              {screenShares.length > 0 && (
+                <div className="share-stats">
+                  <span className="live-badge live-badge-danger">
+                    <span className="live-badge-dot" /> AO VIVO
+                  </span>
+                  {shareStats?.height && <span className="share-stat">{shareStats.height}p</span>}
+                  {shareStats?.frameRate && <span className="share-stat">{Math.round(shareStats.frameRate)} fps</span>}
+                  <span className="share-stat">{formatDuration(shareElapsed)}</span>
+                </div>
+              )}
+            </div>
             <div className="voice-section-header-actions">
               {screenShares.length > 0 && (
                 <>
@@ -300,8 +412,11 @@ export default function VoiceChannel({ channel, stompClient, stompConnected }) {
 function ChannelAccessSection({ members }) {
   if (members.length === 0) return null;
   return (
-    <section className="voice-section">
-      <p className="voice-section-title">MEMBROS COM ACESSO A ESSE CANAL — {members.length}</p>
+    <section id="voice-members-section" className="voice-section">
+      <div className="voice-section-header">
+        <p className="voice-section-title">MEMBROS COM ACESSO A ESSE CANAL — {members.length}</p>
+        <span className="voice-section-sort-hint">Ordenado por atividade</span>
+      </div>
       <div className="voice-participants">
         {members.map((m) => (
           <MemberRow key={m.userId} member={m} />

@@ -327,6 +327,16 @@ export function ChevronsRightIcon(props) {
   );
 }
 
+export function MenuIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <line x1="4" y1="7" x2="20" y2="7" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="17" x2="20" y2="17" />
+    </svg>
+  );
+}
+
 export function DownloadIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
