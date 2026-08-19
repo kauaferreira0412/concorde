@@ -83,6 +83,27 @@ export function PhoneOffIcon(props) {
   );
 }
 
+/**
+ * Icone de "encerrar chamada" - o telefone risco (PhoneOffIcon) e' ambiguo (parece so'
+ * "sem telefone"/silenciado). Esse aqui e' o desenho universal de "desligar" usado por
+ * Discord/Zoom/Meet: um bocal de telefone preenchido, na diagonal - reconhecivel de cara
+ * mesmo pequeno, por isso e' preenchido (fill) em vez de traco fino como o resto do set.
+ */
+export function HangUpIcon(props) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      stroke="none"
+      width={props.size || 18}
+      height={props.size || 18}
+      className={props.className}
+    >
+      <path d="M12 8.5c-4.2 0-8 1.64-11.4 4.55a1.15 1.15 0 0 0-.04 1.7l2.53 2.53c.42.42 1.08.46 1.55.1a13.3 13.3 0 0 1 2.83-1.7c.44-.2.71-.65.68-1.13l-.2-2.63A15.6 15.6 0 0 1 12 10.9c1.37 0 2.7.16 3.95.62l-.2 2.63c-.03.48.24.93.68 1.13a13.3 13.3 0 0 1 2.83 1.7c.47.36 1.13.32 1.55-.1l2.53-2.53a1.15 1.15 0 0 0-.04-1.7C20 10.14 16.2 8.5 12 8.5z" />
+    </svg>
+  );
+}
+
 export function ShieldIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>

@@ -12,6 +12,7 @@ import {
   CameraOffIcon,
   ChevronsLeftIcon,
   ChevronsRightIcon,
+  HangUpIcon,
   HashIcon,
   HeadphonesIcon,
   HeadphonesOffIcon,
@@ -467,7 +468,7 @@ export default function ChannelSidebar({
               <ScreenShareIcon />
             </button>
             <button className="voice-status-icon-btn leave" onClick={leaveChannel} title="Sair da call">
-              <PhoneOffIcon />
+              <HangUpIcon />
             </button>
           </div>
         </div>
