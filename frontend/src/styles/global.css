@@ -817,8 +817,8 @@ img.chat-header-avatar { object-fit: cover; }
 .chat-pending-attachment strong { font-size: 13.5px; }
 .chat-pending-attachment .icon-btn { margin-left: auto; flex-shrink: 0; }
 
-.chat-input { display: flex; align-items: flex-end; gap: 8px; padding: 16px 20px 20px; }
-.chat-attach-btn { flex-shrink: 0; margin-bottom: 1px; }
+.chat-input { display: flex; align-items: center; gap: 8px; padding: 16px 20px 20px; }
+.chat-attach-btn { flex-shrink: 0; }
 .chat-input-field { position: relative; flex: 1; min-width: 0; }
 .chat-input-field textarea {
   display: block;
