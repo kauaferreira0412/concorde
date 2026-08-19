@@ -285,6 +285,28 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stompConnected]);
 
+  // Reforco pro mesmo problema do efeito acima, so' que pra quando NENHUM disconnect/reconnect
+  // chega a ser detectado (reportado pelo usuario com prints: o STOMP continua "conectado" o
+  // tempo todo do ponto de vista do cliente, audio/fala continuam 100% normais pelo LiveKit,
+  // mas os broadcasts de presenca desse canal simplesmente param de chegar pra ele especifico -
+  // sem nenhum evento pra reagir, o unico jeito confiavel de nunca mais ficar preso
+  // desatualizado "pra sempre" e' tambem buscar o snapshot de verdade via REST de tempos em
+  // tempos, em vez de confiar 100% no push.
+  useEffect(() => {
+    if (!activeChannel) return;
+    const channelId = activeChannel.id;
+    const interval = setInterval(() => {
+      api
+        .get(`/api/channels/${channelId}/voice-presence`)
+        .then(({ data }) => {
+          presenceDeafenedRef.current = new Map((data || []).map((p) => [String(p.userId), p.deafened]));
+          if (roomRef.current) refreshParticipants(roomRef.current);
+        })
+        .catch(() => {});
+    }, 12000);
+    return () => clearInterval(interval);
+  }, [activeChannel]);
+
   // Avisa o navegador pra perguntar "tem certeza que quer sair?" se voce fechar a aba ou
   // der F5 estando numa call - o texto do aviso e' fixo pelo proprio navegador por seguranca,
   // nao da pra customizar, mas a confirmacao em si funciona em todo navegador moderno.

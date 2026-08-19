@@ -168,11 +168,14 @@ export default function ChannelSidebar({
     if (voiceChannels.length === 0) return;
     let cancelled = false;
 
-    voiceChannels.forEach((c) => {
-      api.get(`/api/channels/${c.id}/voice-presence`).then(({ data }) => {
-        if (!cancelled) setPresenceByChannel((prev) => ({ ...prev, [c.id]: data }));
+    function refetchAll() {
+      voiceChannels.forEach((c) => {
+        api.get(`/api/channels/${c.id}/voice-presence`).then(({ data }) => {
+          if (!cancelled) setPresenceByChannel((prev) => ({ ...prev, [c.id]: data }));
+        });
       });
-    });
+    }
+    refetchAll();
 
     const subs = [];
     if (stompClient && stompConnected) {
@@ -185,8 +188,20 @@ export default function ChannelSidebar({
       });
     }
 
+    // Reforco: de vez em quando (relatado pelo usuario, com prints) a lista de "quem esta
+    // conectado" trava desatualizada pra um cliente especifico - o STOMP continua "conectado"
+    // do ponto de vista dele (chat/audio da call continuam funcionando 100% normal, ele
+    // escuta e fala com todo mundo), mas os broadcasts de presenca desse canal simplesmente
+    // param de chegar (nunca detectamos um disconnect/reconnect de verdade pra disparar o
+    // resubscribe acima). Sem um jeito confiavel de saber QUANDO isso acontece, a solucao e'
+    // nao depender 100% do push: busca o snapshot de verdade via REST a cada 12s tambem,
+    // sobrescrevendo qualquer coisa que tenha ficado presa - o pior caso agora e' ficar
+    // desatualizado por alguns segundos, nunca mais "pra sempre ate' sair e entrar de novo".
+    const interval = setInterval(refetchAll, 12000);
+
     return () => {
       cancelled = true;
+      clearInterval(interval);
       subs.forEach((s) => s.unsubscribe());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
