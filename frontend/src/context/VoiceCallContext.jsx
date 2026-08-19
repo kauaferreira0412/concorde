@@ -115,7 +115,6 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const screenAudioTracksRef = useRef(new Map()); // identity -> RemoteAudioTrack (audio da transmissao de tela dessa pessoa)
   const participantVolumesRef = useRef(new Map()); // identity -> 0..200, fonte da verdade sincrona
   const streamVolumesRef = useRef(new Map());
-  const micEnabledBeforeDeafenRef = useRef(true);
   // So' preenchido no app desktop (Electron), quando o compartilhamento foi iniciado pelo
   // ScreenSharePicker (video/audio capturados "na mao" via chromeMediaSourceId, nao pelo
   // setScreenShareEnabled padrao do LiveKit) - precisa pra saber COMO parar depois.
@@ -767,14 +766,21 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     }
   }
 
-  /** Um moderador me mutou/desmutou a força - reflete o estado de verdade na hora nos dois
-   *  sentidos (o desmutar tambem precisa realmente religar o microfone, senao a pessoa
-   *  continua aparecendo/ficando muda mesmo depois do moderador "liberar"). */
+  /**
+   * Um moderador me mutou/desmutou a força - reflete o estado de verdade na hora nos dois
+   * sentidos (o desmutar tambem precisa realmente religar o microfone, senao a pessoa
+   * continua aparecendo/ficando muda mesmo depois do moderador "liberar").
+   *
+   * Excecao: se eu estiver ENSURDECIDO agora (por mim mesmo OU a força, tanto faz) e o
+   * moderador so' liberar o MUTE, isso NAO liga meu microfone sozinho - ensurdecido
+   * continua implicando mudo ate' o ensurdecido em si acabar (ver toggleDeafen). Sem isso,
+   * "desmutar" enquanto ensurdecido acabava tirando o ensurdecido de tabela (efeito colateral
+   * pensado pra quando EU clico no meu proprio botao de mic, nao pra quando um moderador
+   * libera um mute separado que eu apliquei em mim mesmo).
+   */
   async function applyForceMute(muted) {
     forceMutedRef.current = muted;
-    // micEnabledRef.current === muted quer dizer que o estado atual do mic contradiz o que
-    // foi pedido (ex: pediram pra mutar mas o mic ainda ta ligado) - so' nesse caso alterna.
-    if (roomRef.current && micEnabledRef.current === muted) {
+    if (roomRef.current && !deafenedRef.current && micEnabledRef.current === muted) {
       await toggleMic();
     }
   }
@@ -866,7 +872,6 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     }
 
     if (next) {
-      micEnabledBeforeDeafenRef.current = micEnabledRef.current;
       if (micEnabledRef.current) {
         await room.localParticipant.setMicrophoneEnabled(false);
         setMicEnabled(false);
@@ -875,7 +880,15 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           publishVoiceMicState(stompClientRef.current, activeChannelRef.current.id, false);
         }
       }
-    } else if (micEnabledBeforeDeafenRef.current) {
+    } else if (!forceMutedRef.current) {
+      // Reativando o audio: o microfone SO' nao volta se ainda tiver uma trava de mute
+      // separada ativa (um force-mute independente que ninguem liberou ainda) - senao volta
+      // a falar normalmente sozinho, sem precisar clicar em desmutar de novo tambem (regra
+      // pedida explicitamente: "quando ele se desensurdecer, volta tudo normal, tanto falar
+      // quanto ouvir"). Antes disso dependia de lembrar se o mic estava ligado ANTES de
+      // ensurdecer (micEnabledBeforeDeafenRef) - que ficava errado nesse cenario (ensurdecer
+      // enquanto ja' mutado a força, depois so' o mute ser liberado): o "antes" registrado
+      // era "desligado", entao nunca voltava. Agora e' so' "nenhuma trava ativa = liga".
       await room.localParticipant.setMicrophoneEnabled(true);
       setMicEnabled(true);
       const micPub = room.localParticipant.getTrackPublication(Track.Source.Microphone);
