@@ -827,15 +827,25 @@ img.chat-header-avatar { object-fit: cover; }
 }
 .chat-edited { font-size: 11px; color: var(--text-muted); margin-left: 6px; font-style: italic; }
 
-/* Mencao (@username) dentro do texto - mais forte quando e' voce mesmo sendo mencionado. */
+/* Mencao (@username) dentro do texto - mais forte quando e' voce mesmo sendo mencionado.
+   E' um <button> (clicavel - abre o perfil da pessoa, ver MessageText em ChatWindow.jsx),
+   por isso zera border/font/cursor por cima do button{} global - senao herdava padding
+   grande e cor de fundo padrao de botao, ficando gigante e sem cara de "pill" de texto. */
 .chat-mention {
+  display: inline;
+  border: none;
   background: var(--accent-soft);
   color: var(--accent-text);
   border-radius: 4px;
   padding: 0 3px;
+  font: inherit;
   font-weight: 600;
+  cursor: pointer;
 }
+.chat-mention:hover:not(:disabled) { background: var(--accent-ring); }
+.chat-mention:disabled { cursor: text; }
 .chat-mention.me { background: var(--warning-soft); color: var(--warning); }
+.chat-mention.me:hover:not(:disabled) { background: var(--warning-soft); filter: brightness(1.15); }
 /* A mensagem inteira ganha uma faixa sutil quando menciona voce - facil de achar na rolagem. */
 .chat-message.mentioned { background: var(--warning-soft); border-left: 2px solid var(--warning); padding-left: 8px; }
 .chat-message.mentioned:hover { background: var(--warning-soft); }

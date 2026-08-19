@@ -11,23 +11,27 @@ import ImageLightbox from "./ImageLightbox.jsx";
 import { CheckIcon, PencilIcon, PlusIcon, ReplyIcon, TrashIcon, XIcon } from "./icons.jsx";
 
 /** @username -> vira um "pill" destacado (mais forte se for voce mesmo) - so reconhece
-    quem e' de verdade membro do servidor, o resto fica texto normal. */
-function MessageText({ content, memberUsernames, myUsername }) {
+    quem e' de verdade membro do servidor, o resto fica texto normal. Clicavel: abre o popup
+    de perfil da pessoa mencionada (ver useProfile/ProfileContext), igual clicar no avatar dela. */
+function MessageText({ content, memberUsernames, myUsername, members, openProfile }) {
   if (!content) return null;
   return (
     <p>
-      {splitMentions(content, memberUsernames).map((part, i) =>
-        part.mention ? (
-          <span
+      {splitMentions(content, memberUsernames).map((part, i) => {
+        if (!part.mention) return <span key={i}>{part.text}</span>;
+        const mentionedMember = members.find((m) => m.username.toLowerCase() === part.mention.toLowerCase());
+        return (
+          <button
             key={i}
+            type="button"
             className={"chat-mention" + (part.mention.toLowerCase() === myUsername?.toLowerCase() ? " me" : "")}
+            onClick={() => mentionedMember && openProfile(mentionedMember.userId)}
+            disabled={!mentionedMember}
           >
             {part.text}
-          </span>
-        ) : (
-          <span key={i}>{part.text}</span>
-        )
-      )}
+          </button>
+        );
+      })}
     </p>
   );
 }
@@ -328,7 +332,13 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                 </div>
               ) : (
                 <>
-                  <MessageText content={m.content} memberUsernames={memberUsernames} myUsername={user?.username} />
+                  <MessageText
+                    content={m.content}
+                    memberUsernames={memberUsernames}
+                    myUsername={user?.username}
+                    members={members}
+                    openProfile={openProfile}
+                  />
                   {m.imageUrl && (
                     <button type="button" className="chat-image-btn" onClick={() => setLightboxImage(m.imageUrl)}>
                       <img src={m.imageUrl} alt="Imagem enviada no chat" className="chat-image" />
