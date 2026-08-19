@@ -44,14 +44,16 @@ app:
     secret: "troque-este-segredo-por-um-valor-forte-de-32-bytes-no-minimo"
     expiration-minutes: 1440
 
-  # Controle de versao do app desktop (Electron) - ver DesktopVersionController. Quem esta
-  # com versao instalada MENOR que essa fica bloqueado ANTES do login, com tela pedindo pra
-  # atualizar (ver UpdateRequiredGate.jsx no frontend). Pra forcar todo mundo a atualizar
-  # depois de publicar uma versao nova (npm run package:desktop, bump em package.json version),
-  # so' subir esse numero aqui (ou a variavel DESKTOP_MIN_VERSION na VPS) - nao precisa mexer
-  # em mais nada, nem reconstruir o instalador de novo.
+  # Controle de versao do app desktop (Electron) - ver DesktopVersionController. Cada vez que
+  # "npm run package:desktop" gera um instalador novo, ele grava o commit atual (git short SHA)
+  # tanto DENTRO do instalador (embutido no bundle, ver VITE_APP_BUILD_ID em
+  # package-desktop.mjs) quanto em desktop-min-version.txt (classpath, lido abaixo) - ou seja,
+  # TODA publicacao de instalador novo automaticamente descontinua a anterior, sem precisar
+  # editar nada aqui na mao. min-version-override so' existe pra forcar um valor manualmente
+  # se um dia precisar (ex: reverter uma publicacao) sem gerar instalador de novo - vazio por
+  # padrao, nesse caso usa o conteudo do arquivo.
   desktop:
-    min-version: ${DESKTOP_MIN_VERSION:0.1.0}
+    min-version-override: ${DESKTOP_MIN_VERSION:}
     download-url: ${DESKTOP_DOWNLOAD_URL:https://187-127-37-101.sslip.io/login}
 
   # Conta de administrador criada automaticamente na primeira subida (se ainda nao existir).

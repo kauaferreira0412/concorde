@@ -10,23 +10,30 @@
 //   npm run package:desktop -- --linux -> gera .AppImage em vez de .exe
 //
 // Passos:
-//   1. vite build MIRANDO A VPS (ver DESKTOP_ORIGIN abaixo) - o app empacotado carrega o
+//   1. gera um "build id" novo (data/hora - ver BUILD_ID abaixo) e grava ele tanto DENTRO do
+//      instalador (embutido no bundle React, VITE_APP_BUILD_ID) quanto no backend
+//      (desktop-min-version.txt) - e' assim que o controle de versao obrigatoria funciona
+//      (ver DesktopVersionController/UpdateRequiredGate.jsx): TODA vez que voce roda esse
+//      script, o instalador novo automaticamente descontinua qualquer instalacao anterior,
+//      sem precisar mexer em nada na mao. So' precisa commitar/dar push (o
+//      desktop-min-version.txt atualizado vai junto, o deploy normal do backend ja aplica).
+//   2. vite build MIRANDO A VPS (ver DESKTOP_ORIGIN abaixo) - o app empacotado carrega o
 //      index.html via file:// dentro do Electron, sem "mesma origem" nenhuma pra aproveitar
 //      (diferente do navegador, que usa window.location sozinho - ver src/api/client.js e
 //      src/ws/chatSocket.js) - por isso so' esse build injeta VITE_API_URL/VITE_WS_URL fixos,
 //      apontando pro servidor de producao de verdade. O app desktop sempre fala com a MESMA
 //      VPS/banco que o site normal, nunca com localhost.
-//   2. electron-builder (empacota o Electron + esse dist/ num instalador, ver "build" no
+//   3. electron-builder (empacota o Electron + esse dist/ num instalador, ver "build" no
 //      package.json pra config de icone/NSIS/etc)
-//   3. copia o instalador gerado (nome varia com plataforma/versao) pra
+//   4. copia o instalador gerado (nome varia com plataforma/versao) pra
 //      public/downloads/Concorde-Setup.<ext> com nome fixo, pra o link de download nunca
 //      quebrar entre versoes
-//   4. vite build de novo, agora SEM as variaveis (build normal do site, mesma origem de
+//   5. vite build de novo, agora SEM as variaveis (build normal do site, mesma origem de
 //      sempre) - so' assim que public/downloads/ (agora com o instalador) entra no dist/
 //      que sera servido pelo Caddy. Se pulassemos esse passo o proprio SITE ficaria com as
 //      chamadas de API fixadas na VPS em vez de "mesma origem".
 import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, copyFileSync, statSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, copyFileSync, statSync, rmSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -39,6 +46,15 @@ const DESKTOP_ORIGIN = "https://187-127-37-101.sslip.io";
 
 const releaseDir = join(root, "release");
 const downloadsDir = join(root, "public", "downloads");
+
+// Timestamp (nao o commit do git) de proposito - nesse fluxo o instalador e' sempre gerado
+// ANTES do commit/push da mudanca que ele carrega (ver DEPLOY.md), entao "git rev-parse HEAD"
+// pegaria o commit ERRADO (o anterior). Um timestamp e' sempre unico e sempre o mais novo,
+// sem depender de quando o commit acontece.
+const BUILD_ID = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "");
+const desktopMinVersionFile = join(root, "..", "backend", "src", "main", "resources", "desktop-min-version.txt");
+writeFileSync(desktopMinVersionFile, BUILD_ID + "\n");
+console.log(`Build id gerado: ${BUILD_ID} (gravado em backend/src/main/resources/desktop-min-version.txt)`);
 
 const args = process.argv.slice(2);
 const platform = args.includes("--mac") ? "mac" : args.includes("--linux") ? "linux" : "win";
@@ -69,6 +85,9 @@ run("npx vite build", {
   // file:// sem dar tela branca (ver vite.config.js). O build do site (mais abaixo) NAO leva
   // isso, continua com caminho absoluto de sempre.
   VITE_DESKTOP_BUILD: "true",
+  // Embutido no bundle (import.meta.env.VITE_APP_BUILD_ID, ver UpdateRequiredGate.jsx) - so'
+  // esse build (o que vai DENTRO do instalador) carrega isso, o build do site mais abaixo nao.
+  VITE_APP_BUILD_ID: BUILD_ID,
 });
 run(`npx electron-builder ${builderFlag} --publish=never`);
 
@@ -96,4 +115,8 @@ console.log(`\nInstalador copiado: public/downloads/${destName}`);
 // igual sempre foi. So' entra aqui pra empacotar o instalador junto como arquivo estatico.
 run("npx vite build");
 
-console.log(`\nPronto! "public/downloads/${destName}" agora esta em dist/downloads/${destName} - o proximo deploy ja serve o download.`);
+console.log(
+  `\nPronto! "public/downloads/${destName}" agora esta em dist/downloads/${destName} - o proximo deploy ja serve o download.` +
+    `\nNao esqueca de commitar/dar push do desktop-min-version.txt junto (build id ${BUILD_ID}) - e' isso que` +
+    ` descontinua as instalacoes antigas assim que o backend for reiniciado no deploy.`
+);

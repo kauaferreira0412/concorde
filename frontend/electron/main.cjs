@@ -128,10 +128,6 @@ ipcMain.handle("concorde:stop-window-audio", () => {
   if (audioCapture) audioCapture.stopCapture();
 });
 
-// Controle de versao (ver UpdateRequiredGate.jsx) - a UI compara isso com o
-// /api/desktop/version do backend ANTES de deixar logar.
-ipcMain.handle("concorde:get-app-version", () => app.getVersion());
-
 // Abre o link de download (site) no navegador PADRAO do usuario, nao numa janela do proprio
 // Concorde - faz mais sentido baixar um instalador novo por fora do app que esta desatualizado
 // (e que a pessoa esta prestes a desinstalar).
