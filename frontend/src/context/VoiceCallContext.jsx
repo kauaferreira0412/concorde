@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { Room, RoomEvent, Track } from "livekit-client";
 import api from "../api/client";
 import { useAuth } from "./AuthContext.jsx";
+import { useAlert } from "./AlertContext.jsx";
 import { useMicLevel } from "../utils/useMicLevel";
 import { getNoiseSuppressionEnabled, getSavedAudioInput, getSavedAudioOutput, getSavedVideoInput } from "../utils/audioSettings";
 import {
@@ -71,6 +72,7 @@ function loadActiveChannel() {
  */
 export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const { user } = useAuth();
+  const { showAlert } = useAlert();
   const [activeChannel, setActiveChannelState] = useState(null); // { id, name, serverId }
   const [connected, setConnected] = useState(false);
   const [micEnabled, setMicEnabledState] = useState(true);
@@ -643,7 +645,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         await newRoom.connect(data.wsUrl, data.token);
       } catch (err) {
         clearActiveChannel();
-        alert("Não foi possível conectar na call: " + err.message);
+        showAlert("Não foi possível conectar na call: " + err.message);
         return;
       }
 
@@ -680,7 +682,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         if (micPub?.track?.mediaStreamTrack) startMicMeter(micPub.track.mediaStreamTrack);
       } catch (err) {
         setMicEnabled(false);
-        alert(
+        showAlert(
           "Conectado, mas não consegui acessar seu microfone (permissão negada ou nenhum dispositivo encontrado): " +
             err.message
         );
@@ -751,20 +753,22 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     }
   }
 
-  /** Um moderador me mutou a força - desliga o microfone de verdade na hora (nao so' um
-   *  aviso visual). Tirar a restricao so' libera pra eu conseguir desmutar sozinho de novo -
-   *  nao reativa o microfone sozinho, pra nao "assustar" ligando o mic sem eu ter pedido. */
+  /** Um moderador me mutou/desmutou a força - reflete o estado de verdade na hora nos dois
+   *  sentidos (o desmutar tambem precisa realmente religar o microfone, senao a pessoa
+   *  continua aparecendo/ficando muda mesmo depois do moderador "liberar"). */
   async function applyForceMute(muted) {
     forceMutedRef.current = muted;
-    if (muted && roomRef.current && micEnabledRef.current) {
+    // micEnabledRef.current === muted quer dizer que o estado atual do mic contradiz o que
+    // foi pedido (ex: pediram pra mutar mas o mic ainda ta ligado) - so' nesse caso alterna.
+    if (roomRef.current && micEnabledRef.current === muted) {
       await toggleMic();
     }
   }
 
-  /** Mesma ideia pro ensurdecido a força. */
+  /** Mesma ideia pro ensurdecido a força - libera/aplica de verdade nos dois sentidos. */
   async function applyForceDeafen(deafened) {
     forceDeafenedRef.current = deafened;
-    if (deafened && roomRef.current && !deafenedRef.current) {
+    if (roomRef.current && deafenedRef.current !== deafened) {
       await toggleDeafen();
     }
   }
@@ -776,7 +780,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     // Um moderador te mutou a força (ver applyForceMute) - so' consegue se desmutar sozinho
     // se voce TAMBEM tiver permissao de mutar gente (regra pedida explicitamente pelo usuario).
     if (next && forceMutedRef.current && !myPermissionsRef.current.has("MUTE_MEMBERS")) {
-      alert("Você foi mutado por um moderador - só quem também tem permissão de mutar membros consegue reverter isso.");
+      showAlert("Você foi mutado por um moderador - só quem também tem permissão de mutar membros consegue reverter isso.");
       return;
     }
     // "Desmutar enquanto ensurdecido" nao faz sentido sozinho (voce continuaria sem ouvir
@@ -804,7 +808,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     const next = !deafenedRef.current;
     // Um moderador te ensurdeceu a força (ver applyForceDeafen) - mesma regra do mic acima.
     if (!next && forceDeafenedRef.current && !myPermissionsRef.current.has("DEAFEN_MEMBERS")) {
-      alert("Você foi ensurdecido por um moderador - só quem também tem permissão de ensurdecer membros consegue reverter isso.");
+      showAlert("Você foi ensurdecido por um moderador - só quem também tem permissão de ensurdecer membros consegue reverter isso.");
       return;
     }
     setDeafened(next);
@@ -872,7 +876,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       );
       setCameraEnabled(next);
     } catch (err) {
-      alert("Não foi possível acessar sua câmera (permissão negada ou nenhum dispositivo encontrado): " + err.message);
+      showAlert("Não foi possível acessar sua câmera (permissão negada ou nenhum dispositivo encontrado): " + err.message);
     }
   }
 
@@ -993,7 +997,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       playScreenShareStartSound();
     } catch (err) {
       console.warn("Não foi possível iniciar o compartilhamento de tela:", err);
-      alert("Não foi possível compartilhar essa tela/janela: " + err.message);
+      showAlert("Não foi possível compartilhar essa tela/janela: " + err.message);
     }
   }
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { useServerMembers } from "../utils/useServerMembers";
 import { useProfile } from "../context/ProfileContext.jsx";
+import { useAlert } from "../context/AlertContext.jsx";
 import { ChevronsLeftIcon, ChevronsRightIcon, PencilIcon, TrashIcon, UsersIcon } from "./icons.jsx";
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
@@ -106,6 +107,7 @@ export default function MemberList({ serverId, stompClient, stompConnected }) {
  */
 export function MemberRow({ member, serverId, canManage }) {
   const { openProfile } = useProfile();
+  const { showAlert } = useAlert();
   const [menu, setMenu] = useState(null); // { x, y }
   const [editingNickname, setEditingNickname] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState(member.nickname || "");
@@ -152,7 +154,7 @@ export function MemberRow({ member, serverId, canManage }) {
       await api.delete(`/api/servers/${serverId}/members/${member.userId}`);
       setRemoved(true);
     } catch (err) {
-      alert(err.response?.data?.error || "Não foi possível remover esse membro");
+      showAlert(err.response?.data?.error || "Não foi possível remover esse membro");
     }
   }
 
