@@ -631,6 +631,29 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       newRoom.on(RoomEvent.TrackUnpublished, (pub) => {
         if (pub.source === Track.Source.ScreenShare) removeVideoTrack(pub.trackSid);
       });
+      // Fica sabendo de uma tela compartilhada NOVA (alguem que ja estava na call comeca a
+      // compartilhar agora) ANTES dela ser baixada - mais confiavel que so' reagir depois em
+      // TrackSubscribed (fica sujeito a corrida: o LiveKit auto-inscreve e baixa por um
+      // instante ate' a gente conseguir cancelar) - recusa a inscricao aqui, na hora, se
+      // ninguem pediu pra assistir essa pessoa ainda, e ja registra o quadrado "clique pra
+      // assistir" mesmo assim (reportado pelo usuario: telas de amigos as vezes nem apareciam
+      // disponiveis pra escolher assistir). Telas que JA estavam ativas quando voce entrou na
+      // call continuam cobertas pelo TrackSubscribed abaixo (esse evento so' dispara pra
+      // publicacoes novas DEPOIS que voce ja esta conectado).
+      newRoom.on(RoomEvent.TrackPublished, (pub, participant) => {
+        if (pub.source !== Track.Source.ScreenShare && pub.source !== Track.Source.ScreenShareAudio) return;
+        const watching = watchedShareIdentitiesRef.current.has(participant.identity);
+        if (!watching) pub.setSubscribed(false).catch(() => {});
+        if (pub.source === Track.Source.ScreenShare) {
+          upsertScreenShare(pub.trackSid, {
+            track: watching ? pub.track : null,
+            pub,
+            participantIdentity: participant.identity,
+            participantName: participant.name || participant.identity,
+            isLocal: false,
+          });
+        }
+      });
       // Sua propria tela compartilhada e sua propria camera tambem entram na lista, pra
       // voce poder conferir o que esta sendo transmitido (assim como as dos outros).
       newRoom.on(RoomEvent.LocalTrackPublished, (pub, participant) => {

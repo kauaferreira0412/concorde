@@ -1428,11 +1428,14 @@ img.chat-header-avatar { object-fit: cover; }
 .screenshare-empty svg { color: var(--text-muted); }
 .screenshare-empty p { margin: 0; }
 
-/* Quadrado "escolher assistir" (ver ScreenShareTile em VoiceChannel.jsx) - mesmo tamanho do
-   tile de camera (.camera-tile-md), so' que em vez do video mostra o nome de quem esta
-   compartilhando centralizado, ate' voce clicar pra entrar naquela transmissao especifica -
-   pedido explicito do usuario: ninguem deve ver a tela de outro automaticamente. */
+/* Quadrado "escolher assistir" (ver ScreenShareTile em VoiceChannel.jsx) - tamanho proprio,
+   fixo e pequeno (nao usa o zoom de camera nem o de tela cheia - e' so' um "escolher"), mostra
+   o nome de quem esta compartilhando centralizado ate' voce clicar pra entrar naquela
+   transmissao especifica - pedido explicito do usuario: ninguem deve ver a tela de outro
+   automaticamente. */
 .screenshare-tile-pick {
+  width: 200px;
+  height: 120px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1495,6 +1498,16 @@ img.chat-header-avatar { object-fit: cover; }
 .camera-tile-md { width: 168px; height: 94px; }
 .camera-tile-lg { width: 240px; height: 135px; }
 .camera-tile-xl { width: 340px; height: 191px; }
+/* Tela compartilhada assistida - bem maior que webcam (SCREEN_SIZES em VoiceChannel.jsx),
+   texto/detalhe numa tela precisa de mais espaco pra dar pra ler. Reportado como "minuscula e
+   sem como aumentar" quando ainda usava o tamanho de camera (.camera-tile-md) fixo. */
+.screenshare-tile-md { width: 400px; height: 225px; }
+.screenshare-tile-lg { width: 560px; height: 315px; }
+.screenshare-tile-xl { width: 760px; height: 428px; }
+.screenshare-tile-xxl { width: 960px; height: 540px; }
+@media (max-width: 900px) {
+  .screenshare-tile-lg, .screenshare-tile-xl, .screenshare-tile-xxl { width: 100%; max-width: 560px; height: auto; aspect-ratio: 16 / 9; }
+}
 .camera-tile video {
   width: 100%;
   height: 100%;
