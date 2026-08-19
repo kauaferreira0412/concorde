@@ -356,6 +356,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   transition: padding 0.22s ease;
 }
 .channel-sidebar.collapsed .channel-sidebar-header { padding: 17px 0; justify-content: center; }
+.channel-sidebar-header-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 /* Largura fixa por baixo do corte (overflow:hidden do pai) - assim o conteudo nao
    quebra linha/reflui durante a animacao, so' fica "cortado" suavemente enquanto some. */
 .channel-sidebar-body {
@@ -1583,6 +1584,22 @@ img.chat-header-avatar { object-fit: cover; }
   margin: 0; text-transform: uppercase; letter-spacing: 0.04em;
 }
 .settings-field { display: flex; flex-direction: column; gap: 6px; }
+/* Input + botao de salvar lado a lado, pra acoes pontuais dentro de uma aba (ex: apelido
+   por servidor) que nao fazem sentido esperar ate' o "Salvar" geral do rodape. */
+.settings-inline-save { display: flex; gap: 8px; }
+.settings-inline-save input { flex: 1; }
+/* !important pelo mesmo motivo de .settings-actions button acima - ".modal button:not(...)"
+   e' mais especifico e força width:100%/margin-top sem isso. */
+.settings-inline-save button { width: auto !important; margin-top: 0 !important; flex-shrink: 0; padding: 10px 16px; }
+/* "Seus servidores" (Configurações > Perfil) - lista simples, so' leitura. */
+.settings-server-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.settings-server-list li {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13.5px; font-weight: 500; color: var(--text-secondary);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel-2);
+}
 .settings-checkbox-row {
   display: flex; align-items: center; gap: 8px;
   font-size: 13px; font-weight: 500; color: var(--text-secondary);

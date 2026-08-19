@@ -26,6 +26,9 @@ public class Server {
 
     private String iconUrl;
 
+    @Column(length = 300)
+    private String description;
+
     @Builder.Default
     private Instant createdAt = Instant.now();
 }

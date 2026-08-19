@@ -8,50 +8,29 @@ const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: 
 
 /**
  * Cartao de perfil de QUALQUER usuario (clicavel a partir do chat, lista de membros, canal
- * de voz - ver useProfile/ProfileContext). Quando e' o seu proprio perfil, vira editavel
- * (apelido + bio) na hora, sem precisar de outra tela.
+ * de voz - ver useProfile/ProfileContext). E' so' leitura - quando e' o seu proprio perfil,
+ * o botao manda pra Configuracoes > Perfil (ver openSettingsInstead), que e' onde a edicao
+ * de verdade mora hoje (apelido, foto, bio, apelido por servidor - ver SettingsModal.jsx).
  */
 export default function ProfileModal({ userId, onClose }) {
-  const { user: me, updateUser } = useAuth();
+  const { user: me } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loadError, setLoadError] = useState("");
-  const [editing, setEditing] = useState(false);
-  const [nickname, setNickname] = useState("");
-  const [bio, setBio] = useState("");
-  const [saveError, setSaveError] = useState("");
-  const [saving, setSaving] = useState(false);
 
   const isMe = me?.id === userId;
 
   useEffect(() => {
     setProfile(null);
     setLoadError("");
-    setEditing(false);
-    setSaveError("");
     api
       .get(`/api/users/${userId}/profile`)
-      .then(({ data }) => {
-        setProfile(data);
-        setNickname(data.nickname || "");
-        setBio(data.bio || "");
-      })
+      .then(({ data }) => setProfile(data))
       .catch((err) => setLoadError(err.response?.data?.error || "Não foi possível carregar esse perfil"));
   }, [userId]);
 
-  async function handleSave(e) {
-    e.preventDefault();
-    setSaveError("");
-    setSaving(true);
-    try {
-      const { data } = await api.put("/api/users/me/profile", { nickname: nickname.trim(), bio: bio.trim() });
-      setProfile((prev) => ({ ...prev, nickname: data.nickname, bio: data.bio }));
-      updateUser({ nickname: data.nickname, bio: data.bio });
-      setEditing(false);
-    } catch (err) {
-      setSaveError(err.response?.data?.error || "Falha ao salvar perfil");
-    } finally {
-      setSaving(false);
-    }
+  function openSettingsInstead() {
+    onClose();
+    window.dispatchEvent(new CustomEvent("concorde:open-settings"));
   }
 
   return (
@@ -59,7 +38,7 @@ export default function ProfileModal({ userId, onClose }) {
       <div className="modal profile-modal" onClick={(e) => e.stopPropagation()}>
         {loadError && <p className="auth-error">{loadError}</p>}
 
-        {profile && !editing && (
+        {profile && (
           <>
             <div className="profile-header">
               <div className="member-avatar-wrap profile-avatar-wrap">
@@ -83,53 +62,12 @@ export default function ProfileModal({ userId, onClose }) {
                 Fechar
               </button>
               {isMe && (
-                <button type="button" onClick={() => setEditing(true)}>
-                  Editar perfil
+                <button type="button" onClick={openSettingsInstead}>
+                  Editar nas Configurações
                 </button>
               )}
             </div>
           </>
-        )}
-
-        {profile && editing && (
-          <form onSubmit={handleSave}>
-            <h2>Editar perfil</h2>
-
-            <div className="settings-field">
-              <label className="settings-label">Apelido</label>
-              <input
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                placeholder={profile.username}
-                maxLength={32}
-              />
-              <p className="admin-hint" style={{ margin: 0 }}>
-                Aparece no seu perfil no lugar de "{profile.username}". Em branco = usa o nome de usuário.
-              </p>
-            </div>
-
-            <div className="settings-field">
-              <label className="settings-label">Sobre mim</label>
-              <textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                maxLength={190}
-                rows={3}
-                placeholder="Conte um pouco sobre você..."
-              />
-            </div>
-
-            {saveError && <p className="auth-error">{saveError}</p>}
-
-            <div className="settings-actions">
-              <button type="button" className="link-btn" onClick={() => setEditing(false)} disabled={saving}>
-                Cancelar
-              </button>
-              <button type="submit" disabled={saving}>
-                {saving ? "Salvando..." : "Salvar"}
-              </button>
-            </div>
-          </form>
         )}
       </div>
     </div>

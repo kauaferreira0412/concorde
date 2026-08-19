@@ -11,7 +11,13 @@ public class ServerDtos {
 
     public record CreateServerRequest(@NotBlank String name) {}
 
-    public record ServerResponse(Long id, String name, Long ownerId, String iconUrl) {}
+    public record ServerResponse(Long id, String name, Long ownerId, String iconUrl, String description) {}
+
+    /** Edicao de nome/descricao do servidor - so' o dono/ADMIN pode (ver ServerService.updateServer). */
+    public record UpdateServerRequest(@NotBlank String name, String description) {}
+
+    /** Apelido do usuario logado DENTRO desse servidor especifico (ver Membership.nickname). */
+    public record SetNicknameRequest(String nickname) {}
 
     public record CreateChannelRequest(@NotBlank String name, ChannelType type) {}
 
@@ -19,5 +25,5 @@ public class ServerDtos {
 
     public record ServerWithChannels(ServerResponse server, List<ChannelResponse> channels) {}
 
-    public record MemberResponse(Long userId, String username, String avatarUrl, PresenceStatus status, Role role) {}
+    public record MemberResponse(Long userId, String username, String nickname, String avatarUrl, PresenceStatus status, Role role) {}
 }

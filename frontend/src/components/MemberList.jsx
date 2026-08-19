@@ -86,7 +86,9 @@ export function MemberRow({ member }) {
         <Avatar name={member.username} url={member.avatarUrl} className="voice-avatar small" />
         <span className={"status-dot " + STATUS_DOT_CLASS[member.status]} title={STATUS_LABEL[member.status]} />
       </div>
-      <span className="member-row-name">{member.username}</span>
+      {/* Apelido DESSE servidor (ver Configurações > Perfil) tem prioridade sobre o username -
+          mesma logica do Discord: e' local aquele servidor, so' quem esta nele ve. */}
+      <span className="member-row-name">{member.nickname || member.username}</span>
       {member.role === "ADMIN" && <span className="admin-badge">ADMIN</span>}
     </button>
   );

@@ -26,6 +26,12 @@ public class Membership {
     @Column(nullable = false)
     private Long userId;
 
+    /** Apelido SO' desse servidor - se preenchido, sobrepoe o apelido/username global pra
+     * quem estiver vendo esse usuario dentro desse servidor especifico (lista de membros -
+     * ver MemberResponse). Independente do "Apelido" global do usuario (User.nickname). */
+    @Column(length = 32)
+    private String nickname;
+
     @Builder.Default
     private Instant joinedAt = Instant.now();
 }

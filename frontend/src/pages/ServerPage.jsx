@@ -10,6 +10,7 @@ import VoiceChannel from "../components/VoiceChannel.jsx";
 import MemberList from "../components/MemberList.jsx";
 import CreateServerModal from "../components/CreateServerModal.jsx";
 import CreateChannelModal from "../components/CreateChannelModal.jsx";
+import EditServerModal from "../components/EditServerModal.jsx";
 import SettingsModal from "../components/SettingsModal.jsx";
 import { VoiceCallProvider } from "../context/VoiceCallContext.jsx";
 
@@ -22,6 +23,7 @@ export default function ServerPage() {
   const [channels, setChannels] = useState([]);
   const [selectedChannel, setSelectedChannel] = useState(null);
   const [showCreateServer, setShowCreateServer] = useState(false);
+  const [editingServer, setEditingServer] = useState(null); // server sendo editado, null = fechado
   const [createChannelType, setCreateChannelType] = useState(null); // null | "TEXT" | "VOICE"
   const [showSettings, setShowSettings] = useState(false);
   const [stompClient, setStompClient] = useState(null);
@@ -77,10 +79,27 @@ export default function ServerPage() {
     });
   }, [selectedServerId]);
 
+  // A edicao do PROPRIO perfil (apelido/foto/bio) vive dentro de Configuracoes agora (nao
+  // tem mais uma tela separada de "editar perfil") - o cartao de perfil (ProfileModal.jsx,
+  // aberto de qualquer lugar via ProfileContext) so' te manda pra ca quando e' voce mesmo.
+  useEffect(() => {
+    function handleOpenSettings() {
+      setShowSettings(true);
+    }
+    window.addEventListener("concorde:open-settings", handleOpenSettings);
+    return () => window.removeEventListener("concorde:open-settings", handleOpenSettings);
+  }, []);
+
   async function handleCreateServer(name) {
     const { data } = await api.post("/api/servers", { name });
     setServers((prev) => [...prev, data]);
     navigate(`/servers/${data.id}`);
+  }
+
+  /** Depois de editar nome/icone/descricao (EditServerModal) - atualiza so' esse servidor
+   *  na lista, sem precisar recarregar tudo de novo. */
+  function handleUpdateServer(updated) {
+    setServers((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
   }
 
   function openCreateChannel(type) {
@@ -109,6 +128,7 @@ export default function ServerPage() {
           onSelectChannel={setSelectedChannel}
           onCreateChannel={openCreateChannel}
           onOpenSettings={() => setShowSettings(true)}
+          onEditServer={setEditingServer}
           stompClient={stompClient}
           stompConnected={stompConnected}
           user={user}
@@ -142,6 +162,9 @@ export default function ServerPage() {
             onClose={() => setCreateChannelType(null)}
             onCreate={handleCreateChannel}
           />
+        )}
+        {editingServer && (
+          <EditServerModal server={editingServer} onClose={() => setEditingServer(null)} onUpdate={handleUpdateServer} />
         )}
         {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       </div>

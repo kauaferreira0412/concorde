@@ -18,6 +18,7 @@ import {
   LogOutIcon,
   MicIcon,
   MicOffIcon,
+  PencilIcon,
   PhoneOffIcon,
   ScreenShareIcon,
   SettingsIcon,
@@ -38,6 +39,7 @@ export default function ChannelSidebar({
   onSelectChannel,
   onCreateChannel,
   onOpenSettings,
+  onEditServer,
   stompClient,
   stompConnected,
   user,
@@ -172,13 +174,20 @@ export default function ChannelSidebar({
             )}
           </div>
         )}
-        <button
-          className="icon-btn collapse-toggle"
-          onClick={toggleCollapsed}
-          title={collapsed ? "Abrir menu de canais" : "Fechar menu de canais"}
-        >
-          {collapsed ? <ChevronsRightIcon /> : <ChevronsLeftIcon />}
-        </button>
+        <div className="channel-sidebar-header-actions">
+          {!collapsed && server && isAdmin && (
+            <button className="icon-btn" onClick={() => onEditServer(server)} title="Editar servidor">
+              <PencilIcon size={15} />
+            </button>
+          )}
+          <button
+            className="icon-btn collapse-toggle"
+            onClick={toggleCollapsed}
+            title={collapsed ? "Abrir menu de canais" : "Fechar menu de canais"}
+          >
+            {collapsed ? <ChevronsRightIcon /> : <ChevronsLeftIcon />}
+          </button>
+        </div>
       </div>
 
       <div className="channel-sidebar-body">

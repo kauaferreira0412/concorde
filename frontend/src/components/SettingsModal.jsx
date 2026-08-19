@@ -87,6 +87,24 @@ export default function SettingsModal({ onClose }) {
   const [visibilitySaving, setVisibilitySaving] = useState(false);
   const [visibilityError, setVisibilityError] = useState("");
 
+  // Apelido/bio GLOBAIS (valem em qualquer servidor) - salvos junto com o resto ao clicar
+  // em "Salvar" no rodape (ver handleSave). Antes isso vivia numa tela separada
+  // (ProfileModal), agora mora aqui junto com o resto do perfil.
+  const [nickname, setNickname] = useState(user?.nickname || "");
+  const [bio, setBio] = useState(user?.bio || "");
+  const [profileError, setProfileError] = useState("");
+
+  // Servidores que o usuario esta - calculado sozinho (so' busca a lista, ver useEffect
+  // abaixo) - e o apelido DENTRO de um servidor especifico escolhido no seletor (esse tem
+  // salvamento proprio, ja que so' faz sentido depois de escolher pra qual servidor).
+  const [myServers, setMyServers] = useState([]);
+  const [serverNicknameTarget, setServerNicknameTarget] = useState("");
+  const [serverNickname, setServerNickname] = useState("");
+  const [serverNicknameLoading, setServerNicknameLoading] = useState(false);
+  const [serverNicknameSaving, setServerNicknameSaving] = useState(false);
+  const [serverNicknameSaved, setServerNicknameSaved] = useState(false);
+  const [serverNicknameError, setServerNicknameError] = useState("");
+
   const [inputDevices, setInputDevices] = useState([]);
   const [outputDevices, setOutputDevices] = useState([]);
   const [videoDevices, setVideoDevices] = useState([]);
@@ -136,6 +154,43 @@ export default function SettingsModal({ onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // "Quantos e quais servidores você está" - so' reaproveita a mesma lista que a sidebar ja
+  // usa (GET /api/servers), calculada sozinha, sem precisar manter nada a parte.
+  useEffect(() => {
+    api.get("/api/servers").then(({ data }) => setMyServers(data));
+  }, []);
+
+  // Ao escolher um servidor no seletor de apelido, busca o apelido que ja existe la' (se
+  // existir) pra pre-preencher o campo, em vez de sempre comecar em branco.
+  useEffect(() => {
+    if (!serverNicknameTarget) {
+      setServerNickname("");
+      return;
+    }
+    setServerNicknameLoading(true);
+    setServerNicknameError("");
+    setServerNicknameSaved(false);
+    api
+      .get(`/api/servers/${serverNicknameTarget}/me/nickname`)
+      .then(({ data }) => setServerNickname(data.nickname || ""))
+      .catch((err) => setServerNicknameError(err.response?.data?.error || "Não foi possível carregar o apelido"))
+      .finally(() => setServerNicknameLoading(false));
+  }, [serverNicknameTarget]);
+
+  async function handleSaveServerNickname() {
+    setServerNicknameSaving(true);
+    setServerNicknameError("");
+    setServerNicknameSaved(false);
+    try {
+      await api.put(`/api/servers/${serverNicknameTarget}/me/nickname`, { nickname: serverNickname.trim() });
+      setServerNicknameSaved(true);
+    } catch (err) {
+      setServerNicknameError(err.response?.data?.error || "Não foi possível salvar o apelido");
+    } finally {
+      setServerNicknameSaving(false);
+    }
+  }
+
   async function startTest() {
     setPermissionError("");
     try {
@@ -177,6 +232,15 @@ export default function SettingsModal({ onClose }) {
   }
 
   async function handleSave() {
+    setProfileError("");
+    try {
+      const { data } = await api.put("/api/users/me/profile", { nickname: nickname.trim(), bio: bio.trim() });
+      updateUser({ nickname: data.nickname, bio: data.bio });
+    } catch (err) {
+      setProfileError(err.response?.data?.error || "Falha ao salvar perfil");
+      return; // nao fecha o modal nem salva o resto - o usuario precisa ver o erro primeiro
+    }
+
     setSavedAudioInput(selectedInput);
     setSavedAudioOutput(selectedOutput);
     setSavedVideoInput(selectedVideoInput);
@@ -288,6 +352,107 @@ export default function SettingsModal({ onClose }) {
                 <p className="settings-section-title">Status</p>
                 <StatusDropdown value={user?.status || "ONLINE"} onChange={handleStatusChange} disabled={visibilitySaving} />
                 {visibilityError && <p className="auth-error">{visibilityError}</p>}
+
+                <div className="settings-divider" />
+
+                <p className="settings-section-title">Sobre você</p>
+
+                <div className="settings-field">
+                  <label className="settings-label">Apelido</label>
+                  <input
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
+                    placeholder={user?.username}
+                    maxLength={32}
+                  />
+                  <p className="admin-hint" style={{ margin: 0 }}>
+                    Aparece no seu perfil no lugar de "{user?.username}", em QUALQUER servidor. Em branco = usa o
+                    nome de usuário.
+                  </p>
+                </div>
+
+                <div className="settings-field">
+                  <label className="settings-label">Sobre mim</label>
+                  <textarea
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    maxLength={190}
+                    rows={3}
+                    placeholder="Conte um pouco sobre você..."
+                  />
+                </div>
+                {profileError && <p className="auth-error">{profileError}</p>}
+
+                <div className="settings-divider" />
+
+                <p className="settings-section-title">Apelido no servidor</p>
+                <p className="admin-hint">
+                  Diferente do apelido global acima - esse vale so' DENTRO do servidor escolhido, os outros membros
+                  desse servidor especifico veem esse em vez do seu apelido/nome normal.
+                </p>
+
+                <div className="settings-field">
+                  <label className="settings-label">Servidor</label>
+                  <select value={serverNicknameTarget} onChange={(e) => setServerNicknameTarget(e.target.value)}>
+                    <option value="">Escolha um servidor...</option>
+                    {myServers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {serverNicknameTarget && (
+                  <div className="settings-field">
+                    <label className="settings-label">Seu apelido nesse servidor</label>
+                    <div className="settings-inline-save">
+                      <input
+                        value={serverNickname}
+                        onChange={(e) => {
+                          setServerNickname(e.target.value);
+                          setServerNicknameSaved(false);
+                        }}
+                        maxLength={32}
+                        disabled={serverNicknameLoading}
+                        placeholder={serverNicknameLoading ? "Carregando..." : "Em branco = usa o apelido global"}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveServerNickname}
+                        disabled={serverNicknameLoading || serverNicknameSaving}
+                      >
+                        {serverNicknameSaving ? "Salvando..." : "Salvar"}
+                      </button>
+                    </div>
+                    {serverNicknameSaved && (
+                      <p className="admin-hint" style={{ margin: 0, color: "var(--success)" }}>
+                        Apelido salvo nesse servidor.
+                      </p>
+                    )}
+                    {serverNicknameError && <p className="auth-error">{serverNicknameError}</p>}
+                  </div>
+                )}
+
+                <div className="settings-divider" />
+
+                <p className="settings-section-title">
+                  Seus servidores — {myServers.length}
+                </p>
+                {myServers.length === 0 ? (
+                  <p className="admin-hint" style={{ margin: 0 }}>
+                    Você ainda não está em nenhum servidor.
+                  </p>
+                ) : (
+                  <ul className="settings-server-list">
+                    {myServers.map((s) => (
+                      <li key={s.id}>
+                        <Avatar name={s.name} url={s.iconUrl} className="voice-avatar small" />
+                        {s.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </>
             )}
 

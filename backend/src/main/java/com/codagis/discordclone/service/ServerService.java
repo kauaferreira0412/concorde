@@ -87,9 +87,15 @@ public class ServerService {
         assertMember(serverId, userId);
         List<Membership> memberships = membershipRepository.findByServerId(serverId);
         List<Long> userIds = memberships.stream().map(Membership::getUserId).toList();
+        // Nao da pra usar Collectors.toMap aqui - ele chama Objects.requireNonNull() no valor
+        // por baixo dos panos e explode com NullPointerException assim que algum apelido
+        // (o caso comum) estiver em branco. Um HashMap comum aceita valor null numa boa.
+        var nicknameByUserId = new java.util.HashMap<Long, String>();
+        memberships.forEach(m -> nicknameByUserId.put(m.getUserId(), m.getNickname()));
         var statusById = presenceService.effectiveStatusOf(userIds);
         return userRepository.findAllById(userIds).stream()
-                .map(u -> new MemberResponse(u.getId(), u.getUsername(), u.getAvatarUrl(), statusById.get(u.getId()), u.getRole()))
+                .map(u -> new MemberResponse(u.getId(), u.getUsername(), nicknameByUserId.get(u.getId()),
+                        u.getAvatarUrl(), statusById.get(u.getId()), u.getRole()))
                 .sorted((a, b) -> {
                     boolean aOffline = a.status() == PresenceStatus.OFFLINE;
                     boolean bOffline = b.status() == PresenceStatus.OFFLINE;
@@ -97,6 +103,47 @@ public class ServerService {
                     return a.username().compareToIgnoreCase(b.username());
                 })
                 .toList();
+    }
+
+    /** So o dono do servidor (ou o ADMIN) pode editar nome/descricao - mesmo criterio de
+     * quem pode criar servidor pra comecar (ver AdminGuard). */
+    @Transactional
+    public ServerResponse updateServer(Long requesterId, Long serverId, UpdateServerRequest req) {
+        adminGuard.assertAdmin(requesterId);
+        Server server = serverRepository.findById(serverId)
+                .orElseThrow(() -> new IllegalArgumentException("Servidor nao encontrado"));
+        server.setName(req.name());
+        server.setDescription(blankToNull(req.description()));
+        return toResponse(serverRepository.save(server));
+    }
+
+    @Transactional
+    public ServerResponse updateServerIcon(Long requesterId, Long serverId, String iconUrl) {
+        adminGuard.assertAdmin(requesterId);
+        Server server = serverRepository.findById(serverId)
+                .orElseThrow(() -> new IllegalArgumentException("Servidor nao encontrado"));
+        server.setIconUrl(iconUrl);
+        return toResponse(serverRepository.save(server));
+    }
+
+    public String getMyNickname(Long serverId, Long userId) {
+        return membershipRepository.findByServerIdAndUserId(serverId, userId)
+                .map(Membership::getNickname)
+                .orElse(null);
+    }
+
+    /** Qualquer MEMBRO do servidor pode escolher o proprio apelido ali dentro (nao precisa
+     * ser dono/admin - e' uma preferencia pessoal, igual o apelido global do usuario). */
+    @Transactional
+    public void setMyNickname(Long serverId, Long userId, String nickname) {
+        Membership membership = membershipRepository.findByServerIdAndUserId(serverId, userId)
+                .orElseThrow(() -> new IllegalStateException("Usuario nao pertence a esse servidor"));
+        membership.setNickname(blankToNull(nickname));
+        membershipRepository.save(membership);
+    }
+
+    private String blankToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
     }
 
     public List<ChannelResponse> listChannels(Long serverId, Long userId) {
@@ -118,7 +165,7 @@ public class ServerService {
     }
 
     private ServerResponse toResponse(Server server) {
-        return new ServerResponse(server.getId(), server.getName(), server.getOwnerId(), server.getIconUrl());
+        return new ServerResponse(server.getId(), server.getName(), server.getOwnerId(), server.getIconUrl(), server.getDescription());
     }
 
     private ChannelResponse toResponse(Channel channel) {
