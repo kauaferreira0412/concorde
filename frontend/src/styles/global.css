@@ -93,7 +93,7 @@ button:active { transform: translateY(0.5px) scale(0.985); }
 button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); }
 
-input {
+input, textarea {
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -103,8 +103,8 @@ input {
   font-family: inherit;
   transition: border-color 0.2s var(--ease-standard), box-shadow 0.2s var(--ease-standard);
 }
-input::placeholder { color: var(--text-muted); }
-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+input:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 
 /* input[type=range] (sliders de volume) nao deve herdar a caixa de text input (fundo, borda,
    padding) - senao vira uma barra gigante em volta de um controle fininho. !important pra
@@ -1574,7 +1574,11 @@ img.chat-header-avatar { object-fit: cover; }
 }
 .settings-test-row { margin: 0; }
 .settings-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 4px; }
-.settings-actions button:not(.link-btn) { width: auto; padding: 10px 20px; }
+/* !important pra vencer ".modal button:not(...)" (mais especifico por causa dos varios
+   :not() - a mesma guerra de especificidade documentada acima em input[type=range]) - sem
+   isso o botao "Salvar"/"Confirmar" ficava width:100%, gigante do lado do "Cancelar" pequeno
+   (link-btn) numa linha so'. */
+.settings-actions button:not(.link-btn) { width: auto !important; padding: 10px 20px; margin-top: 0; }
 
 /* ============================================================
    Admin panel

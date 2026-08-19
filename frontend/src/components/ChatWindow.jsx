@@ -7,7 +7,7 @@ import { useServerMembers } from "../utils/useServerMembers";
 import { applyMention, getMentionQuery, mentionsUser, splitMentions } from "../utils/mentions";
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
-import { CheckIcon, ImageIcon, PencilIcon, ReplyIcon, TrashIcon, XIcon } from "./icons.jsx";
+import { CheckIcon, PencilIcon, PlusIcon, ReplyIcon, TrashIcon, XIcon } from "./icons.jsx";
 
 /** @username -> vira um "pill" destacado (mais forte se for voce mesmo) - so reconhece
     quem e' de verdade membro do servidor, o resto fica texto normal. */
@@ -401,7 +401,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
           disabled={!stompConnected || sending}
           title="Enviar imagem"
         >
-          <ImageIcon />
+          <PlusIcon />
         </button>
         <div className="chat-input-field">
           {mentionQuery !== null && mentionMatches.length > 0 && (
