@@ -81,12 +81,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const [cameraEnabled, setCameraEnabledState] = useState(false);
   const [participants, setParticipants] = useState([]); // dentro da call, com quem realmente entrou
   const [speakingIds, setSpeakingIds] = useState(new Set());
-  const [screenShares, setScreenShares] = useState([]); // [{ sid, name, isLocal, watching }]
+  const [screenShares, setScreenShares] = useState([]); // [{ sid, name, isLocal, watching, track }]
   // Webcam de quem estiver com a camera ligada (voce e/ou outros) - funciona igual no
   // navegador e no app desktop, e' so' getUserMedia comum via LiveKit (setCameraEnabled),
   // sem nenhuma parte nativa envolvida. Ver toggleCamera/CameraTile em VoiceChannel.jsx.
   const [cameraTracks, setCameraTracks] = useState([]); // [{ identity, name, isLocal, track }]
-  const [selectedScreenShareSid, setSelectedScreenShareSid] = useState(null);
   const [participantVolumes, setParticipantVolumesState] = useState({}); // identity -> 0..200 (voz)
   const [streamVolumes, setStreamVolumesState] = useState({}); // identity -> 0..200 (audio da transmissao de tela dessa pessoa)
   // So' usado no app desktop (Electron) - true enquanto o seletor customizado de tela/janela
@@ -105,12 +104,16 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const { level: micLevel, start: startMicMeter, stop: stopMicMeter } = useMicLevel();
 
   const roomRef = useRef(null);
-  const videoContainerElRef = useRef(null); // registrado pelo VoiceChannel quando esta na tela
   // trackSid -> { track (null se nao estiver "assistindo"), pub (RemoteTrackPublication, pra
   // poder inscrever/desinscrever - null pra sua propria tela), participantIdentity,
   // participantName, isLocal }
   const videoTracksRef = useRef(new Map());
-  const selectedSidRef = useRef(null);
+  // identities de quem voce ESCOLHEU assistir a tela (ver toggleWatchScreenShare) - por
+  // padrao ninguem esta aqui: video/audio de compartilhamento de tela de outra pessoa so'
+  // baixa de verdade depois que voce clica pra entrar naquela transmissao especifica (pedido
+  // explicito do usuario: "quero que o usuario escolha entrar em cada live ou nao", em vez de
+  // todo mundo ja ver/ouvir automaticamente assim que alguem comeca a compartilhar).
+  const watchedShareIdentitiesRef = useRef(new Set());
   // identity -> { track (LocalVideoTrack ou RemoteVideoTrack), name, isLocal } - diferente de
   // videoTracksRef (compartilhamento de tela, um "palco" so' de cada vez), camera mostra TODOS
   // que estiverem com ela ligada ao mesmo tempo, em tiles pequenos - ver CameraTile.
@@ -365,65 +368,39 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         participantIdentity: v.participantIdentity,
         isLocal: v.isLocal,
         // "assistindo" = a gente tem o track de video de verdade em maos agora. Fica falso
-        // quando o usuario escolhe parar de assistir (ver toggleWatchScreenShare) sem por
-        // isso sumir da lista de abas - continua la, so' sem baixar video ate' voltar a assistir.
+        // ate' voce clicar pro quadrado pra entrar nessa transmissao (ver toggleWatchScreenShare)
+        // sem por isso sumir da lista - continua la, so' sem baixar video ate' entrar.
         watching: !!v.track,
+        track: v.track || null,
       }))
     );
   }
-
-  /** Renderiza dentro do container atual (se houver) so a tela SELECIONADA - nao todas de uma vez. */
-  function renderSelectedVideo(sid) {
-    const container = videoContainerElRef.current;
-    if (!container) return;
-    container.innerHTML = "";
-    const entry = sid ? videoTracksRef.current.get(sid) : null;
-    if (entry?.track) {
-      const el = entry.track.attach();
-      el.dataset.participant = entry.participantIdentity;
-      container.appendChild(el);
-    }
-  }
-
-  const selectScreenShare = useCallback((sid) => {
-    selectedSidRef.current = sid;
-    setSelectedScreenShareSid(sid);
-    renderSelectedVideo(sid);
-  }, []);
 
   /** Cria ou atualiza a entrada de uma transmissao de tela (mescla com o que ja existia). */
   function upsertScreenShare(sid, patch) {
     const merged = { ...(videoTracksRef.current.get(sid) || {}), ...patch };
     videoTracksRef.current.set(sid, merged);
     syncScreenShares();
-    // Se ninguem estava selecionado ainda, mostra essa automaticamente assim que o video
-    // chegar (ex: primeira pessoa a compartilhar, ou voce mesmo iniciando o seu).
-    if (!selectedSidRef.current && merged.track) {
-      selectScreenShare(sid);
-    } else if (selectedSidRef.current === sid) {
-      renderSelectedVideo(sid);
-    }
   }
 
   /** A transmissao acabou de verdade (a pessoa parou de compartilhar) - some da lista. */
   function removeVideoTrack(sid) {
     videoTracksRef.current.delete(sid);
     syncScreenShares();
-    if (selectedSidRef.current === sid) {
-      const next = [...videoTracksRef.current.keys()][0] || null;
-      selectScreenShare(next);
-    }
   }
 
   /**
-   * Deixa de assistir (ou volta a assistir) uma transmissao sem sair da call de voz - so'
-   * cancela a inscricao do video no LiveKit (para de baixar aquele fluxo), a aba continua
-   * la pra retomar quando quiser. Nao se aplica a sua propria tela (isLocal / sem pub).
+   * Voce ESCOLHE entrar (ou sair) de uma transmissao especifica - so' a partir daqui o video/
+   * audio dela realmente baixa (ver gate em RoomEvent.TrackSubscribed abaixo, que usa
+   * watchedShareIdentitiesRef pra decidir se aceita ou recusa a inscricao automatica do
+   * LiveKit). Nao se aplica a sua propria tela (isLocal / sem pub).
    */
   const toggleWatchScreenShare = useCallback(async (sid) => {
     const entry = videoTracksRef.current.get(sid);
     if (!entry || entry.isLocal || !entry.pub) return;
     const nextWatching = !entry.track;
+    if (nextWatching) watchedShareIdentitiesRef.current.add(entry.participantIdentity);
+    else watchedShareIdentitiesRef.current.delete(entry.participantIdentity);
     try {
       await entry.pub.setSubscribed(nextWatching);
     } catch (err) {
@@ -443,7 +420,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       }
     }
     // O proprio evento TrackSubscribed/TrackUnsubscribed do LiveKit vai atualizar entry.track
-    // e chamar syncScreenShares/renderSelectedVideo quando a mudanca for confirmada.
+    // e chamar syncScreenShares quando a mudanca for confirmada.
   }, []);
 
   function setParticipantVolume(identity, percent) {
@@ -486,7 +463,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     await roomRef.current?.disconnect();
     roomRef.current = null;
     videoTracksRef.current.clear();
-    selectedSidRef.current = null;
+    watchedShareIdentitiesRef.current = new Set();
     micAudioTracksRef.current.clear();
     screenAudioTracksRef.current.clear();
     participantVolumesRef.current = new Map();
@@ -511,10 +488,8 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     screenSharingRef.current = false;
     setDeafened(false);
     setScreenShares([]);
-    setSelectedScreenShareSid(null);
     setParticipantVolumesState({});
     setStreamVolumesState({});
-    if (videoContainerElRef.current) videoContainerElRef.current.innerHTML = "";
   }
 
   async function joinChannel(channel) {
@@ -545,13 +520,29 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
 
       newRoom.on(RoomEvent.TrackSubscribed, (track, pub, participant) => {
         if (track.kind === Track.Kind.Video && pub.source === Track.Source.ScreenShare) {
-          upsertScreenShare(pub.trackSid, {
-            track,
-            pub,
-            participantIdentity: participant.identity,
-            participantName: participant.name || participant.identity,
-            isLocal: false,
-          });
+          // O LiveKit auto-inscreve todo track novo por padrao (inclusive telas dos outros) -
+          // se ninguem pediu explicitamente pra assistir ESSA pessoa ainda (ver
+          // toggleWatchScreenShare/watchedShareIdentitiesRef), recusa a inscricao na hora e so'
+          // registra que a transmissao existe (o quadrado clicavel aparece, sem baixar video
+          // nenhum) - pedido explicito do usuario pra ninguem ver automaticamente.
+          if (!watchedShareIdentitiesRef.current.has(participant.identity)) {
+            pub.setSubscribed(false).catch(() => {});
+            upsertScreenShare(pub.trackSid, {
+              track: null,
+              pub,
+              participantIdentity: participant.identity,
+              participantName: participant.name || participant.identity,
+              isLocal: false,
+            });
+          } else {
+            upsertScreenShare(pub.trackSid, {
+              track,
+              pub,
+              participantIdentity: participant.identity,
+              participantName: participant.name || participant.identity,
+              isLocal: false,
+            });
+          }
         } else if (track.kind === Track.Kind.Video && pub.source === Track.Source.Camera) {
           cameraTracksRef.current.set(participant.identity, {
             track,
@@ -569,6 +560,12 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
             micAudioTracksRef.current.set(participant.identity, track);
             track.setVolume(silenced ? 0 : (participantVolumesRef.current.get(participant.identity) ?? 100) / 100);
           } else if (pub.source === Track.Source.ScreenShareAudio) {
+            // Mesma trava do video acima (watchedShareIdentitiesRef) - o audio da transmissao
+            // de quem voce nao escolheu assistir tambem nao toca sozinho.
+            if (!watchedShareIdentitiesRef.current.has(participant.identity)) {
+              pub.setSubscribed(false).catch(() => {});
+              return;
+            }
             screenAudioTracksRef.current.set(participant.identity, track);
             track.setVolume(silenced ? 0 : (streamVolumesRef.current.get(participant.identity) ?? 100) / 100);
           }
@@ -595,7 +592,6 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           if (entry) {
             entry.track = null;
             syncScreenShares();
-            if (selectedSidRef.current === pub.trackSid) renderSelectedVideo(pub.trackSid);
           }
         }
         if (pub.source === Track.Source.Microphone) {
@@ -813,12 +809,42 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           pub.track.setVolume(silenced ? 0 : (participantVolumesRef.current.get(participant.identity) ?? 100) / 100);
           pub.track.attachedElements.forEach((el) => (el.muted = silenced));
         } else if (pub.source === Track.Source.ScreenShareAudio) {
+          // Se a reconexao trouxe de volta o audio de uma transmissao que voce NAO escolheu
+          // assistir (mesma regra do watchedShareIdentitiesRef em TrackSubscribed), desfaz a
+          // inscricao de novo - nao deve tocar sozinho so' porque reconectou.
+          if (!watchedShareIdentitiesRef.current.has(participant.identity)) {
+            pub.setSubscribed(false).catch(() => {});
+            return;
+          }
           screenAudioTracksRef.current.set(participant.identity, pub.track);
           pub.track.setVolume(silenced ? 0 : (streamVolumesRef.current.get(participant.identity) ?? 100) / 100);
           pub.track.attachedElements.forEach((el) => (el.muted = silenced));
         }
       });
     });
+
+    // Mesma logica pro video de compartilhamento de tela: reconstroi so' as entradas dos
+    // OUTROS (preserva a sua propria, isLocal, que nao vem de remoteParticipants) a partir de
+    // quem voce escolheu assistir - se a reconexao trouxe de volta uma inscricao de video que
+    // voce nao pediu, desfaz de novo.
+    for (const [sid, entry] of [...videoTracksRef.current.entries()]) {
+      if (!entry.isLocal) videoTracksRef.current.delete(sid);
+    }
+    room.remoteParticipants.forEach((participant) => {
+      const pub = participant.getTrackPublication(Track.Source.ScreenShare);
+      if (!pub) return;
+      const watching = watchedShareIdentitiesRef.current.has(participant.identity);
+      if (pub.isSubscribed !== watching) pub.setSubscribed(watching).catch(() => {});
+      videoTracksRef.current.set(pub.trackSid, {
+        track: watching ? pub.track : null,
+        pub,
+        participantIdentity: participant.identity,
+        participantName: participant.name || participant.identity,
+        isLocal: false,
+      });
+    });
+    syncScreenShares();
+
     syncCameraTracks();
     refreshParticipants(room);
 
@@ -1177,12 +1203,6 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     }
   }
 
-  /** Chamado pelo VoiceChannel quando monta/desmonta, para anexar/soltar o video no container certo. */
-  const registerVideoContainer = useCallback((el) => {
-    videoContainerElRef.current = el;
-    if (el) renderSelectedVideo(selectedSidRef.current);
-  }, []);
-
   return (
     <VoiceCallContext.Provider
       value={{
@@ -1198,8 +1218,6 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         micLevel,
         pingMs,
         screenShares,
-        selectedScreenShareSid,
-        selectScreenShare,
         toggleWatchScreenShare,
         participantVolumes,
         streamVolumes,
@@ -1211,7 +1229,6 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         toggleDeafen,
         toggleScreenShare,
         toggleCamera,
-        registerVideoContainer,
         myPermissions,
         moveParticipant,
         kickParticipant,

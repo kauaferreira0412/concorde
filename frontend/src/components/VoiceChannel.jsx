@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useServerMembers } from "../utils/useServerMembers";
 import {
-  EyeIcon,
   EyeOffIcon,
   MaximizeIcon,
   MenuIcon,
@@ -10,11 +9,9 @@ import {
   MicOffIcon,
   ScreenShareIcon,
   VolumeIcon,
-  WidenIcon,
   ZoomInIcon,
   ZoomOutIcon,
 } from "./icons.jsx";
-import VolumeSlider from "./VolumeSlider.jsx";
 import { MemberRow } from "./MemberList.jsx";
 
 // Tamanhos disponiveis pro tile de webcam - "size" vira uma classe CSS (.camera-tile-<size>,
@@ -26,12 +23,6 @@ const CAMERA_SIZES = ["sm", "md", "lg", "xl"];
 // so' controla a resolucao do "preenchimento" (ver mic-meter-segments em VoiceChannel).
 const MIC_SEGMENT_COUNT = 40;
 const MIC_SEGMENTS = Array.from({ length: MIC_SEGMENT_COUNT }, (_, i) => i);
-
-function formatDuration(totalSeconds) {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
 
 /** Cabecalho do canal de voz - nome, subtitulo "Canal de voz · Servidor", badge de "TEMPO
  *  REAL" enquanto conectado. Sem "facepile" de iniciais aqui (pedido do usuario pra tirar) -
@@ -96,6 +87,67 @@ function CameraTile({ track, name, isLocal, size }) {
 }
 
 /**
+ * Um quadrado por transmissao de tela ativa - mesmo estilo/tamanho do tile de camera (pedido
+ * explicito do usuario, com print de referencia). Enquanto ninguem escolheu assistir aquela
+ * transmissao especifica (isLocal e' sempre "assistida", e' a sua propria), o quadrado so'
+ * mostra o nome de quem esta compartilhando no centro e funciona como botao - clicar nele e'
+ * o unico jeito de comecar a baixar aquele video (ver toggleWatchScreenShare/
+ * watchedShareIdentitiesRef no VoiceCallContext: ninguem mais entra automaticamente numa
+ * transmissao so' porque alguem comecou a compartilhar).
+ */
+function ScreenShareTile({ share, onToggleWatch }) {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !share.track) return;
+    share.track.attach(el);
+    return () => share.track.detach(el);
+  }, [share.track]);
+
+  function handleMaximize() {
+    const el = videoRef.current;
+    const request = el?.requestFullscreen || el?.webkitRequestFullscreen;
+    request?.call(el);
+  }
+
+  if (!share.isLocal && !share.watching) {
+    return (
+      <button
+        type="button"
+        className="camera-tile camera-tile-md screenshare-tile-pick"
+        onClick={() => onToggleWatch(share.sid)}
+        title={`Clique para assistir a transmissão de ${share.name}`}
+      >
+        <ScreenShareIcon size={22} />
+        <span className="screenshare-tile-pick-name">{share.name}</span>
+        <span className="screenshare-tile-pick-hint">Clique para assistir</span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="camera-tile camera-tile-md">
+      <video ref={videoRef} autoPlay playsInline muted={share.isLocal} onDoubleClick={handleMaximize} />
+      <span className="camera-tile-name">{share.name}</span>
+      <button type="button" className="camera-tile-maximize" onClick={handleMaximize} title="Tela cheia">
+        <MaximizeIcon size={13} />
+      </button>
+      {!share.isLocal && (
+        <button
+          type="button"
+          className="screenshare-tile-stop"
+          onClick={() => onToggleWatch(share.sid)}
+          title="Parar de assistir (economiza dados - você continua na call de voz normalmente)"
+        >
+          <EyeOffIcon size={13} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
  * Vista de UM canal de voz. A conexao em si (LiveKit) vive no VoiceCallContext, entao
  * ela sobrevive mesmo se voce sair desse canal para ler um canal de texto - igual ao
  * Discord, que te mantem na call enquanto voce navega pelo servidor.
@@ -110,79 +162,20 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
     screenShares,
     cameraTracks,
     participants,
-    selectedScreenShareSid,
-    selectScreenShare,
     toggleScreenShare,
     toggleWatchScreenShare,
-    streamVolumes,
-    setStreamVolume,
     joinChannel,
-    registerVideoContainer,
   } = useVoiceCall();
   // Hoje nao existe permissao por canal (todo membro do servidor ve todos os canais - ver
   // README), entao "quem tem acesso a esse canal de voz" = todo membro do servidor.
   const members = useServerMembers(channel.serverId, stompClient, stompConnected);
 
-  const videoContainerRef = useRef(null);
   const isThisChannelActive = connected && activeChannel?.id === channel.id;
-  const selectedShare = screenShares.find((s) => s.sid === selectedScreenShareSid) || null;
 
   // Indice em CAMERA_SIZES - comeca no "md" (index 1, tamanho de antes). Afeta todos os
   // tiles de webcam de uma vez (ver botoes +/- no cabecalho da secao CÂMERAS).
   const [cameraSizeIdx, setCameraSizeIdx] = useState(1);
   const cameraSize = CAMERA_SIZES[cameraSizeIdx];
-
-  // "Ampliar" - estagio intermediario entre o tamanho normal e a tela cheia de verdade
-  // (Fullscreen API, via handleFullscreen): ocupa 100% da largura da area central, mas
-  // continua dentro da pagina - da pra rolar e ver participantes/membros normalmente.
-  const [theaterMode, setTheaterMode] = useState(false);
-
-  useEffect(() => {
-    if (screenShares.length === 0) setTheaterMode(false);
-  }, [screenShares.length]);
-
-  useEffect(() => {
-    if (!isThisChannelActive) return;
-    registerVideoContainer(videoContainerRef.current);
-    return () => registerVideoContainer(null);
-  }, [isThisChannelActive, registerVideoContainer]);
-
-  // Estatisticas "ao vivo" da transmissao (resolucao/fps/duracao), mostradas no cabecalho da
-  // secao COMPARTILHAMENTO DE TELA - lidas direto do <video> atual (videoContainerRef), sem
-  // precisar que o VoiceCallContext exponha o track cru. Resolucao/fps vem de verdade do
-  // getSettings() da MediaStreamTrack por baixo; duracao e' contada localmente a partir do
-  // momento em que a primeira transmissao apareceu.
-  const [shareElapsed, setShareElapsed] = useState(0);
-  const [shareStats, setShareStats] = useState(null); // { width, height, frameRate }
-  const shareStartRef = useRef(null);
-
-  useEffect(() => {
-    if (screenShares.length === 0) {
-      shareStartRef.current = null;
-      setShareElapsed(0);
-      setShareStats(null);
-      return;
-    }
-    if (!shareStartRef.current) shareStartRef.current = Date.now();
-    function tick() {
-      setShareElapsed(Math.floor((Date.now() - shareStartRef.current) / 1000));
-      const videoEl = videoContainerRef.current?.querySelector("video");
-      const settings = videoEl?.srcObject?.getVideoTracks?.()[0]?.getSettings?.();
-      if (settings?.width) {
-        setShareStats({ width: settings.width, height: settings.height, frameRate: settings.frameRate });
-      }
-    }
-    tick();
-    const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
-  }, [screenShares.length]);
-
-  function handleFullscreen() {
-    const videoEl = videoContainerRef.current?.querySelector("video");
-    if (!videoEl) return;
-    const request = videoEl.requestFullscreen || videoEl.webkitRequestFullscreen;
-    request?.call(videoEl);
-  }
 
   if (!isThisChannelActive) {
     return (
@@ -271,34 +264,8 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
 
         <section className="voice-section">
           <div className="voice-section-header">
-            <div className="voice-section-title-group">
-              <p className="voice-section-title">COMPARTILHAMENTO DE TELA</p>
-              {screenShares.length > 0 && (
-                <div className="share-stats">
-                  <span className="live-badge live-badge-danger">
-                    <span className="live-badge-dot" /> AO VIVO
-                  </span>
-                  {shareStats?.height && <span className="share-stat">{shareStats.height}p</span>}
-                  {shareStats?.frameRate && <span className="share-stat">{Math.round(shareStats.frameRate)} fps</span>}
-                  <span className="share-stat">{formatDuration(shareElapsed)}</span>
-                </div>
-              )}
-            </div>
+            <p className="voice-section-title">COMPARTILHAMENTO DE TELA</p>
             <div className="voice-section-header-actions">
-              {screenShares.length > 0 && (
-                <>
-                  <button
-                    className={"icon-btn" + (theaterMode ? " icon-btn-active" : "")}
-                    onClick={() => setTheaterMode((v) => !v)}
-                    title={theaterMode ? "Voltar ao tamanho normal" : "Ampliar (ocupa a largura toda, sem sair da página)"}
-                  >
-                    <WidenIcon />
-                  </button>
-                  <button className="icon-btn" onClick={handleFullscreen} title="Ver em tela cheia">
-                    <MaximizeIcon />
-                  </button>
-                </>
-              )}
               <button
                 type="button"
                 className={"btn-accent-sm" + (screenSharing ? " active" : "")}
@@ -315,76 +282,21 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
             </div>
           </div>
 
-          {screenShares.length > 1 && (
-            <div className="screenshare-tabs">
+          {screenShares.length === 0 ? (
+            <div className="screenshare-empty">
+              <ScreenShareIcon size={28} />
+              <p>Ninguém está compartilhando a tela agora.</p>
+            </div>
+          ) : (
+            // Um quadrado por transmissao (lado a lado, mesmo tamanho/estilo do tile de
+            // camera) - quem nao e' voce so' vira video de verdade depois que voce clica pra
+            // entrar naquela transmissao especifica (ver ScreenShareTile acima).
+            <div className="camera-grid">
               {screenShares.map((s) => (
-                <button
-                  key={s.sid}
-                  className={"screenshare-tab" + (s.sid === selectedScreenShareSid ? " active" : "")}
-                  onClick={() => selectScreenShare(s.sid)}
-                >
-                  🖥️ {s.name}
-                </button>
+                <ScreenShareTile key={s.sid} share={s} onToggleWatch={toggleWatchScreenShare} />
               ))}
             </div>
           )}
-
-          {selectedShare && !selectedShare.isLocal && (
-            <div className="screenshare-controls">
-              <button
-                type="button"
-                className={"btn-outline-sm" + (!selectedShare.watching ? " active" : "")}
-                onClick={() => toggleWatchScreenShare(selectedShare.sid)}
-                title={
-                  selectedShare.watching
-                    ? "Parar de assistir (economiza dados - você continua na call de voz normalmente)"
-                    : "Voltar a assistir esta transmissão"
-                }
-              >
-                {selectedShare.watching ? (
-                  <>
-                    <EyeOffIcon size={14} /> Parar de assistir
-                  </>
-                ) : (
-                  <>
-                    <EyeIcon size={14} /> Assistir transmissão
-                  </>
-                )}
-              </button>
-              <VolumeSlider
-                value={streamVolumes[selectedShare.participantIdentity] ?? 100}
-                onChange={(v) => setStreamVolume(selectedShare.participantIdentity, v)}
-                label={`Volume do áudio da transmissão de ${selectedShare.name} (padrão 100%, pode passar de 100%)`}
-              />
-            </div>
-          )}
-
-          <div
-            className={
-              "screenshare-stage" +
-              (screenShares.length === 0 ? " empty" : "") +
-              (theaterMode ? " theater" : "")
-            }
-          >
-            {screenShares.length === 0 && (
-              <div className="screenshare-empty">
-                <ScreenShareIcon size={28} />
-                <p>Ninguém está compartilhando a tela agora.</p>
-              </div>
-            )}
-            {/* Fica sempre montado (mesmo sem ninguem compartilhando) para o VoiceCallContext
-                ter uma referencia estavel de onde anexar o video quando alguem comecar. */}
-            <div
-              className={"voice-video-grid" + (screenShares.length === 0 || !selectedShare?.watching ? " empty" : "")}
-              ref={videoContainerRef}
-              onDoubleClick={handleFullscreen}
-            />
-            {selectedShare && !selectedShare.watching && (
-              <p className="screenshare-paused-hint">
-                Você não está assistindo esta transmissão agora. Clique em "Assistir transmissão" acima para voltar.
-              </p>
-            )}
-          </div>
         </section>
 
         <ChannelAccessSection members={members} />

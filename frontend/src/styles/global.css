@@ -717,8 +717,7 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
 }
 .chat-header-subtitle { margin: 0; font-size: 11.5px; font-weight: 500; color: var(--text-muted); }
 
-/* Badge generica de "ao vivo" - reaproveitada no cabecalho do canal ("TEMPO REAL") e nas
-   estatisticas de compartilhamento de tela ("AO VIVO", ver .share-stats). */
+/* Badge generica de "ao vivo" - usada no cabecalho do canal de voz ("TEMPO REAL"). */
 .live-badge {
   display: flex; align-items: center; gap: 6px; flex-shrink: 0;
   padding: 4px 10px;
@@ -973,16 +972,6 @@ img.chat-header-avatar { object-fit: cover; }
 .voice-section-title-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .voice-section-sort-hint { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
 
-/* Estatisticas "ao vivo" da transmissao de tela (resolucao/fps/duracao) - ver
-   shareStats/shareElapsed em VoiceChannel.jsx, ao lado do titulo COMPARTILHAMENTO DE TELA. */
-.share-stats { display: flex; align-items: center; gap: 8px; }
-.share-stat {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
 /* Botao primario pequeno (preenchido, cor de destaque) - "Compartilhar tela". */
 .btn-accent-sm {
   display: flex; align-items: center; gap: 6px;
@@ -1227,23 +1216,6 @@ img.chat-header-avatar { object-fit: cover; }
   flex-shrink: 0;
 }
 
-.screenshare-controls {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-.screenshare-watch-btn { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.screenshare-controls .volume-slider-row { width: 180px; flex: 0 0 auto; }
-.screenshare-paused-hint {
-  color: var(--text-muted);
-  font-size: 12.5px;
-  text-align: center;
-  padding: 20px;
-  margin: 0;
-}
-
 /* ============================================================
    Lista de membros (online/offline) - painel a direita, espelha
    a largura/comportamento de recolher do channel-sidebar.
@@ -1370,67 +1342,74 @@ img.chat-header-avatar { object-fit: cover; }
 .status-option strong { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
 .status-option small { font-size: 11.5px; color: var(--text-muted); }
 
-.screenshare-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-.screenshare-tab {
-  background: var(--bg-panel-2);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 12.5px;
-  padding: 7px 12px;
-}
-.screenshare-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
-.screenshare-tab.active { background: var(--accent-soft); border-color: rgba(47,107,255,0.4); color: var(--accent-text); }
-
-/* "Palco" do video: fundo escuro tipo cinema, video nunca passa de ~760px de largura
-   nem de 55% da altura da tela - antes ele esticava full-bleed, ficando gigante. */
-.screenshare-stage {
-  background: var(--bg-app);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 90px;
-  overflow: hidden;
-}
 /* Ninguem compartilhando ainda: caixa tracejada com icone, maior e mais convidativa do que
-   so' um texto solto (era assim antes - um <p> sozinho fora do "palco"). */
-.screenshare-stage.empty {
-  border-style: dashed;
-  border-color: var(--border);
-  background: var(--bg-app);
-  min-height: 220px;
-}
+   so' um texto solto. */
 .screenshare-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  padding: 20px;
+  padding: 24px;
   text-align: center;
   color: var(--accent-text);
   font-size: 13px;
   font-weight: 600;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
 }
 .screenshare-empty svg { color: var(--text-muted); }
 .screenshare-empty p { margin: 0; }
-/* "Ampliar" (WidenIcon, ver VoiceChannel.jsx) - estagio intermediario antes da tela cheia de
-   verdade: o video ocupa 100% da largura da area central, mas continua dentro da pagina -
-   ainda da pra rolar e ver as outras secoes (participantes, membros) normalmente. */
-.screenshare-stage.theater .voice-video-grid video { max-width: 100%; width: 100%; max-height: 75vh; }
-.voice-video-grid { width: 100%; display: flex; align-items: center; justify-content: center; padding: 14px; }
-.voice-video-grid.empty { padding: 0; min-height: 0; }
-.voice-video-grid video {
-  display: block;
-  max-width: min(100%, 760px);
-  max-height: 55vh;
-  width: auto;
-  height: auto;
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
+
+/* Quadrado "escolher assistir" (ver ScreenShareTile em VoiceChannel.jsx) - mesmo tamanho do
+   tile de camera (.camera-tile-md), so' que em vez do video mostra o nome de quem esta
+   compartilhando centralizado, ate' voce clicar pra entrar naquela transmissao especifica -
+   pedido explicito do usuario: ninguem deve ver a tela de outro automaticamente. */
+.screenshare-tile-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  background: var(--bg-app);
+  color: var(--text-secondary);
+  text-align: center;
 }
-.voice-video-grid:not(.empty) { cursor: pointer; }
+.screenshare-tile-pick:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--accent); }
+.screenshare-tile-pick-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.screenshare-tile-pick-hint { font-size: 10.5px; color: var(--text-muted); }
+/* Botao de "parar de assistir" no canto oposto ao de tela cheia (ver .camera-tile-maximize),
+   mesmo estilo discreto-ate-o-hover. */
+.screenshare-tile-stop {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: rgba(4, 5, 8, 0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.camera-tile:hover .screenshare-tile-stop { opacity: 1; }
+.screenshare-tile-stop:hover { background: var(--danger); }
+@media (hover: none) {
+  .screenshare-tile-stop { opacity: 1; }
+}
 
 /* Webcams - ao contrario da tela compartilhada (um "palco" so' de cada vez), varias podem
    ficar ligadas ao mesmo tempo, entao aparecem lado a lado em tiles pequenos. O tamanho de
