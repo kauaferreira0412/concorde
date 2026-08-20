@@ -13,7 +13,7 @@ import {
   setSavedVideoInput,
   setSoundEffectsEnabled,
 } from "../utils/audioSettings";
-import { NOISE_SUPPRESSION_MODES } from "../utils/noiseSuppression";
+import { NOISE_SUPPRESSION_MODES, createNoiseSuppressionProcessor } from "../utils/noiseSuppression";
 import { getDesktopNotificationsEnabled, setDesktopNotificationsEnabled } from "../utils/notificationSettings";
 import {
   formatShortcut,
@@ -145,6 +145,13 @@ export default function SettingsModal({ onClose }) {
   const streamRef = useRef(null);
   const audioElRef = useRef(null);
   const { level, start: startMeter, stop: stopMeter } = useMicLevel();
+  // Testar microfone tambem precisa passar pela MESMA supressao de ruido escolhida abaixo -
+  // senao "bater na mesa pra testar" nunca mostrava diferenca nenhuma entre os modos (bug
+  // relatado: "continuo ouvindo com qualquer supressão ligada"), porque esse teste captava o
+  // microfone cru direto (getUserMedia -> <audio>), sem passar pelo AudioWorklet nenhum -
+  // so' a call de verdade (LiveKit) usava a supressao, ver VoiceCallContext.jsx.
+  const testAudioContextRef = useRef(null);
+  const testProcessorRef = useRef(null);
 
   useEffect(() => {
     // O navegador so mostra os nomes dos dispositivos depois de uma permissao de microfone
@@ -214,14 +221,33 @@ export default function SettingsModal({ onClose }) {
     setPermissionError("");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: selectedInput ? { deviceId: { exact: selectedInput } } : true,
+        audio: selectedInput ? { deviceId: { exact: selectedInput }, noiseSuppression: false } : { noiseSuppression: false },
       });
       streamRef.current = stream;
+      const rawTrack = stream.getAudioTracks()[0];
 
-      // Toca de volta o que o microfone esta captando - e' assim que voce "se ouve".
-      // Recomenda-se usar fone de ouvido para evitar microfonia (eco/feedback).
+      // Passa pelo MESMO AudioWorklet de supressao de ruido escolhido abaixo - assim "bater na
+      // mesa"/testar o microfone reflete de verdade o que vai acontecer numa call, em vez de
+      // sempre tocar o audio cru independente do modo selecionado.
+      let audibleTrack = rawTrack;
+      if (noiseSuppressionMode !== "off") {
+        try {
+          const audioContext = new AudioContext();
+          const processor = createNoiseSuppressionProcessor(noiseSuppressionMode);
+          await processor.init({ track: rawTrack, audioContext });
+          testAudioContextRef.current = audioContext;
+          testProcessorRef.current = processor;
+          audibleTrack = processor.processedTrack;
+        } catch (err) {
+          console.warn("Não foi possível aplicar a supressão de ruído no teste:", err);
+        }
+      }
+      const audibleStream = new MediaStream([audibleTrack]);
+
+      // Toca de volta o que o microfone esta captando (ja' filtrado) - e' assim que voce "se
+      // ouve". Recomenda-se usar fone de ouvido para evitar microfonia (eco/feedback).
       if (audioElRef.current) {
-        audioElRef.current.srcObject = stream;
+        audioElRef.current.srcObject = audibleStream;
         audioElRef.current.muted = false;
         await audioElRef.current.play();
         if (selectedOutput && outputSupported) {
@@ -233,7 +259,7 @@ export default function SettingsModal({ onClose }) {
         }
       }
 
-      startMeter(stream.getAudioTracks()[0]);
+      startMeter(audibleTrack);
       setTesting(true);
     } catch (err) {
       setPermissionError("Não consegui abrir o microfone selecionado: " + err.message);
@@ -246,9 +272,26 @@ export default function SettingsModal({ onClose }) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+    if (testProcessorRef.current) {
+      testProcessorRef.current.destroy();
+      testProcessorRef.current = null;
+    }
+    if (testAudioContextRef.current) {
+      testAudioContextRef.current.close().catch(() => {});
+      testAudioContextRef.current = null;
+    }
     if (audioElRef.current) audioElRef.current.srcObject = null;
     setTesting(false);
   }
+
+  // Troca o modo de supressao COM o teste ja' rodando (bater na mesa comparando) - reinicia o
+  // teste sozinho pra aplicar o novo modo na hora, sem precisar clicar em "Parar"/"Testar" nele.
+  useEffect(() => {
+    if (!testing) return;
+    stopTest();
+    startTest();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noiseSuppressionMode]);
 
   async function handleSave() {
     setProfileError("");
