@@ -4,7 +4,16 @@ import api from "../api/client";
 import { useAuth } from "./AuthContext.jsx";
 import { useAlert } from "./AlertContext.jsx";
 import { useMicLevel } from "../utils/useMicLevel";
-import { getNoiseSuppressionMode, getSavedAudioInput, getSavedAudioOutput, getSavedVideoInput } from "../utils/audioSettings";
+import {
+  getNoiseSuppressionMode,
+  getSavedAudioInput,
+  getSavedAudioOutput,
+  getSavedParticipantVolume,
+  getSavedStreamVolume,
+  getSavedVideoInput,
+  setSavedParticipantVolume,
+  setSavedStreamVolume,
+} from "../utils/audioSettings";
 import { createNoiseSuppressionProcessor } from "../utils/noiseSuppression";
 import {
   playJoinSound,
@@ -468,10 +477,48 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     // e chamar syncScreenShares quando a mudanca for confirmada.
   }, []);
 
+  /** identity e' sempre "user-<id>" (ver VoiceController no backend) - extrai o id pra
+   *  gravar/ler a preferencia de volume por PESSOA (localStorage), nao por sessao de call. */
+  function userIdFromIdentity(identity) {
+    const match = /^user-(\d+)$/.exec(identity || "");
+    return match ? match[1] : null;
+  }
+
+  /**
+   * Le o volume de voz que deve valer AGORA pra essa pessoa - do Map em memoria se ja' foi
+   * lido/ajustado nessa call, senao do localStorage (preferencia de uma call anterior), senao
+   * 100% (padrao). Preenche o Map E o estado do React na primeira leitura, pra o slider no
+   * popover de moderacao ja' abrir mostrando o valor certo (nao sempre "100%") mesmo antes de
+   * voce mexer nele de novo.
+   */
+  function resolveParticipantVolume(identity) {
+    if (participantVolumesRef.current.has(identity)) return participantVolumesRef.current.get(identity);
+    const userId = userIdFromIdentity(identity);
+    const value = (userId && getSavedParticipantVolume(userId)) ?? 100;
+    participantVolumesRef.current.set(identity, value);
+    setParticipantVolumesState(Object.fromEntries(participantVolumesRef.current));
+    return value;
+  }
+
+  /** Mesma ideia do resolveParticipantVolume acima, pro audio da transmissao de tela. */
+  function resolveStreamVolume(identity) {
+    if (streamVolumesRef.current.has(identity)) return streamVolumesRef.current.get(identity);
+    const userId = userIdFromIdentity(identity);
+    const value = (userId && getSavedStreamVolume(userId)) ?? 100;
+    streamVolumesRef.current.set(identity, value);
+    setStreamVolumesState(Object.fromEntries(streamVolumesRef.current));
+    return value;
+  }
+
   function setParticipantVolume(identity, percent) {
     const clamped = Math.max(0, Math.min(200, Math.round(percent)));
     participantVolumesRef.current.set(identity, clamped);
     setParticipantVolumesState(Object.fromEntries(participantVolumesRef.current));
+    // Gravado por PESSOA (userId), sobrevive a ela sair/entrar de novo na call, voce sair/
+    // entrar, ou ate' fechar e abrir o app - pedido explicito do usuario (antes so' vivia num
+    // Map em memoria, resetava pro padrao toda vez que o track era republicado).
+    const userId = userIdFromIdentity(identity);
+    if (userId) setSavedParticipantVolume(userId, clamped);
     // Ensurdecido tem prioridade - so' aplica o volume de verdade no track se voce estiver
     // ouvindo alguem no momento; a preferencia fica salva e volta a valer depois (ver
     // toggleMic/clearDeafened), senao mexer no slider "furaria" o silencio sem querer.
@@ -484,6 +531,8 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     const clamped = Math.max(0, Math.min(200, Math.round(percent)));
     streamVolumesRef.current.set(identity, clamped);
     setStreamVolumesState(Object.fromEntries(streamVolumesRef.current));
+    const userId = userIdFromIdentity(identity);
+    if (userId) setSavedStreamVolume(userId, clamped);
     if (!deafenedRef.current) {
       screenAudioTracksRef.current.get(identity)?.setVolume(clamped / 100);
     }
@@ -608,7 +657,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           const silenced = deafenedRef.current;
           if (pub.source === Track.Source.Microphone) {
             micAudioTracksRef.current.set(participant.identity, track);
-            track.setVolume(silenced ? 0 : (participantVolumesRef.current.get(participant.identity) ?? 100) / 100);
+            track.setVolume(silenced ? 0 : resolveParticipantVolume(participant.identity) / 100);
           } else if (pub.source === Track.Source.ScreenShareAudio) {
             // Mesma trava do video acima (watchedShareIdentitiesRef) - o audio da transmissao
             // de quem voce nao escolheu assistir tambem nao toca sozinho.
@@ -617,7 +666,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
               return;
             }
             screenAudioTracksRef.current.set(participant.identity, track);
-            track.setVolume(silenced ? 0 : (streamVolumesRef.current.get(participant.identity) ?? 100) / 100);
+            track.setVolume(silenced ? 0 : resolveStreamVolume(participant.identity) / 100);
           }
           // audio toca sozinho, nao precisa aparecer na tela - o "el.muted" aqui e' so' um
           // reforco pro caso raro de webAudioMix nao estar disponivel (cai pro elemento nativo);
@@ -844,10 +893,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
    */
   function restoreListenVolumes(room) {
     micAudioTracksRef.current.forEach((track, identity) => {
-      track.setVolume((participantVolumesRef.current.get(identity) ?? 100) / 100);
+      track.setVolume(resolveParticipantVolume(identity) / 100);
     });
     screenAudioTracksRef.current.forEach((track, identity) => {
-      track.setVolume((streamVolumesRef.current.get(identity) ?? 100) / 100);
+      track.setVolume(resolveStreamVolume(identity) / 100);
     });
     // Reforco pro caso raro de webAudioMix nao estar disponivel (cai pro elemento nativo).
     room.remoteParticipants.forEach((participant) => {
@@ -887,7 +936,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           });
         } else if (pub.source === Track.Source.Microphone) {
           micAudioTracksRef.current.set(participant.identity, pub.track);
-          pub.track.setVolume(silenced ? 0 : (participantVolumesRef.current.get(participant.identity) ?? 100) / 100);
+          pub.track.setVolume(silenced ? 0 : resolveParticipantVolume(participant.identity) / 100);
           pub.track.attachedElements.forEach((el) => (el.muted = silenced));
         } else if (pub.source === Track.Source.ScreenShareAudio) {
           // Se a reconexao trouxe de volta o audio de uma transmissao que voce NAO escolheu
@@ -898,7 +947,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
             return;
           }
           screenAudioTracksRef.current.set(participant.identity, pub.track);
-          pub.track.setVolume(silenced ? 0 : (streamVolumesRef.current.get(participant.identity) ?? 100) / 100);
+          pub.track.setVolume(silenced ? 0 : resolveStreamVolume(participant.identity) / 100);
           pub.track.attachedElements.forEach((el) => (el.muted = silenced));
         }
       });

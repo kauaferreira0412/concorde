@@ -55,3 +55,28 @@ export function getNoiseSuppressionMode() {
 export function setNoiseSuppressionMode(mode) {
   localStorage.setItem(NOISE_SUPPRESSION_MODE_KEY, mode);
 }
+
+// Volume individual de cada pessoa (voz e audio de transmissao de tela, separados) - por
+// PESSOA (userId), nao por sessao de call. Antes isso vivia so' num Map em memoria
+// (VoiceCallContext.jsx) - funcionava emquanto voce continuava na MESMA call, mas resetava pro
+// padrao (100%) sempre que a pessoa saia/reconectava a call ou parava/comecava a compartilhar
+// de novo (um Map novo em memoria, sem nenhum jeito de saber "ah, isso aqui eu tinha baixado
+// antes"). Gravando no localStorage, a preferencia agora sobrevive a qualquer coisa - a pessoa
+// sair e entrar, voce sair e entrar, ate' fechar e abrir o app de novo.
+const PARTICIPANT_VOLUME_PREFIX = "voiceParticipantVolume_";
+const STREAM_VOLUME_PREFIX = "voiceStreamVolume_";
+
+export function getSavedParticipantVolume(userId) {
+  const raw = localStorage.getItem(PARTICIPANT_VOLUME_PREFIX + userId);
+  return raw === null ? null : Number(raw);
+}
+export function setSavedParticipantVolume(userId, percent) {
+  localStorage.setItem(PARTICIPANT_VOLUME_PREFIX + userId, String(percent));
+}
+export function getSavedStreamVolume(userId) {
+  const raw = localStorage.getItem(STREAM_VOLUME_PREFIX + userId);
+  return raw === null ? null : Number(raw);
+}
+export function setSavedStreamVolume(userId, percent) {
+  localStorage.setItem(STREAM_VOLUME_PREFIX + userId, String(percent));
+}
