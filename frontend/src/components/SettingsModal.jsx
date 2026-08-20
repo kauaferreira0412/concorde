@@ -220,8 +220,18 @@ export default function SettingsModal({ onClose }) {
   async function startTest() {
     setPermissionError("");
     try {
+      // MESMAS constraints que a call de verdade usa (ver audioCaptureDefaults em
+      // VoiceCallContext.jsx) - echoCancellation/autoGainControl explicitos aqui tambem
+      // (nao so' deixando no padrao do navegador), pra garantir que a captura em si e' idêntica,
+      // nao so' o filtro de ruido por cima. noiseSuppression nativa sempre false nos dois lugares
+      // (a supressao de verdade e' o AudioWorklet logo abaixo).
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: selectedInput ? { deviceId: { exact: selectedInput }, noiseSuppression: false } : { noiseSuppression: false },
+        audio: {
+          ...(selectedInput ? { deviceId: { exact: selectedInput } } : {}),
+          echoCancellation: true,
+          autoGainControl: true,
+          noiseSuppression: false,
+        },
       });
       streamRef.current = stream;
       const rawTrack = stream.getAudioTracks()[0];
