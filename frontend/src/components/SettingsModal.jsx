@@ -7,7 +7,7 @@ import {
   getSavedAudioOutput,
   getSavedVideoInput,
   getSoundEffectsEnabled,
-  setNoiseSuppressionMode,
+  setNoiseSuppressionMode as persistNoiseSuppressionMode,
   setSavedAudioInput,
   setSavedAudioOutput,
   setSavedVideoInput,
@@ -317,7 +317,7 @@ export default function SettingsModal({ onClose }) {
     setSavedAudioOutput(selectedOutput);
     setSavedVideoInput(selectedVideoInput);
     setSoundEffectsEnabled(soundEffects);
-    setNoiseSuppressionMode(noiseSuppressionMode);
+    persistNoiseSuppressionMode(noiseSuppressionMode);
     setMuteShortcut(muteShortcut);
     setDeafenShortcut(deafenShortcut);
 
