@@ -14,6 +14,7 @@
     "package:desktop": "node scripts/package-desktop.mjs"
   },
   "dependencies": {
+    "@sapphi-red/web-noise-suppressor": "^0.4.0",
     "@stomp/stompjs": "^7.0.0",
     "axios": "^1.7.7",
     "livekit-client": "^2.5.7",

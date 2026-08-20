@@ -2,17 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMicLevel } from "../utils/useMicLevel";
 import {
-  getNoiseSuppressionEnabled,
+  getNoiseSuppressionMode,
   getSavedAudioInput,
   getSavedAudioOutput,
   getSavedVideoInput,
   getSoundEffectsEnabled,
-  setNoiseSuppressionEnabled,
+  setNoiseSuppressionMode,
   setSavedAudioInput,
   setSavedAudioOutput,
   setSavedVideoInput,
   setSoundEffectsEnabled,
 } from "../utils/audioSettings";
+import { NOISE_SUPPRESSION_MODES } from "../utils/noiseSuppression";
 import { getDesktopNotificationsEnabled, setDesktopNotificationsEnabled } from "../utils/notificationSettings";
 import {
   formatShortcut,
@@ -130,7 +131,7 @@ export default function SettingsModal({ onClose }) {
   const [selectedOutput, setSelectedOutput] = useState(getSavedAudioOutput());
   const [selectedVideoInput, setSelectedVideoInput] = useState(getSavedVideoInput());
   const [soundEffects, setSoundEffects] = useState(getSoundEffectsEnabled());
-  const [noiseSuppression, setNoiseSuppression] = useState(getNoiseSuppressionEnabled());
+  const [noiseSuppressionMode, setNoiseSuppressionMode] = useState(getNoiseSuppressionMode());
   const [desktopNotifications, setDesktopNotifications] = useState(getDesktopNotificationsEnabled());
   const [notificationError, setNotificationError] = useState("");
   const notificationsSupported = typeof Notification !== "undefined";
@@ -263,7 +264,7 @@ export default function SettingsModal({ onClose }) {
     setSavedAudioOutput(selectedOutput);
     setSavedVideoInput(selectedVideoInput);
     setSoundEffectsEnabled(soundEffects);
-    setNoiseSuppressionEnabled(noiseSuppression);
+    setNoiseSuppressionMode(noiseSuppressionMode);
     setMuteShortcut(muteShortcut);
     setDeafenShortcut(deafenShortcut);
 
@@ -559,18 +560,19 @@ export default function SettingsModal({ onClose }) {
 
                 <div className="settings-divider" />
 
-                <label className="settings-checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={noiseSuppression}
-                    onChange={(e) => setNoiseSuppression(e.target.checked)}
-                  />
-                  Supressão de ruído no microfone
-                </label>
-                <p className="admin-hint" style={{ margin: "4px 0 0" }}>
-                  Filtra ruído de fundo (ventilador, teclado, etc). Desative se seu microfone soar
-                  estranho ou abafado com ela ligada (comum em microfones de estúdio/instrumentos).
-                </p>
+                <div className="settings-field">
+                  <label className="settings-label">Supressão de ruído do microfone</label>
+                  <select value={noiseSuppressionMode} onChange={(e) => setNoiseSuppressionMode(e.target.value)}>
+                    {NOISE_SUPPRESSION_MODES.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="admin-hint" style={{ margin: 0 }}>
+                    {NOISE_SUPPRESSION_MODES.find((m) => m.value === noiseSuppressionMode)?.description}
+                  </p>
+                </div>
               </>
             )}
 

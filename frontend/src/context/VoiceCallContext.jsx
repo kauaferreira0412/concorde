@@ -4,7 +4,8 @@ import api from "../api/client";
 import { useAuth } from "./AuthContext.jsx";
 import { useAlert } from "./AlertContext.jsx";
 import { useMicLevel } from "../utils/useMicLevel";
-import { getNoiseSuppressionEnabled, getSavedAudioInput, getSavedAudioOutput, getSavedVideoInput } from "../utils/audioSettings";
+import { getNoiseSuppressionMode, getSavedAudioInput, getSavedAudioOutput, getSavedVideoInput } from "../utils/audioSettings";
+import { createNoiseSuppressionProcessor } from "../utils/noiseSuppression";
 import {
   playJoinSound,
   playLeaveSound,
@@ -190,6 +191,28 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   function setCameraEnabled(value) {
     cameraEnabledRef.current = value;
     setCameraEnabledState(value);
+  }
+
+  /**
+   * Aplica (ou remove) a supressao de ruido por IA escolhida em Configuracoes no track do
+   * microfone que acabou de ser publicado - ver utils/noiseSuppression.js pro porque disso
+   * existir (RNNoise/GTCRN em vez da constraint nativa fraca do navegador). Chamado sempre que
+   * o microfone e' (re)publicado (ver RoomEvent.LocalTrackPublished em joinChannel) - cobre
+   * entrar na call, desmutar, liberar um ensurdecido e trocar de dispositivo de entrada,
+   * automaticamente, sem precisar lembrar de chamar isso em cada lugar separado.
+   */
+  async function applyNoiseSuppression(track) {
+    const mode = getNoiseSuppressionMode();
+    try {
+      if (mode === "off") {
+        if (track.getProcessor?.()) await track.stopProcessor();
+        return;
+      }
+      const processor = createNoiseSuppressionProcessor(mode);
+      await track.setProcessor(processor);
+    } catch (err) {
+      console.warn(`Não foi possível aplicar a supressão de ruído (${mode}):`, err);
+    }
   }
 
   /** Le room.engine.client.rtt a cada 2s (API interna do SDK, mas estavel - o proprio LiveKit
@@ -534,9 +557,14 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         // controlar o audio por um GainNode (Web Audio API), que aceita valores acima de 1
         // (ate' 200% aqui - ver setParticipantVolume/setStreamVolume).
         webAudioMix: true,
+        // noiseSuppression nativa do navegador DESLIGADA de proposito - a supressao de
+        // verdade agora e' feita por IA (RNNoise/GTCRN, ver utils/noiseSuppression.js e o
+        // RoomEvent.LocalTrackPublished abaixo). Aplicar as duas juntas (nativa + IA) foi
+        // provavelmente a causa do "corta o audio inteiro" relatado em alguns microfones -
+        // dois filtros agressivos brigando entre si.
         audioCaptureDefaults: {
           ...(savedInput ? { deviceId: savedInput } : {}),
-          noiseSuppression: getNoiseSuppressionEnabled(),
+          noiseSuppression: false,
         },
       });
 
@@ -657,6 +685,14 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       // Sua propria tela compartilhada e sua propria camera tambem entram na lista, pra
       // voce poder conferir o que esta sendo transmitido (assim como as dos outros).
       newRoom.on(RoomEvent.LocalTrackPublished, (pub, participant) => {
+        // Toda vez que o microfone e' (re)publicado - primeira vez ao entrar, desmutar,
+        // liberar um ensurdecido, trocar de dispositivo de entrada (dispara restart) - aplica
+        // a supressao de ruido escolhida em Configuracoes (ver utils/noiseSuppression.js). Um
+        // lugar so' pra isso em vez de espalhar em cada setMicrophoneEnabled(true) espalhado
+        // pelo arquivo (join/toggleMic/toggleDeafen) - nenhum lugar (atual ou futuro) esquece.
+        if (pub.source === Track.Source.Microphone && pub.track) {
+          applyNoiseSuppression(pub.track);
+        }
         if (pub.source === Track.Source.ScreenShare && pub.track) {
           upsertScreenShare(pub.trackSid, {
             track: pub.track,

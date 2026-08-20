@@ -2,7 +2,8 @@ const INPUT_KEY = "audioInputDeviceId";
 const OUTPUT_KEY = "audioOutputDeviceId";
 const VIDEO_INPUT_KEY = "videoInputDeviceId";
 const SOUND_EFFECTS_KEY = "voiceSoundEffectsEnabled";
-const NOISE_SUPPRESSION_KEY = "voiceNoiseSuppressionEnabled";
+const NOISE_SUPPRESSION_KEY = "voiceNoiseSuppressionEnabled"; // legado (boolean) - migrado abaixo
+const NOISE_SUPPRESSION_MODE_KEY = "voiceNoiseSuppressionMode";
 
 export function getSavedAudioInput() {
   return localStorage.getItem(INPUT_KEY) || "";
@@ -38,15 +39,19 @@ export function setSoundEffectsEnabled(enabled) {
 }
 
 /**
- * Supressao de ruido do microfone (feita pelo proprio navegador, via constraint padrao
- * de getUserMedia) - ligada por padrao, mas o usuario pode desativar (ex: alguns
- * microfones de estudio/instrumentos musicais soam pior com ela ligada, porque o filtro
- * confunde o som "incomum" com ruido). Vale a partir da proxima vez que entrar numa call.
+ * Supressao de ruido do microfone - "off" | "rnnoise" | "gtcrn" (ver
+ * utils/noiseSuppression.js pras duas opcoes de IA de verdade, no lugar da constraint nativa
+ * fraca do navegador que tinha antes). Vale a partir da proxima vez que entrar numa call.
  */
-export function getNoiseSuppressionEnabled() {
-  const raw = localStorage.getItem(NOISE_SUPPRESSION_KEY);
-  return raw === null ? true : raw === "true";
+export function getNoiseSuppressionMode() {
+  const raw = localStorage.getItem(NOISE_SUPPRESSION_MODE_KEY);
+  if (raw === "off" || raw === "rnnoise" || raw === "gtcrn") return raw;
+  // Migra o valor antigo (checkbox liga/desliga a supressao nativa do navegador) - "ligado"
+  // vira RNNoise (a opcao leve, mais parecida com o que existia), "desligado" vira "off".
+  const legacyRaw = localStorage.getItem(NOISE_SUPPRESSION_KEY);
+  if (legacyRaw !== null) return legacyRaw === "true" ? "rnnoise" : "off";
+  return "rnnoise";
 }
-export function setNoiseSuppressionEnabled(enabled) {
-  localStorage.setItem(NOISE_SUPPRESSION_KEY, String(enabled));
+export function setNoiseSuppressionMode(mode) {
+  localStorage.setItem(NOISE_SUPPRESSION_MODE_KEY, mode);
 }
