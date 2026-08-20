@@ -655,26 +655,33 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           // Se voce estiver ensurdecido, entra silenciado (volume 0) independente da
           // preferencia salva - ela so' volta a valer quando voce reativar o audio.
           const silenced = deafenedRef.current;
-          if (pub.source === Track.Source.Microphone) {
-            micAudioTracksRef.current.set(participant.identity, track);
-            track.setVolume(silenced ? 0 : resolveParticipantVolume(participant.identity) / 100);
-          } else if (pub.source === Track.Source.ScreenShareAudio) {
+          if (pub.source === Track.Source.ScreenShareAudio) {
             // Mesma trava do video acima (watchedShareIdentitiesRef) - o audio da transmissao
             // de quem voce nao escolheu assistir tambem nao toca sozinho.
             if (!watchedShareIdentitiesRef.current.has(participant.identity)) {
               pub.setSubscribed(false);
               return;
             }
+          }
+          // ATTACH ANTES de setVolume(), de proposito - track.setVolume() do livekit-client so'
+          // aplica de verdade nos elementos JA' anexados (attachedElements); chamado antes do
+          // attach() ele so' GUARDA o numero (elementVolume) pra aplicar de novo depois, dentro
+          // do proprio attach(). O problema: essa reaplicacao e' um "if (this.elementVolume)" -
+          // um "if" comum, e 0 e' falsy em JS! Quando o volume salvo e' EXATAMENTE 0 (silenciar
+          // alguem por completo), esse "if" nunca entra, o gainNode nunca recebe o 0 de verdade,
+          // e a pessoa continua audivel mesmo com o slider mostrando 0% - exatamente o bug
+          // relatado (Anderson zera o Luis Henrique, ele sai/entra, volta a ouvir ele). Anexar
+          // primeiro garante que attachedElements ja' NAO esta' vazio quando setVolume() roda,
+          // entao ele aplica direto no gainNode, sem depender dessa reaplicacao com bug do 0.
+          const el = track.attach();
+          if (deafenedRef.current) el.muted = true;
+          if (pub.source === Track.Source.Microphone) {
+            micAudioTracksRef.current.set(participant.identity, track);
+            track.setVolume(silenced ? 0 : resolveParticipantVolume(participant.identity) / 100);
+          } else if (pub.source === Track.Source.ScreenShareAudio) {
             screenAudioTracksRef.current.set(participant.identity, track);
             track.setVolume(silenced ? 0 : resolveStreamVolume(participant.identity) / 100);
           }
-          // audio toca sozinho, nao precisa aparecer na tela - o "el.muted" aqui e' so' um
-          // reforco pro caso raro de webAudioMix nao estar disponivel (cai pro elemento nativo);
-          // o controle de verdade (inclusive do ensurdecido) e' via track.setVolume() acima,
-          // porque com webAudioMix ligado (ver joinChannel) o audio toca por fora do elemento
-          // <audio>, direto pelo Web Audio API - mutar o elemento sozinho nao silencia nada.
-          const el = track.attach();
-          if (deafenedRef.current) el.muted = true;
           // O microfone so fica "inscrito" (chega aqui) depois que a pessoa efetivamente
           // publica o track - se a gente nao atualizar a lista agora, quem entrou na call
           // fica preso mostrando "mudo" pros outros ate' a proxima vez que mutar/desmutar
@@ -936,6 +943,9 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           });
         } else if (pub.source === Track.Source.Microphone) {
           micAudioTracksRef.current.set(participant.identity, pub.track);
+          // Precisa estar anexado ANTES do setVolume() - ver comentario grande no
+          // RoomEvent.TrackSubscribed acima pro bug do "0 e' falsy" que isso evita.
+          if (pub.track.attachedElements.length === 0) pub.track.attach();
           pub.track.setVolume(silenced ? 0 : resolveParticipantVolume(participant.identity) / 100);
           pub.track.attachedElements.forEach((el) => (el.muted = silenced));
         } else if (pub.source === Track.Source.ScreenShareAudio) {
@@ -947,6 +957,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
             return;
           }
           screenAudioTracksRef.current.set(participant.identity, pub.track);
+          if (pub.track.attachedElements.length === 0) pub.track.attach();
           pub.track.setVolume(silenced ? 0 : resolveStreamVolume(participant.identity) / 100);
           pub.track.attachedElements.forEach((el) => (el.muted = silenced));
         }
