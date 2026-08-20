@@ -27,6 +27,10 @@ public class VoicePresenceService {
     // sessionId do STOMP -> canal/usuario, para limpar automaticamente se o socket cair sem "leave" explicito
     private final Map<String, Long> sessionChannel = new ConcurrentHashMap<>();
     private final Map<String, Long> sessionUser = new ConcurrentHashMap<>();
+    // channelId -> (userId -> sessionId da sessao STOMP MAIS RECENTE dessa pessoa nesse canal) -
+    // existe so' pra leaveBySession saber se a sessao que esta desconectando ainda e' a atual
+    // (ver comentario la' embaixo pro bug que isso resolve).
+    private final Map<Long, Map<Long, String>> currentSession = new ConcurrentHashMap<>();
 
     public VoicePresenceService(SimpMessagingTemplate messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
@@ -46,14 +50,34 @@ public class VoicePresenceService {
                         effectiveForceMuted, forceDeafened));
         sessionChannel.put(sessionId, channelId);
         sessionUser.put(sessionId, userId);
+        currentSession.computeIfAbsent(channelId, k -> new ConcurrentHashMap<>()).put(userId, sessionId);
         broadcast(channelId);
     }
 
+    /**
+     * Se o WebSocket de chat cair e reconectar bem rapido (rede instavel por um instante,
+     * notebook "cochilou"), a ORDEM de chegada dos eventos no servidor nao e' garantida: as
+     * vezes o "entrei de novo" (join, sessao NOVA) chega antes do "cai" (disconnect da sessao
+     * VELHA) ser processado. Sem essa checagem, esse disconnect atrasado apagava a entrada de
+     * presenca que a sessao NOVA acabou de recriar - a pessoa continuava na call normalmente
+     * (LiveKit e' outra conexao, nao afetada), so' sumia da lista "quem esta conectado" pros
+     * outros, sem nenhum jeito de se recuperar sozinha (reportado pelo usuario - so' saindo e
+     * entrando de novo na call resolvia). Aqui so' remove de verdade se a sessao desconectando
+     * ainda for a MAIS RECENTE registrada pra esse usuario nesse canal.
+     */
     public void leaveBySession(String sessionId) {
         Long channelId = sessionChannel.remove(sessionId);
         Long userId = sessionUser.remove(sessionId);
         if (channelId == null || userId == null) {
             return;
+        }
+        Map<Long, String> perUserSession = currentSession.get(channelId);
+        String latestSessionForUser = perUserSession != null ? perUserSession.get(userId) : null;
+        if (!sessionId.equals(latestSessionForUser)) {
+            return; // uma reconexao ja' registrou uma sessao mais nova - esse "saiu" ja' esta obsoleto
+        }
+        if (perUserSession != null) {
+            perUserSession.remove(userId);
         }
         Map<Long, VoiceParticipantInfo> participants = byChannel.get(channelId);
         if (participants != null) {

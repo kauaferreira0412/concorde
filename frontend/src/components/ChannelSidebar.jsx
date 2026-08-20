@@ -386,6 +386,17 @@ export default function ChannelSidebar({
                               onContextMenu={(e) => {
                                 if (!canAdjustVolume && !canModerate) return;
                                 e.preventDefault();
+                                // Busca o snapshot de verdade NA HORA que o menu abre - o
+                                // broadcast em tempo real (STOMP) as vezes fica ate' 12s
+                                // desatualizado pra um cliente especifico (ver poll de reforco
+                                // logo acima, useEffect com refetchAll), o que fazia um segundo
+                                // moderador achar que a pessoa NAO estava mutada (rotulo errado
+                                // "Mutar" em vez de "Desmutar") e clicar em "Mutar" de novo em
+                                // vez de liberar - reportado como "outro moderador nao consegue
+                                // desmutar". Um GET direto aqui elimina essa espera.
+                                api.get(`/api/channels/${c.id}/voice-presence`).then(({ data }) => {
+                                  setPresenceByChannel((prev) => ({ ...prev, [c.id]: data }));
+                                });
                                 // So' guarda a "localizacao" (quem/onde/posicao do clique) - NAO guarda
                                 // forceMuted/forceDeafened aqui: isso e' lido AO VIVO de
                                 // presenceByChannel na hora de renderizar (ver mais abaixo), senao
