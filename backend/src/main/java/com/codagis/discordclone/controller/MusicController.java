@@ -47,6 +47,7 @@ public class MusicController {
      *  quando comecou a tocar na hora (ver MusicController.play/music-bot/index.js enqueue). */
     public record PlayResponse(String title, Integer durationSec, boolean queued) {}
     public record RemoveFromQueueRequest(int index) {}
+    public record OpenQueueRequest(String name) {}
 
     /** Link (YouTube/etc, o que o yt-dlp suportar) ou busca livre (o bot resolve pro primeiro
      *  resultado) - entra tocando na hora se a call estiver ociosa, ou no FIM da fila se ja'
@@ -75,6 +76,7 @@ public class MusicController {
         assertCanControlMusic(channel);
         Map<String, Object> empty = new HashMap<>();
         empty.put("active", false);
+        empty.put("name", null);
         empty.put("nowPlaying", null);
         empty.put("queue", List.of());
         try {
@@ -86,12 +88,14 @@ public class MusicController {
     }
 
     /** So' pode existir UMA fila aberta por canal (pedido explicito do usuario) - recusa se ja'
-     *  tiver uma (ver /open no bot); pra abrir outra, precisa apagar a atual primeiro. */
+     *  tiver uma (ver /open no bot); pra abrir outra, precisa apagar a atual primeiro. Nome e'
+     *  opcional, so' aparece no titulo do card (ver /fila [nome] no ChatWindow.jsx). */
     @PostMapping("/{channelId}/music/queue/open")
-    public void openQueue(@PathVariable Long channelId) {
+    public void openQueue(@PathVariable Long channelId, @RequestBody(required = false) OpenQueueRequest req) {
         Channel channel = requireVoiceChannel(channelId);
         assertCanControlMusic(channel);
-        callBot("/queue/" + channelId + "/open", Map.of());
+        String name = req == null || req.name() == null ? "" : req.name();
+        callBot("/queue/" + channelId + "/open", Map.of("name", name));
     }
 
     /** Apaga a fila inteira (descarta tudo que ainda nao tocou) e libera pra abrir uma nova -

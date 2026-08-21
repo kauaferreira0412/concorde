@@ -29,7 +29,9 @@ const PLAY_COMMAND_RE = /^\/play\s+(.+)$/i;
 const STOP_COMMAND_RE = /^\/stop\s*$/i;
 const PAUSE_COMMAND_RE = /^\/pause\s*$/i;
 const CONTINUE_COMMAND_RE = /^\/continue\s*$/i;
-const FILA_COMMAND_RE = /^\/fila\s*$/i;
+// Nome e' opcional ("/fila" sozinho tambem funciona, so' fica sem titulo) - so' cosmetico,
+// aparece no topo do card (ver MusicQueueCard.jsx).
+const FILA_COMMAND_RE = /^\/fila(?:\s+(.+))?$/i;
 // Marcador especial no CONTEUDO da mensagem (ver /fila abaixo) - em vez de mandar texto pro
 // chat, /fila manda essa mensagem "magica" com o id do canal de VOZ embutido; ao renderizar
 // (ver MessageText/DiceRollCard mais abaixo) qualquer mensagem com esse conteudo exato vira um
@@ -42,7 +44,7 @@ const MUSIC_QUEUE_MARKER_RE = /^\[\[MUSIC_QUEUE:(\d+)\]\]$/;
 const SLASH_COMMANDS = [
   { name: "roll", description: "Rolar dados de RPG (ex: 2d20+5)" },
   { name: "play", description: "Tocar música (ou adicionar à fila) na sua call" },
-  { name: "fila", description: "Mostrar a fila de música ao vivo no chat" },
+  { name: "fila", description: "Criar a fila de música ao vivo no chat (nome opcional)" },
   { name: "pause", description: "Pausar a música da sua call" },
   { name: "continue", description: "Continuar a música pausada" },
   { name: "stop", description: "Parar a música da sua call" },
@@ -395,7 +397,8 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     // - por isso "abre" no backend ANTES de postar o card; se ja' tiver uma aberta, o backend
     // recusa e a gente avisa em vez de duplicar o card (precisa apagar a fila atual primeiro,
     // ver o botão "Apagar fila" dentro do MusicQueueCard.jsx).
-    if (FILA_COMMAND_RE.test(draft.trim())) {
+    const filaMatch = FILA_COMMAND_RE.exec(draft.trim());
+    if (filaMatch) {
       if (!activeChannel) {
         showAlert("Você precisa estar conectado numa call de voz para ver a fila de música");
         return;
@@ -403,7 +406,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       setDraft("");
       setSending(true);
       try {
-        await api.post(`/api/channels/${activeChannel.id}/music/queue/open`);
+        await api.post(`/api/channels/${activeChannel.id}/music/queue/open`, { name: filaMatch[1]?.trim() || "" });
         sendChatMessage(stompClient, channel.id, `[[MUSIC_QUEUE:${activeChannel.id}]]`, null, null);
       } catch (err) {
         showAlert(err.response?.data?.error || "Não foi possível abrir a fila de música");

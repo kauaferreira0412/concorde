@@ -42,7 +42,7 @@ export default function MusicQueueCard({ channelId, stompClient, stompConnected 
         if (!cancelled) setState(data);
       })
       .catch(() => {
-        if (!cancelled) setState({ active: false, nowPlaying: null, queue: [] });
+        if (!cancelled) setState({ active: false, name: null, nowPlaying: null, queue: [] });
       });
     return () => {
       cancelled = true;
@@ -101,12 +101,13 @@ export default function MusicQueueCard({ channelId, stompClient, stompConnected 
     return <div className="music-queue-card music-queue-loading">🎵 Carregando fila…</div>;
   }
 
-  const { active, nowPlaying, queue } = state;
+  const { active, name, nowPlaying, queue } = state;
+  const title = name ? `🎵 ${name}` : "🎵 Fila de música";
 
   if (!active) {
     return (
       <div className="music-queue-card music-queue-closed">
-        <p className="music-queue-title">🎵 Fila de música</p>
+        <p className="music-queue-title">{title}</p>
         <p className="music-queue-empty">Essa fila foi apagada. Use /fila pra abrir uma nova.</p>
       </div>
     );
@@ -115,7 +116,7 @@ export default function MusicQueueCard({ channelId, stompClient, stompConnected 
   return (
     <div className="music-queue-card">
       <div className="music-queue-header">
-        <p className="music-queue-title">🎵 Fila de música</p>
+        <p className="music-queue-title">{title}</p>
         <button type="button" className="music-queue-delete-btn" title="Apagar fila" disabled={deleting} onClick={deleteQueue}>
           <XIcon size={13} /> Apagar fila
         </button>
