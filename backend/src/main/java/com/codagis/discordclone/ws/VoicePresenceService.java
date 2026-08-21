@@ -150,6 +150,39 @@ public class VoicePresenceService {
         return get(channelId, userId) != null;
     }
 
+    /** userId sintetico pro bot de musica NESSE canal - negativo pra nunca colidir com um id
+     *  de usuario de verdade (sempre positivo, gerado pelo banco). Um por canal (nao um so'
+     *  global) porque o bot pode estar tocando em varios canais de voz ao mesmo tempo. */
+    private Long botUserId(Long channelId) {
+        return -channelId;
+    }
+
+    /**
+     * Bot de musica (ver MusicController/music-bot/index.js) entrando/saindo da call - chamado
+     * pelo PROPRIO bot (via endpoint interno, nao tem sessao STOMP porque ele nao e' um cliente
+     * do chat) na hora que ele de fato conecta/desconecta do LiveKit, inclusive quando isso
+     * acontece sozinho (ex: desconexao por inatividade) - por isso nao da pra disparar isso so'
+     * a partir do /play e /stop do MusicController, so' o bot sabe com certeza quando entrou/saiu.
+     */
+    public void joinBot(Long channelId) {
+        byChannel.computeIfAbsent(channelId, k -> new ConcurrentHashMap<>())
+                .put(botUserId(channelId), new VoiceParticipantInfo(botUserId(channelId), "🎵 Music Bot", null,
+                        true, false, false, false));
+        broadcast(channelId);
+    }
+
+    public void leaveBot(Long channelId) {
+        Map<Long, VoiceParticipantInfo> participants = byChannel.get(channelId);
+        if (participants == null) {
+            return;
+        }
+        participants.remove(botUserId(channelId));
+        if (participants.isEmpty()) {
+            byChannel.remove(channelId);
+        }
+        broadcast(channelId);
+    }
+
     private VoiceParticipantInfo get(Long channelId, Long userId) {
         Map<Long, VoiceParticipantInfo> participants = byChannel.get(channelId);
         return participants == null ? null : participants.get(userId);

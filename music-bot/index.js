@@ -25,6 +25,11 @@ const PORT = process.env.PORT || 4001;
 const LIVEKIT_WS_URL = process.env.LIVEKIT_WS_URL;
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
+// So' pra avisar o backend "entrei/saí de verdade da call" (ver MusicBotInternalController) -
+// assim o bot aparece na lista de presenca de voz igual qualquer outro participante, em vez de
+// ser invisivel pro app (o LiveKit sabe que ele esta la', mas o app tem seu PROPRIO controle de
+// presenca separado, que so' quem publica nele aparece na sidebar).
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8080";
 // 48kHz mono - mesma taxa que o resto do app usa (ver joinChannel em VoiceCallContext.jsx),
 // evita reamostragem desnecessaria dentro do proprio LiveKit.
 const SAMPLE_RATE = 48000;
@@ -73,7 +78,22 @@ async function connectSession(channelId) {
   const session = { room, source, track, ytdlp: null, ffmpeg: null, idleTimer: null };
   sessions.set(channelId, session);
   console.log(`[${channelId}] bot entrou em ${roomName}`);
+  notifyBackendPresence(channelId, true);
   return session;
+}
+
+/** Avisa o backend que o bot entrou/saiu de verdade - melhor esforco (nao trava nada da call
+ *  se o backend estiver fora do ar nesse instante, so' o bot fica "invisivel" na sidebar). */
+async function notifyBackendPresence(channelId, joined) {
+  try {
+    await fetch(`${BACKEND_URL}/internal/music-bot/${channelId}/presence`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ joined }),
+    });
+  } catch (err) {
+    console.warn(`[${channelId}] falha ao avisar presença pro backend:`, err.message);
+  }
 }
 
 async function getSession(channelId) {
@@ -113,6 +133,7 @@ async function disconnectSession(channelId) {
     console.warn(`[${channelId}] erro ao desconectar:`, err.message);
   }
   console.log(`[${channelId}] bot saiu da call`);
+  notifyBackendPresence(channelId, false);
 }
 
 /** So' o titulo, sem baixar audio nenhum - pra devolver algo bonito pro usuario ver no chat. */

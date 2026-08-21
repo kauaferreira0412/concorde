@@ -41,7 +41,10 @@ public class SecurityConfig {
                     // /api/desktop/** precisa ser publico - e' checado ANTES do login (ver
                     // DesktopVersionController/UpdateRequiredGate.jsx), entao ainda nao existe
                     // token nenhum nessa hora.
-                    .requestMatchers("/api/auth/**", "/api/desktop/**", "/ws/**", "/h2-console/**").permitAll()
+                    // /internal/** so' e' alcancavel de dentro da rede interna do Docker (ver
+                    // MusicBotInternalController) - o bot de musica nao e' um usuario logado,
+                    // entao nao tem JWT nenhum pra mandar aqui.
+                    .requestMatchers("/api/auth/**", "/api/desktop/**", "/ws/**", "/h2-console/**", "/internal/**").permitAll()
                     .anyRequest().authenticated()
             )
             .headers(headers -> headers.frameOptions(frame -> frame.disable())) // necessario para /h2-console

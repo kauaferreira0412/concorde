@@ -82,9 +82,16 @@ services:
       LIVEKIT_WS_URL: wss://${DOMAIN}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      # "backend" e' o service acima - resolve sozinho na rede interna do Docker. So' usado pra
+      # avisar "entrei/saí da call" (ver MusicBotInternalController), pra ele aparecer na lista
+      # de presenca de voz igual qualquer outro participante.
+      BACKEND_URL: http://backend:8080
     dns:
       - 8.8.8.8
       - 1.1.1.1
+    # NAO depende de "backend" aqui de proposito - "backend" ja' depende de "music-bot" (ver
+    # acima), e o Docker Compose nao aceita depends_on circular. Sem problema: notifyBackendPresence
+    # no bot e' melhor esforco (ver music-bot/index.js), nao trava nada se o backend subir depois.
     depends_on:
       - livekit
 

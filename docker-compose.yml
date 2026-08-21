@@ -31,5 +31,10 @@ services:
       LIVEKIT_WS_URL: ws://livekit:7880
       LIVEKIT_API_KEY: devkey
       LIVEKIT_API_SECRET: devsecret1234567890devsecret1234567890
+      # O backend roda FORA do Docker em dev (IntelliJ, ver README) - "host.docker.internal"
+      # e' o jeito do Docker Desktop (Windows/Mac) de alcancar a maquina host de dentro de um
+      # container. So' usado pra avisar "entrei/saí da call" (ver MusicBotInternalController) -
+      # se o backend nao estiver rodando nesse instante isso so' falha silenciosamente.
+      BACKEND_URL: http://host.docker.internal:8080
     depends_on:
       - livekit
