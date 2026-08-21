@@ -10,7 +10,7 @@
 // em disco, o audio so' passa pela memoria a caminho da call.
 import express from "express";
 import { spawn } from "node:child_process";
-import { AccessToken } from "livekit-server-sdk";
+import { AccessToken, TrackSource as GrantTrackSource } from "livekit-server-sdk";
 import {
   AudioFrame,
   AudioSource,
@@ -54,7 +54,10 @@ async function connectSession(channelId) {
     // O bot nunca precisa OUVIR ninguem - so' fala (toca musica). autoSubscribe:false abaixo
     // reforca isso (economiza banda/CPU decodificando audio que ninguem vai usar).
     canSubscribe: false,
-    canPublishSources: ["microphone"],
+    // Precisa ser o enum TrackSource de verdade (numero), nao a string "microphone" - passar
+    // string aqui faz o FFI do LiveKit quebrar na hora de serializar o grant pro JWT
+    // ("Cannot convert TrackSource microphone to string").
+    canPublishSources: [GrantTrackSource.MICROPHONE],
   });
   const token = await at.toJwt();
 
