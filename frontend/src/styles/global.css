@@ -1883,6 +1883,16 @@ h3.chat-heading {
   display: block;
   cursor: pointer;
 }
+/* Tela compartilhada (normal ou "modo teatro") NAO pode usar cover como webcam usa - cover
+   corta as bordas pra preencher a caixa toda, e' aceitavel numa webcam (um rostinho) mas numa
+   tela inteira corta conteudo de verdade (barra de tarefas, texto na borda, etc - reportado
+   pelo usuario como "parece que ta dando zoom e cortando"). contain mostra a tela INTEIRA,
+   com uma tarja preta dos lados se a proporcao nao bater exatamente com a caixa. */
+.screenshare-tile-default video,
+.screenshare-tile-theater video {
+  object-fit: contain;
+  background: #000;
+}
 .camera-tile-name {
   position: absolute;
   left: 6px;
