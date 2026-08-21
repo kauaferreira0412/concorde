@@ -22,7 +22,7 @@ public class ServerDtos {
 
     public record CreateChannelRequest(@NotBlank String name, ChannelType type) {}
 
-    public record ChannelResponse(Long id, Long serverId, String name, ChannelType type) {}
+    public record ChannelResponse(Long id, Long serverId, String name, ChannelType type, boolean adminOnly) {}
 
     public record ServerWithChannels(ServerResponse server, List<ChannelResponse> channels) {}
 

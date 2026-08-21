@@ -420,3 +420,14 @@ export function AlertTriangleIcon(props) {
     </svg>
   );
 }
+
+/** Canal "Atualizações" (so' admin posta, ver ChannelSidebar/ChatWindow) - megafone em vez
+ *  do # normal de canal de texto, deixa claro de cara que e' um canal diferente. */
+export function MegaphoneIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <path d="M3 11v2a2 2 0 0 0 2 2h1l3 6h2l-1-6h1l9 4V5l-9 4H6a2 2 0 0 0-2 2Z" />
+      <path d="M11 9v6" />
+    </svg>
+  );
+}

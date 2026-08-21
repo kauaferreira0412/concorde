@@ -1,10 +1,12 @@
 package com.codagis.discordclone.service;
 
+import com.codagis.discordclone.domain.Channel;
 import com.codagis.discordclone.domain.Message;
 import com.codagis.discordclone.domain.Role;
 import com.codagis.discordclone.domain.User;
 import com.codagis.discordclone.dto.MessageDtos.ChatMessage;
 import com.codagis.discordclone.dto.MessageDtos.ReplyPreview;
+import com.codagis.discordclone.repository.ChannelRepository;
 import com.codagis.discordclone.repository.MessageRepository;
 import com.codagis.discordclone.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -19,10 +21,12 @@ public class MessageService {
 
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
+    private final ChannelRepository channelRepository;
 
-    public MessageService(MessageRepository messageRepository, UserRepository userRepository) {
+    public MessageService(MessageRepository messageRepository, UserRepository userRepository, ChannelRepository channelRepository) {
         this.messageRepository = messageRepository;
         this.userRepository = userRepository;
+        this.channelRepository = channelRepository;
     }
 
     @Transactional
@@ -31,6 +35,18 @@ public class MessageService {
         boolean hasImage = imageUrl != null && !imageUrl.isBlank();
         if (!hasText && !hasImage) {
             throw new IllegalArgumentException("Mensagem vazia - escreva algo ou anexe uma imagem");
+        }
+        // Canal "so' admin posta" (ver Channel.adminOnly, ex: "Atualizações") - todo mundo
+        // continua podendo LER (nao bloqueado em history/nem na assinatura do topico), so' o
+        // ENVIO e' restrito ao admin GLOBAL. O frontend ja' esconde a caixa de escrever pra
+        // quem nao e' admin (ver ChatWindow.jsx) - isso aqui e' a garantia de verdade, contra
+        // alguem forcando a mensagem na mao pelo WebSocket.
+        Channel channel = channelRepository.findById(channelId).orElse(null);
+        if (channel != null && channel.isAdminOnly()) {
+            boolean isAdmin = userRepository.findById(authorId).map(u -> u.getRole() == Role.ADMIN).orElse(false);
+            if (!isAdmin) {
+                throw new IllegalStateException("Só administradores podem postar nesse canal");
+            }
         }
         // So aceita responder a uma mensagem que existe DE VERDADE nesse mesmo canal - evita
         // referenciar mensagem de outro canal ou um id inventado.

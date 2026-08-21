@@ -55,6 +55,10 @@ public class ServerService {
         // Canais padrao, igual ao Discord quando voce cria um servidor novo
         channelRepository.save(Channel.builder().serverId(server.getId()).name("geral").type(ChannelType.TEXT).build());
         channelRepository.save(Channel.builder().serverId(server.getId()).name("Geral").type(ChannelType.VOICE).build());
+        // Canal de "Atualizações" - todo mundo le, so' o admin GLOBAL posta (ver
+        // Channel.adminOnly/MessageService.save). Servidores JA' existentes ganham o deles via
+        // AnnouncementsChannelBootstrap (roda uma vez, idempotente) - aqui e' so' pros novos.
+        channelRepository.save(Channel.builder().serverId(server.getId()).name("Atualizações").type(ChannelType.TEXT).adminOnly(true).build());
 
         return toResponse(server);
     }
@@ -296,6 +300,6 @@ public class ServerService {
     }
 
     private ChannelResponse toResponse(Channel channel) {
-        return new ChannelResponse(channel.getId(), channel.getServerId(), channel.getName(), channel.getType());
+        return new ChannelResponse(channel.getId(), channel.getServerId(), channel.getName(), channel.getType(), channel.isAdminOnly());
     }
 }

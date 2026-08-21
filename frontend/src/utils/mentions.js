@@ -28,22 +28,3 @@ export function mentionsUser(content, username) {
 function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-
-/**
- * Quebra o texto em pedaços pra renderizar, retornando [{ text, mention: username|null }].
- * So' marca como mencao de verdade quando bate com algum membro conhecido - "@" solto ou
- * um nome que ninguem tem nao vira estilo nenhum, fica texto normal.
- */
-export function splitMentions(content, memberUsernames) {
-  if (!content) return [{ text: "", mention: null }];
-  const known = new Set(memberUsernames.map((u) => u.toLowerCase()));
-  const parts = content.split(/(@\w+)/g);
-  return parts
-    .filter((p) => p !== "")
-    .map((part) => {
-      if (part.startsWith("@") && known.has(part.slice(1).toLowerCase())) {
-        return { text: part, mention: part.slice(1) };
-      }
-      return { text: part, mention: null };
-    });
-}

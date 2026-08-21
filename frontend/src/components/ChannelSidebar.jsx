@@ -16,6 +16,7 @@ import {
   HeadphonesIcon,
   HeadphonesOffIcon,
   LogOutIcon,
+  MegaphoneIcon,
   MicIcon,
   MicOffIcon,
   PencilIcon,
@@ -306,7 +307,11 @@ export default function ChannelSidebar({
                     className={"channel-item" + (c.id === selectedChannelId ? " active" : "")}
                     onClick={() => onSelectChannel(c)}
                   >
-                    <HashIcon size={16} className="channel-item-icon" />
+                    {c.adminOnly ? (
+                      <MegaphoneIcon size={16} className="channel-item-icon" />
+                    ) : (
+                      <HashIcon size={16} className="channel-item-icon" />
+                    )}
                     {c.name}
                     {(mentionedChannels[c.id] || unreadCounts[c.id] > 0) && (
                       <span className="channel-item-badges">

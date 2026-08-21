@@ -4,35 +4,67 @@ import { subscribeToChannel, sendChatMessage, editChatMessage, deleteChatMessage
 import { useAuth } from "../context/AuthContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
 import { useServerMembers } from "../utils/useServerMembers";
-import { applyMention, getMentionQuery, mentionsUser, splitMentions } from "../utils/mentions";
+import { applyMention, getMentionQuery, mentionsUser } from "../utils/mentions";
+import { parseMarkdownBlocks, renderInline } from "../utils/markdown.jsx";
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import ImageLightbox from "./ImageLightbox.jsx";
-import { CheckIcon, PencilIcon, PlusIcon, ReplyIcon, TrashIcon, XIcon } from "./icons.jsx";
+import { CheckIcon, MegaphoneIcon, PencilIcon, PlusIcon, ReplyIcon, TrashIcon, XIcon } from "./icons.jsx";
 
-/** @username -> vira um "pill" destacado (mais forte se for voce mesmo) - so reconhece
-    quem e' de verdade membro do servidor, o resto fica texto normal. Clicavel: abre o popup
-    de perfil da pessoa mencionada (ver useProfile/ProfileContext), igual clicar no avatar dela. */
+/** Renderiza o conteudo da mensagem com markdown "estilo Discord" (negrito/italico/sublinhado/
+ *  tachado/codigo/citacao/listas/titulos/links, ver utils/markdown.jsx) + @mencoes clicaveis
+ *  (mesmo pipeline - so' reconhece quem e' de verdade membro do servidor). */
 function MessageText({ content, memberUsernames, myUsername, members, openProfile }) {
   if (!content) return null;
+  const ctx = { memberUsernames, myUsername, members, openProfile };
   return (
-    <p>
-      {splitMentions(content, memberUsernames).map((part, i) => {
-        if (!part.mention) return <span key={i}>{part.text}</span>;
-        const mentionedMember = members.find((m) => m.username.toLowerCase() === part.mention.toLowerCase());
-        return (
-          <button
-            key={i}
-            type="button"
-            className={"chat-mention" + (part.mention.toLowerCase() === myUsername?.toLowerCase() ? " me" : "")}
-            onClick={() => mentionedMember && openProfile(mentionedMember.userId)}
-            disabled={!mentionedMember}
-          >
-            {part.text}
-          </button>
-        );
+    <div className="chat-markdown">
+      {parseMarkdownBlocks(content).map((block, i) => {
+        const key = `b${i}`;
+        switch (block.type) {
+          case "code":
+            return (
+              <pre key={key} className="chat-code-block">
+                <code>{block.text}</code>
+              </pre>
+            );
+          case "quote":
+            return (
+              <blockquote key={key} className="chat-blockquote">
+                {renderInline(block.text, ctx, key)}
+              </blockquote>
+            );
+          case "ul":
+            return (
+              <ul key={key}>
+                {block.items.map((item, j) => (
+                  <li key={j}>{renderInline(item, ctx, `${key}-${j}`)}</li>
+                ))}
+              </ul>
+            );
+          case "ol":
+            return (
+              <ol key={key}>
+                {block.items.map((item, j) => (
+                  <li key={j}>{renderInline(item, ctx, `${key}-${j}`)}</li>
+                ))}
+              </ol>
+            );
+          case "h1":
+          case "h2":
+          case "h3": {
+            const Tag = block.type;
+            return (
+              <Tag key={key} className="chat-heading">
+                {renderInline(block.text, ctx, key)}
+              </Tag>
+            );
+          }
+          default:
+            return <p key={key}>{renderInline(block.text, ctx, key)}</p>;
+        }
       })}
-    </p>
+    </div>
   );
 }
 
@@ -256,7 +288,9 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
 
   return (
     <div className="chat-window">
-      <div className="chat-header"># {channel.name}</div>
+      <div className={"chat-header" + (channel.adminOnly ? " chat-header-announcements" : "")}>
+        {channel.adminOnly ? <MegaphoneIcon size={15} className="chat-header-announcements-icon" /> : "#"} {channel.name}
+      </div>
       {stompError ? (
         <div className="chat-status error">⚠️ {stompError}</div>
       ) : !stompConnected ? (
@@ -398,63 +432,74 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
         </div>
       )}
 
-      <form className="chat-input" onSubmit={handleSend}>
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp"
-          ref={fileInputRef}
-          onChange={handlePickImage}
-          hidden
-        />
-        <button
-          type="button"
-          className="icon-btn chat-attach-btn"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={!stompConnected || sending}
-          title="Enviar imagem"
-        >
-          <PlusIcon />
-        </button>
-        <div className="chat-input-field">
-          {mentionQuery !== null && mentionMatches.length > 0 && (
-            <div className="mention-menu">
-              {mentionMatches.map((m, i) => (
-                <button
-                  type="button"
-                  key={m.userId}
-                  className={"mention-option" + (i === mentionIndex ? " active" : "")}
-                  onMouseDown={(e) => {
-                    e.preventDefault(); // nao deixa o input perder foco antes do clique registrar
-                    pickMention(m.username);
-                  }}
-                >
-                  <Avatar name={m.username} url={m.avatarUrl} className="voice-avatar small" />
-                  {m.username}
-                </button>
-              ))}
-            </div>
-          )}
-          <textarea
-            ref={draftInputRef}
-            rows={1}
-            value={draft}
-            onChange={handleDraftChange}
-            onKeyDown={handleDraftKeyDown}
-            onPaste={handlePaste}
-            placeholder={
-              pendingImage
-                ? "Adicionar legenda (opcional)..."
-                : sending
-                ? "Enviando..."
-                : `Conversar em #${channel.name} (@ pra mencionar, Ctrl+V cola imagem, Shift+Enter quebra linha)`
-            }
-            disabled={!stompConnected || sending}
-          />
+      {channel.adminOnly && !isAdmin ? (
+        // Canal "so' admin posta" (ver Channel.adminOnly no backend, ex: "Atualizações") -
+        // todo mundo le normalmente, mas quem nao e' admin nem VE a caixa de escrever (o
+        // backend tambem recusa de verdade, ver MessageService.save - isso aqui e' so' pra
+        // nao nem mostrar um campo que sempre ia falhar).
+        <div className="chat-readonly-notice">
+          <MegaphoneIcon size={15} />
+          Só administradores podem postar em #{channel.name}.
         </div>
-        <button type="submit" disabled={!stompConnected || sending || (!draft.trim() && !pendingImage)}>
-          Enviar
-        </button>
-      </form>
+      ) : (
+        <form className="chat-input" onSubmit={handleSend}>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            ref={fileInputRef}
+            onChange={handlePickImage}
+            hidden
+          />
+          <button
+            type="button"
+            className="icon-btn chat-attach-btn"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!stompConnected || sending}
+            title="Enviar imagem"
+          >
+            <PlusIcon />
+          </button>
+          <div className="chat-input-field">
+            {mentionQuery !== null && mentionMatches.length > 0 && (
+              <div className="mention-menu">
+                {mentionMatches.map((m, i) => (
+                  <button
+                    type="button"
+                    key={m.userId}
+                    className={"mention-option" + (i === mentionIndex ? " active" : "")}
+                    onMouseDown={(e) => {
+                      e.preventDefault(); // nao deixa o input perder foco antes do clique registrar
+                      pickMention(m.username);
+                    }}
+                  >
+                    <Avatar name={m.username} url={m.avatarUrl} className="voice-avatar small" />
+                    {m.username}
+                  </button>
+                ))}
+              </div>
+            )}
+            <textarea
+              ref={draftInputRef}
+              rows={1}
+              value={draft}
+              onChange={handleDraftChange}
+              onKeyDown={handleDraftKeyDown}
+              onPaste={handlePaste}
+              placeholder={
+                pendingImage
+                  ? "Adicionar legenda (opcional)..."
+                  : sending
+                  ? "Enviando..."
+                  : `Conversar em #${channel.name} (@ pra mencionar, **negrito**, *itálico*, Ctrl+V cola imagem, Shift+Enter quebra linha)`
+              }
+              disabled={!stompConnected || sending}
+            />
+          </div>
+          <button type="submit" disabled={!stompConnected || sending || (!draft.trim() && !pendingImage)}>
+            Enviar
+          </button>
+        </form>
+      )}
 
       {deleteTarget && (
         <ConfirmModal
