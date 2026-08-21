@@ -63,6 +63,20 @@ public class MusicController {
         callBot("/stop", Map.of("channelId", channelId));
     }
 
+    @PostMapping("/{channelId}/music/pause")
+    public void pause(@PathVariable Long channelId) {
+        Channel channel = requireVoiceChannel(channelId);
+        assertCanControlMusic(channel);
+        callBot("/pause", Map.of("channelId", channelId, "paused", true));
+    }
+
+    @PostMapping("/{channelId}/music/resume")
+    public void resume(@PathVariable Long channelId) {
+        Channel channel = requireVoiceChannel(channelId);
+        assertCanControlMusic(channel);
+        callBot("/pause", Map.of("channelId", channelId, "paused", false));
+    }
+
     private Channel requireVoiceChannel(Long channelId) {
         Channel channel = channelRepository.findById(channelId)
                 .orElseThrow(() -> new IllegalArgumentException("Canal não encontrado"));

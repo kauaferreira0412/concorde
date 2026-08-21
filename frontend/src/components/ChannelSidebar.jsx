@@ -553,6 +553,12 @@ export default function ChannelSidebar({
           );
           const isForceMuted = presenceEntry?.forceMuted || false;
           const isForceDeafened = presenceEntry?.forceDeafened || false;
+          // Bot de musica usa sempre um userId sintetico NEGATIVO nesse canal (ver
+          // VoicePresenceService.joinBot) - nunca colide com um usuario de verdade (id sempre
+          // positivo, gerado pelo banco). Ele nao ouve nada (ver music-bot/index.js,
+          // canSubscribe:false), entao "ensurdecer" ele nao faz sentido nenhum - some com essa
+          // opcao so' pra ele.
+          const isBot = participantMenu.userId < 0;
           if (!canAdjustVolume && !hasAnyModPermission) return null;
           return (
             <div
@@ -588,7 +594,7 @@ export default function ChannelSidebar({
                       {isForceMuted ? "Desmutar" : "Mutar"}
                     </button>
                   )}
-                  {myServerPermissions.has("DEAFEN_MEMBERS") && (
+                  {myServerPermissions.has("DEAFEN_MEMBERS") && !isBot && (
                     <button
                       type="button"
                       className="participant-mod-btn"

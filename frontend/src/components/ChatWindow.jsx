@@ -26,11 +26,15 @@ const ROLL_NOTATION_RE = /^(\d{0,2})d(\d{1,3})\s*([+-]\s*\d{1,3})?$/i;
 // comando foi digitado (por isso o feedback e' mandado de volta pro canal de texto atual).
 const PLAY_COMMAND_RE = /^\/play\s+(.+)$/i;
 const STOP_COMMAND_RE = /^\/stop\s*$/i;
+const PAUSE_COMMAND_RE = /^\/pause\s*$/i;
+const CONTINUE_COMMAND_RE = /^\/continue\s*$/i;
 
 // Autocomplete de "/" (ver getSlashMenuState).
 const SLASH_COMMANDS = [
   { name: "roll", description: "Rolar dados de RPG (ex: 2d20+5)" },
   { name: "play", description: "Tocar música na sua call (link ou nome da música)" },
+  { name: "pause", description: "Pausar a música da sua call" },
+  { name: "continue", description: "Continuar a música pausada" },
   { name: "stop", description: "Parar a música da sua call" },
 ];
 const DICE_SIDES = [4, 6, 8, 10, 12, 20, 100];
@@ -386,6 +390,27 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
         sendChatMessage(stompClient, channel.id, "⏹️ Música parada.", null, null);
       } catch (err) {
         showAlert(err.response?.data?.error || "Não foi possível parar a música");
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    // /pause e /continue - congelam/retomam a musica atual no ponto exato em que parou (nao e'
+    // a mesma coisa que mutar - ver comentario em music-bot/index.js pumpAudio).
+    if (PAUSE_COMMAND_RE.test(draft.trim()) || CONTINUE_COMMAND_RE.test(draft.trim())) {
+      const pausing = PAUSE_COMMAND_RE.test(draft.trim());
+      if (!activeChannel) {
+        showAlert(`Você precisa estar conectado numa call de voz para ${pausing ? "pausar" : "continuar"} a música`);
+        return;
+      }
+      setDraft("");
+      setSending(true);
+      try {
+        await api.post(`/api/channels/${activeChannel.id}/music/${pausing ? "pause" : "resume"}`);
+        sendChatMessage(stompClient, channel.id, pausing ? "⏸️ Música pausada." : "▶️ Música retomada.", null, null);
+      } catch (err) {
+        showAlert(err.response?.data?.error || `Não foi possível ${pausing ? "pausar" : "continuar"} a música`);
       } finally {
         setSending(false);
       }

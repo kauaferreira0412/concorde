@@ -89,6 +89,14 @@ public class VoiceModerationController {
         if (toChannel == null || !toChannel.getServerId().equals(fromChannel.getServerId())) {
             throw new IllegalArgumentException("Canal de destino invalido");
         }
+        if (isMusicBot(channelId, payload.targetUserId())) {
+            // O bot nao tem cliente WebSocket ouvindo o evento abaixo - manda ele mesmo trocar
+            // de sala no LiveKit (ver POST /move em music-bot/index.js, a musica continua
+            // tocando, so' muda pra onde o audio e' publicado). Presenca segue o proprio bot
+            // avisando de volta (ver MusicBotInternalController), igual entrar/sair normal.
+            callBotBestEffort("/move", Map.of("fromChannelId", channelId, "toChannelId", toChannel.getId()));
+            return;
+        }
         broadcast(channelId, new VoiceControlEvent("MOVE", payload.targetUserId(), toChannel.getId(),
                 toChannel.getName(), null, null));
     }

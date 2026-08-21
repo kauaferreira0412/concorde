@@ -46,9 +46,10 @@ if (!LIVEKIT_WS_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
 // channelId (string) -> sessao ativa (uma call de voz em que o bot esta conectado agora)
 const sessions = new Map();
 
-/** Entra na call como participante "🎵 Music Bot" e publica um track de audio vazio, pronto
- *  pra receber frames - so' chamado na primeira vez que alguem pede musica naquele canal. */
-async function connectSession(channelId) {
+/** Entra numa sala do LiveKit como "🎵 Music Bot" e publica um track de audio vazio, pronto
+ *  pra receber frames - usado tanto pra entrar pela primeira vez (connectSession) quanto pra
+ *  mover de canal (moveSession, que entra na sala NOVA antes de sair da antiga). */
+async function connectToRoom(channelId) {
   const roomName = `channel-${channelId}`;
   const identity = `musicbot-${channelId}`;
   const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity, name: "🎵 Music Bot" });
@@ -75,11 +76,57 @@ async function connectSession(channelId) {
   options.source = TrackSource.SOURCE_MICROPHONE;
   await room.localParticipant.publishTrack(track, options);
 
-  const session = { room, source, track, ytdlp: null, ffmpeg: null, idleTimer: null, forceMuted: false };
+  return { room, source, track };
+}
+
+/** So' chamado na primeira vez que alguem pede musica naquele canal. */
+async function connectSession(channelId) {
+  const { room, source, track } = await connectToRoom(channelId);
+  const session = {
+    channelId, room, source, track, ytdlp: null, ffmpeg: null, idleTimer: null,
+    forceMuted: false, paused: false, resumePause: null,
+  };
   sessions.set(channelId, session);
-  console.log(`[${channelId}] bot entrou em ${roomName}`);
+  console.log(`[${channelId}] bot entrou em channel-${channelId}`);
   notifyBackendPresence(channelId, true);
   return session;
+}
+
+/**
+ * Move o bot de canal SEM parar a musica - a musica atual (yt-dlp/ffmpeg) continua rodando
+ * normalmente, so' troca PRA ONDE os frames sao publicados: conecta na sala NOVA primeiro,
+ * so' desconecta da antiga DEPOIS de ja estar publicando na nova (evita um instante sem audio
+ * saindo em canal nenhum). A propria sessao (mesmo objeto) e' reindexada pro channelId novo.
+ */
+async function moveSession(fromChannelId, toChannelId) {
+  const session = sessions.get(fromChannelId);
+  if (!session) throw new Error("O bot não está tocando nesse canal");
+  if (session.idleTimer) {
+    clearTimeout(session.idleTimer);
+    session.idleTimer = null;
+  }
+
+  const { room: newRoom, source: newSource, track: newTrack } = await connectToRoom(toChannelId);
+  const oldRoom = session.room;
+  const oldTrack = session.track;
+
+  sessions.delete(fromChannelId);
+  session.channelId = toChannelId;
+  session.room = newRoom;
+  session.source = newSource;
+  session.track = newTrack;
+  sessions.set(toChannelId, session);
+
+  try {
+    await oldTrack.close();
+    await oldRoom.disconnect();
+  } catch (err) {
+    console.warn(`[${fromChannelId}] erro desconectando da sala antiga após mover:`, err.message);
+  }
+
+  console.log(`[${fromChannelId}] bot movido pra channel-${toChannelId}`);
+  notifyBackendPresence(fromChannelId, false);
+  notifyBackendPresence(toChannelId, true);
 }
 
 /** Avisa o backend que o bot entrou/saiu de verdade - melhor esforco (nao trava nada da call
@@ -117,6 +164,14 @@ function stopPlayback(session) {
   if (session.ffmpeg) {
     session.ffmpeg.kill("SIGKILL");
     session.ffmpeg = null;
+  }
+  // Se estava pausado (ver pumpAudio), acorda o loop preso esperando o /continue - senao ele
+  // fica pendurado pra sempre esperando um resume que nunca vai chegar (a musica que ele
+  // estava tocando acabou de ser morta acima).
+  session.paused = false;
+  if (session.resumePause) {
+    session.resumePause();
+    session.resumePause = null;
   }
 }
 
@@ -208,11 +263,14 @@ async function play(channelId, queryRaw) {
 
   session.ytdlp = ytdlp;
   session.ffmpeg = ffmpeg;
-  pumpAudio(channelId, session, ffmpeg).finally(() => {
+  session.paused = false;
+  pumpAudio(session, ffmpeg).finally(() => {
     if (session.ffmpeg !== ffmpeg) return; // uma musica nova ja comecou - isso e' resto da antiga
     session.ffmpeg = null;
     session.ytdlp = null;
-    session.idleTimer = setTimeout(() => disconnectSession(channelId), IDLE_DISCONNECT_MS);
+    // session.channelId (nao o "channelId" capturado aqui em cima) porque o bot pode ter sido
+    // MOVIDO de canal (ver moveSession) enquanto essa musica tocava.
+    session.idleTimer = setTimeout(() => disconnectSession(session.channelId), IDLE_DISCONNECT_MS);
   });
 
   return title;
@@ -226,12 +284,21 @@ async function play(channelId, queryRaw) {
  * interno dele so' segura ~1s por padrao, entao quase tudo seria descartado e a call ficaria
  * quase muda (foi exatamente o bug: o bot entrava, mas nao saia som nenhum).
  */
-async function pumpAudio(channelId, session, ffmpeg) {
+async function pumpAudio(session, ffmpeg) {
   const AHEAD_MS = 300; // quanto de audio deixa "adiantado" na fila antes de pausar a leitura
   let leftover = Buffer.alloc(0);
   try {
     for await (const chunk of ffmpeg.stdout) {
       if (session.ffmpeg !== ffmpeg) return; // trocou de musica no meio - para de bombear a antiga
+      // /pause (ver POST /pause) - trava aqui, SEM consumir mais nada do ffmpeg ate' o /continue
+      // (resumePause abaixo) acordar isso. Diferente do forceMuted (que so' manda silencio e
+      // deixa a musica andar escondida), pausar de verdade CONGELA o ponto da musica.
+      if (session.paused) {
+        await new Promise((resolve) => {
+          session.resumePause = resolve;
+        });
+        if (session.ffmpeg !== ffmpeg) return; // parou/trocou de musica enquanto estava pausado
+      }
       const data = leftover.length ? Buffer.concat([leftover, chunk]) : chunk;
       const usableLength = data.length - (data.length % 2);
       leftover = Buffer.from(data.subarray(usableLength));
@@ -255,7 +322,7 @@ async function pumpAudio(channelId, session, ffmpeg) {
       }
     }
   } catch (err) {
-    console.error(`[${channelId}] erro lendo áudio do ffmpeg:`, err.message);
+    console.error(`[${session.channelId}] erro lendo áudio do ffmpeg:`, err.message);
   }
 }
 
@@ -292,6 +359,37 @@ app.post("/mute", (req, res) => {
   const session = sessions.get(String(channelId));
   if (session) session.forceMuted = Boolean(muted);
   res.json({ ok: true });
+});
+
+/** /pause e /continue (ver ChatWindow.jsx/MusicController.java) - CONGELA a musica no ponto
+ *  exato em que estava (ver pumpAudio), diferente do /mute que so' silencia e deixa avancar. */
+app.post("/pause", (req, res) => {
+  const { channelId, paused } = req.body || {};
+  if (!channelId) return res.status(400).json({ error: "channelId é obrigatório" });
+  const session = sessions.get(String(channelId));
+  if (!session) return res.status(400).json({ error: "Não tem nenhuma música tocando nesse canal" });
+  session.paused = Boolean(paused);
+  if (!session.paused && session.resumePause) {
+    session.resumePause();
+    session.resumePause = null;
+  }
+  res.json({ ok: true });
+});
+
+/** Chamado pelo VoiceModerationController quando um moderador MOVE o bot de canal de voz -
+ *  ver moveSession (a musica continua tocando, so' troca pra onde o audio e' publicado). */
+app.post("/move", async (req, res) => {
+  const { fromChannelId, toChannelId } = req.body || {};
+  if (!fromChannelId || !toChannelId) {
+    return res.status(400).json({ error: "fromChannelId e toChannelId são obrigatórios" });
+  }
+  try {
+    await moveSession(String(fromChannelId), String(toChannelId));
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(`Falha ao mover bot de ${fromChannelId} pra ${toChannelId}:`, err);
+    res.status(500).json({ error: err.message || "Falha ao mover o bot" });
+  }
 });
 
 app.listen(PORT, () => console.log(`Music bot ouvindo na porta ${PORT} (LiveKit: ${LIVEKIT_WS_URL})`));
