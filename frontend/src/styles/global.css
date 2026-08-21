@@ -968,8 +968,13 @@ h3.chat-heading {
   width: 100%;
   max-width: 420px;
 }
-.music-queue-loading { color: var(--text-muted); font-size: 13px; }
-.music-queue-title { font-size: 12.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.music-queue-loading { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 13px; }
+.music-queue-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
+.music-queue-title svg { flex-shrink: 0; color: var(--accent-text); }
 .music-queue-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .music-queue-delete-btn {
   display: flex;

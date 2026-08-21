@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api/client";
 import { subscribeToMusicQueue } from "../ws/chatSocket";
-import { TrashIcon, PlusIcon, XIcon, ChevronsRightIcon } from "./icons.jsx";
+import { TrashIcon, PlusIcon, XIcon, MusicNoteIcon, SkipForwardIcon } from "./icons.jsx";
 
 /** "125" -> "2:05", "3725" -> "1:02:05". null (duracao desconhecida, ex: live) -> "?". */
 function formatDuration(sec) {
@@ -117,11 +117,15 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
   }
 
   if (!state) {
-    return <div className="music-queue-card music-queue-loading">🎵 Carregando fila…</div>;
+    return (
+      <div className="music-queue-card music-queue-loading">
+        <MusicNoteIcon size={14} /> Carregando fila…
+      </div>
+    );
   }
 
   const { name, nowPlaying, queue } = state;
-  const title = name ? `🎵 ${name}` : "🎵 Fila de música";
+  const title = name || "Fila de música";
   // Uma fila NOVA substituiu essa (queueId diferente) - esse card e' historico, se tranca como
   // encerrado pra sempre, mesmo que o broadcast continue chegando (e' o estado da fila NOVA, nao
   // da dele). Sem queueId nenhum (mensagem antiga, de antes dessa funcionalidade existir) so'
@@ -132,7 +136,9 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
   if (closed) {
     return (
       <div className="music-queue-card music-queue-closed">
-        <p className="music-queue-title">{title}</p>
+        <p className="music-queue-title">
+          <MusicNoteIcon size={14} /> {title}
+        </p>
         <p className="music-queue-empty">Essa fila foi encerrada. Use /fila pra abrir uma nova.</p>
       </div>
     );
@@ -141,7 +147,9 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
   return (
     <div className="music-queue-card">
       <div className="music-queue-header">
-        <p className="music-queue-title">{title}</p>
+        <p className="music-queue-title">
+          <MusicNoteIcon size={14} /> {title}
+        </p>
         <button type="button" className="music-queue-delete-btn" title="Encerrar fila" disabled={deleting} onClick={deleteQueue}>
           <XIcon size={13} /> Encerrar fila
         </button>
@@ -159,7 +167,7 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
             disabled={skipping}
             onClick={skipSong}
           >
-            <ChevronsRightIcon size={14} /> Pular
+            <SkipForwardIcon size={14} /> Pular
           </button>
         </div>
       ) : (
