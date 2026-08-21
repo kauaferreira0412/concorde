@@ -39,7 +39,12 @@ const FILA_COMMAND_RE = /^\/fila(?:\s+(.+))?$/i;
 // MusicQueueCard AO VIVO em vez de texto normal. Evita precisar de uma coluna nova no banco so'
 // pra isso (mesma logica de reaproveitamento que o /roll usa colunas dedicadas, mas aqui nem
 // isso e' necessario - o card busca o estado dele sozinho via REST/WebSocket, ver MusicQueueCard.jsx).
-const MUSIC_QUEUE_MARKER_RE = /^\[\[MUSIC_QUEUE:(\d+)\]\]$/;
+// Carrega DOIS ids: o canal de voz, e o "queueId" da fila que existia na hora que esse card foi
+// criado (ver /fila abaixo) - todo card do MESMO canal escuta o MESMO broadcast ao vivo, entao
+// sem o queueId um card antigo (de uma fila ja encerrada) virava a fila NOVA na tela sozinho
+// assim que alguem abria outra; com o queueId, o card compara e se tranca como "encerrada" pra
+// sempre se um queueId diferente aparecer (ver MusicQueueCard.jsx).
+const MUSIC_QUEUE_MARKER_RE = /^\[\[MUSIC_QUEUE:(\d+):([^\]]+)\]\]$/;
 
 // Autocomplete de "/" (ver getSlashMenuState).
 const SLASH_COMMANDS = [
@@ -395,10 +400,10 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     }
 
     // /fila - manda um card AO VIVO da fila de musica pro chat (ver MUSIC_QUEUE_MARKER_RE/
-    // MusicQueueCard.jsx). So' pode ter UMA fila aberta por canal (pedido explicito do usuario)
-    // - por isso "abre" no backend ANTES de postar o card; se ja' tiver uma aberta, o backend
-    // recusa e a gente avisa em vez de duplicar o card (precisa apagar a fila atual primeiro,
-    // ver o botão "Apagar fila" dentro do MusicQueueCard.jsx).
+    // MusicQueueCard.jsx). Abrir uma fila nova ENCERRA a anterior automaticamente no backend
+    // (nao precisa apagar na mao antes) - o queueId que ele devolve vai embutido no marcador da
+    // mensagem, e' assim que ESSE card sabe que e' o ATUAL (o card antigo, com o queueId velho,
+    // vai se trancar sozinho como "encerrada" ao perceber que um id diferente esta em uso agora).
     const filaMatch = FILA_COMMAND_RE.exec(draft.trim());
     if (filaMatch) {
       if (!activeChannel) {
@@ -408,8 +413,10 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       setDraft("");
       setSending(true);
       try {
-        await api.post(`/api/channels/${activeChannel.id}/music/queue/open`, { name: filaMatch[1]?.trim() || "" });
-        sendChatMessage(stompClient, channel.id, `[[MUSIC_QUEUE:${activeChannel.id}]]`, null, null);
+        const { data } = await api.post(`/api/channels/${activeChannel.id}/music/queue/open`, {
+          name: filaMatch[1]?.trim() || "",
+        });
+        sendChatMessage(stompClient, channel.id, `[[MUSIC_QUEUE:${activeChannel.id}:${data.queueId}]]`, null, null);
       } catch (err) {
         showAlert(err.response?.data?.error || "Não foi possível abrir a fila de música");
       } finally {
@@ -631,6 +638,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                   ) : MUSIC_QUEUE_MARKER_RE.test(m.content || "") ? (
                     <MusicQueueCard
                       channelId={Number(MUSIC_QUEUE_MARKER_RE.exec(m.content)[1])}
+                      queueId={MUSIC_QUEUE_MARKER_RE.exec(m.content)[2]}
                       stompClient={stompClient}
                       stompConnected={stompConnected}
                     />

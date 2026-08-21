@@ -21,12 +21,17 @@ function formatDuration(sec) {
  * music-bot/index.js broadcastQueue). channelId aqui e' o canal de VOZ onde o bot toca, nao o
  * canal de texto onde essa mensagem apareceu (podem ser diferentes).
  *
+ * queueId e' o id da fila que existia na hora que ESSE card foi criado (embutido no marcador da
+ * mensagem, ver ChatWindow.jsx) - TODOS os cards do mesmo canal escutam o MESMO broadcast ao
+ * vivo, entao sem isso um card antigo (de uma fila ja encerrada) viraria a fila NOVA na tela
+ * sozinho assim que alguem abrisse outra. Se o broadcast trouxer um queueId DIFERENTE do que
+ * esse card guarda, ele se tranca pra sempre como "encerrada", ignorando qualquer atualizacao
+ * futura daquela fila (que agora e' de outro card).
+ *
  * A fila e' PUBLICA (pedido explicito do usuario) - qualquer membro conectado nessa call pode
- * adicionar, tirar ou apagar a fila inteira, sem exigir nenhuma permissao de moderacao. So'
- * pode ter UMA fila aberta por canal - "active:false" (ver bot) significa que essa foi apagada
- * (ou nunca foi aberta) e precisa de um /fila novo pra abrir outra.
+ * adicionar, tirar, pular ou encerrar a fila inteira, sem exigir nenhuma permissao de moderacao.
  */
-export default function MusicQueueCard({ channelId, stompClient, stompConnected }) {
+export default function MusicQueueCard({ channelId, queueId, stompClient, stompConnected }) {
   const [state, setState] = useState(null); // { active, nowPlaying, queue } | null (carregando)
   const [removingIndex, setRemovingIndex] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -43,7 +48,7 @@ export default function MusicQueueCard({ channelId, stompClient, stompConnected 
         if (!cancelled) setState(data);
       })
       .catch(() => {
-        if (!cancelled) setState({ active: false, name: null, nowPlaying: null, queue: [] });
+        if (!cancelled) setState({ queueId: null, active: false, name: null, nowPlaying: null, queue: [] });
       });
     return () => {
       cancelled = true;
@@ -76,7 +81,7 @@ export default function MusicQueueCard({ channelId, stompClient, stompConnected 
     try {
       await api.post(`/api/channels/${channelId}/music/queue/delete`);
     } catch (err) {
-      setError(err.response?.data?.error || "Não foi possível apagar a fila");
+      setError(err.response?.data?.error || "Não foi possível encerrar a fila");
     } finally {
       setDeleting(false);
     }
@@ -115,14 +120,20 @@ export default function MusicQueueCard({ channelId, stompClient, stompConnected 
     return <div className="music-queue-card music-queue-loading">🎵 Carregando fila…</div>;
   }
 
-  const { active, name, nowPlaying, queue } = state;
+  const { name, nowPlaying, queue } = state;
   const title = name ? `🎵 ${name}` : "🎵 Fila de música";
+  // Uma fila NOVA substituiu essa (queueId diferente) - esse card e' historico, se tranca como
+  // encerrado pra sempre, mesmo que o broadcast continue chegando (e' o estado da fila NOVA, nao
+  // da dele). Sem queueId nenhum (mensagem antiga, de antes dessa funcionalidade existir) so'
+  // confia no "active" normal.
+  const superseded = queueId && state.queueId && state.queueId !== queueId;
+  const closed = superseded || !state.active;
 
-  if (!active) {
+  if (closed) {
     return (
       <div className="music-queue-card music-queue-closed">
         <p className="music-queue-title">{title}</p>
-        <p className="music-queue-empty">Essa fila foi apagada. Use /fila pra abrir uma nova.</p>
+        <p className="music-queue-empty">Essa fila foi encerrada. Use /fila pra abrir uma nova.</p>
       </div>
     );
   }
@@ -131,8 +142,8 @@ export default function MusicQueueCard({ channelId, stompClient, stompConnected 
     <div className="music-queue-card">
       <div className="music-queue-header">
         <p className="music-queue-title">{title}</p>
-        <button type="button" className="music-queue-delete-btn" title="Apagar fila" disabled={deleting} onClick={deleteQueue}>
-          <XIcon size={13} /> Apagar fila
+        <button type="button" className="music-queue-delete-btn" title="Encerrar fila" disabled={deleting} onClick={deleteQueue}>
+          <XIcon size={13} /> Encerrar fila
         </button>
       </div>
 

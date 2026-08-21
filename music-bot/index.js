@@ -10,6 +10,7 @@
 // em disco, o audio so' passa pela memoria a caminho da call.
 import express from "express";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { AccessToken, TrackSource as GrantTrackSource } from "livekit-server-sdk";
 import {
   AudioFrame,
@@ -87,12 +88,19 @@ async function connectSession(channelId) {
     forceMuted: false, paused: false, resumePause: null,
     nowPlaying: null, // { title, durationSec } da musica TOCANDO agora, ou null
     queue: [], // [{ title, durationSec, resolvedQuery }, ...] - proximas na fila (ver /fila)
-    // So' pode ter UMA fila "aberta" (o card do /fila) por vez nesse canal - pra abrir outra,
-    // precisa apagar essa primeiro (ver POST /queue/:channelId/open e /delete). Nao trava o
-    // /play (que continua enfileirando normalmente mesmo sem nenhuma fila aberta) - e' so' o
-    // controle de "quantos cards distintos existem", pra nao duplicar o card no chat.
+    // So' pode ter UMA fila "aberta" (o card do /fila) por vez nesse canal - abrir uma nova
+    // ENCERRA a anterior automaticamente (ver POST /queue/:channelId/open), nao precisa apagar
+    // na mao antes. Nao trava o /play (que continua enfileirando normalmente mesmo sem nenhuma
+    // fila aberta) - e' so' o controle de "qual card esta ativo agora".
     queueOpen: false,
     queueName: null, // nome opcional dado no /fila <nome> - null = mostra so' "Fila de música"
+    // Cada vez que uma fila e' aberta ganha um id novo (ver openQueue) - o card no chat (ver
+    // MusicQueueCard.jsx) guarda o id de QUANDO ELE FOI CRIADO e so' continua se atualizando ao
+    // vivo enquanto esse id bater com o atual; se nao bater mais (uma fila nova substituiu a
+    // dele), o card se tranca pra sempre como "encerrada" em vez de virar a fila nova por baixo
+    // dos panos (todos os cards do mesmo canal escutam o MESMO broadcast, entao sem isso o card
+    // ANTIGO literalmente virava a fila NOVA na tela assim que alguem abria outra).
+    queueId: null,
   };
   sessions.set(channelId, session);
   console.log(`[${channelId}] bot entrou em channel-${channelId}`);
@@ -193,6 +201,7 @@ async function disconnectSession(channelId) {
   session.queue = [];
   session.queueOpen = false;
   session.queueName = null;
+  session.queueId = null;
   try {
     await session.track.close();
     await session.room.disconnect();
@@ -359,6 +368,7 @@ function advanceNext(session) {
 async function broadcastQueue(session) {
   const channelId = session.channelId;
   const payload = {
+    queueId: session.queueId,
     active: session.queueOpen,
     name: session.queueName,
     nowPlaying: session.nowPlaying
@@ -448,8 +458,9 @@ app.post("/play", async (req, res) => {
  *  MusicQueueCard.jsx); as atualizações AO VIVO depois disso vêm via WebSocket (broadcastQueue). */
 app.get("/queue/:channelId", (req, res) => {
   const session = sessions.get(req.params.channelId);
-  if (!session) return res.json({ active: false, name: null, nowPlaying: null, queue: [] });
+  if (!session) return res.json({ queueId: null, active: false, name: null, nowPlaying: null, queue: [] });
   res.json({
+    queueId: session.queueId,
     active: session.queueOpen,
     name: session.queueName,
     nowPlaying: session.nowPlaying
@@ -459,31 +470,33 @@ app.get("/queue/:channelId", (req, res) => {
   });
 });
 
-/** Abre a fila desse canal (ver /fila [nome] em ChatWindow.jsx) - so' UMA por vez: se ja tiver
- *  uma aberta, recusa (o usuario precisa apagar a atual primeiro, ver /delete abaixo). Entra na
- *  call se ainda nao tiver entrado (getSession), mesmo sem nenhuma musica tocando ainda - a
- *  fila pode ser criada "vazia" e ir recebendo musicas depois. Nome e' opcional (so' cosmetico,
- *  aparece no titulo do card - ver MusicQueueCard.jsx). */
+/** Abre a fila desse canal (ver /fila [nome] em ChatWindow.jsx) - ENCERRA automaticamente
+ *  qualquer fila que ja estivesse aberta nesse canal (sem precisar apagar na mao antes: o card
+ *  antigo, que guarda o queueId de quando foi criado, vai notar sozinho que o queueId mudou e
+ *  se trancar como "encerrada" pra sempre, ver MusicQueueCard.jsx - so' o card NOVO, criado com
+ *  esse queueId aqui, continua recebendo atualizacoes ao vivo). Entra na call se ainda nao tiver
+ *  entrado (getSession), mesmo sem nenhuma musica tocando ainda - a fila pode ser criada "vazia"
+ *  e ir recebendo musicas depois. Nome e' opcional (so' cosmetico, aparece no titulo do card). */
 app.post("/queue/:channelId/open", async (req, res) => {
   try {
     const session = await getSession(req.params.channelId);
-    if (session.queueOpen) {
-      return res.status(400).json({ error: "Já existe uma fila ativa nesse canal - apague-a antes de criar outra" });
-    }
     const name = typeof req.body?.name === "string" ? req.body.name.trim().slice(0, 60) : "";
+    session.queue = [];
     session.queueOpen = true;
     session.queueName = name || null;
+    session.queueId = randomUUID();
     broadcastQueue(session);
-    res.json({ ok: true });
+    res.json({ ok: true, queueId: session.queueId });
   } catch (err) {
     console.error(`Falha ao abrir fila no canal ${req.params.channelId}:`, err);
     res.status(500).json({ error: err.message || "Falha ao abrir a fila" });
   }
 });
 
-/** Apaga a fila desse canal por completo - descarta TODAS as musicas que ainda nao tocaram
- *  (a que esta tocando agora continua, so' as proximas somem) e libera pra criar uma fila NOVA
- *  (ver /open acima). NAO desconecta o bot da call. */
+/** Encerra a fila desse canal - descarta TODAS as musicas que ainda nao tocaram (a que esta
+ *  tocando agora continua, so' as proximas somem). NAO apaga o card do chat (ver
+ *  MusicQueueCard.jsx: o card so' passa a mostrar "encerrada" sozinho, via essa mesma
+ *  atualizacao) nem desconecta o bot da call - so' libera pra abrir uma fila nova (ver /open). */
 app.post("/queue/:channelId/delete", (req, res) => {
   const session = sessions.get(req.params.channelId);
   if (!session) return res.status(400).json({ error: "Não tem nenhuma fila nesse canal" });
