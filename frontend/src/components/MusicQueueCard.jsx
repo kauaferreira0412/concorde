@@ -185,7 +185,7 @@ export default function MusicQueueCard({ channelId, stompClient, stompConnected 
           disabled={adding}
         />
         <button type="submit" className="music-queue-add-btn" disabled={adding || !addQuery.trim()} title="Adicionar à fila">
-          <PlusIcon size={14} />
+          {adding ? <span className="music-queue-spinner" /> : <PlusIcon size={14} />}
         </button>
       </form>
 

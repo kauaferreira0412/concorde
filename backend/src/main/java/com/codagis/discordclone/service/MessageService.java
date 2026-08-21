@@ -4,11 +4,13 @@ import com.codagis.discordclone.domain.Channel;
 import com.codagis.discordclone.domain.Message;
 import com.codagis.discordclone.domain.Role;
 import com.codagis.discordclone.domain.User;
+import com.codagis.discordclone.dto.MessageDtos.ChatEvent;
 import com.codagis.discordclone.dto.MessageDtos.ChatMessage;
 import com.codagis.discordclone.dto.MessageDtos.ReplyPreview;
 import com.codagis.discordclone.repository.ChannelRepository;
 import com.codagis.discordclone.repository.MessageRepository;
 import com.codagis.discordclone.repository.UserRepository;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,11 +24,32 @@ public class MessageService {
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
     private final ChannelRepository channelRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public MessageService(MessageRepository messageRepository, UserRepository userRepository, ChannelRepository channelRepository) {
+    public MessageService(MessageRepository messageRepository, UserRepository userRepository, ChannelRepository channelRepository,
+                           SimpMessagingTemplate messagingTemplate) {
         this.messageRepository = messageRepository;
         this.userRepository = userRepository;
         this.channelRepository = channelRepository;
+        this.messagingTemplate = messagingTemplate;
+    }
+
+    /**
+     * Apaga TODA mensagem com esse conteudo EXATO, em qualquer canal - usado so' pelo card de
+     * fila de musica (ver MusicController/MusicQueueCard.jsx), cujo "conteudo" e' um marcador
+     * magico ("[[MUSIC_QUEUE:channelId]]") em vez de texto de verdade. Ignora quem e' o autor
+     * de proposito (a fila e' PUBLICA - qualquer um pode apagar o card de qualquer um, pedido
+     * explicito do usuario), diferente do delete() normal logo abaixo que so deixa autor/admin.
+     */
+    @Transactional
+    public void deleteAllByContent(String content) {
+        List<Message> matches = messageRepository.findByContent(content);
+        for (Message message : matches) {
+            Long channelId = message.getChannelId();
+            Long messageId = message.getId();
+            messageRepository.delete(message);
+            messagingTemplate.convertAndSend("/topic/channel." + channelId, ChatEvent.deleted(messageId));
+        }
     }
 
     @Transactional

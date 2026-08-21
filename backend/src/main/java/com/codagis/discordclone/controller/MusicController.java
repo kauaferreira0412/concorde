@@ -5,6 +5,7 @@ import com.codagis.discordclone.domain.ChannelType;
 import com.codagis.discordclone.repository.ChannelRepository;
 import com.codagis.discordclone.repository.MembershipRepository;
 import com.codagis.discordclone.security.CurrentUser;
+import com.codagis.discordclone.service.MessageService;
 import com.codagis.discordclone.ws.VoicePresenceService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
@@ -29,17 +30,27 @@ public class MusicController {
     private final MembershipRepository membershipRepository;
     private final VoicePresenceService voicePresenceService;
     private final CurrentUser currentUser;
+    private final MessageService messageService;
     private final String musicBotUrl;
     private final RestTemplate restTemplate = new RestTemplate();
 
     public MusicController(ChannelRepository channelRepository, MembershipRepository membershipRepository,
                             VoicePresenceService voicePresenceService, CurrentUser currentUser,
+                            MessageService messageService,
                             @Value("${app.music-bot.url}") String musicBotUrl) {
         this.channelRepository = channelRepository;
         this.membershipRepository = membershipRepository;
         this.voicePresenceService = voicePresenceService;
         this.currentUser = currentUser;
+        this.messageService = messageService;
         this.musicBotUrl = musicBotUrl;
+    }
+
+    /** Marcador magico do card de fila (ver MUSIC_QUEUE_MARKER_RE em ChatWindow.jsx/
+     *  MusicQueueCard.jsx) - o "conteudo" da mensagem-card, usado tanto pra criar quanto pra
+     *  achar e apagar cards antigos (ver openQueue/deleteQueue). */
+    private String queueMessageMarker(Long channelId) {
+        return "[[MUSIC_QUEUE:" + channelId + "]]";
     }
 
     public record PlayRequest(String query) {}
@@ -96,15 +107,25 @@ public class MusicController {
         assertCanControlMusic(channel);
         String name = req == null || req.name() == null ? "" : req.name();
         callBot("/queue/" + channelId + "/open", Map.of("name", name));
+        // Rede de seguranca contra card "fantasma" acumulando no chat - normalmente o card
+        // antigo ja foi apagado em deleteQueue() abaixo, mas se a fila fechou sozinha de outro
+        // jeito (ex: o bot saiu por inatividade sem ninguem clicar em "Apagar fila"), o card
+        // velho ainda estaria la' mostrando "fila apagada" pra sempre. Limpa qualquer sobra ANTES
+        // do frontend postar o card novo, pra nunca ter dois cards da mesma call ao mesmo tempo.
+        messageService.deleteAllByContent(queueMessageMarker(channelId));
     }
 
     /** Apaga a fila inteira (descarta tudo que ainda nao tocou) e libera pra abrir uma nova -
-     *  a musica que estiver tocando agora continua, so' as PROXIMAS somem. */
+     *  a musica que estiver tocando agora continua, so' as PROXIMAS somem. Tambem apaga o card
+     *  dessa fila do chat (nao so' desativa) - PUBLICO, apaga o card de qualquer autor (ver
+     *  MessageService.deleteAllByContent), senao ficava "lixo" acumulando a cada fila nova
+     *  (pedido explicito do usuario: so' pode existir UMA mensagem de fila por vez). */
     @PostMapping("/{channelId}/music/queue/delete")
     public void deleteQueue(@PathVariable Long channelId) {
         Channel channel = requireVoiceChannel(channelId);
         assertCanControlMusic(channel);
         callBot("/queue/" + channelId + "/delete", Map.of());
+        messageService.deleteAllByContent(queueMessageMarker(channelId));
     }
 
     /** A fila e' PUBLICA - qualquer membro conectado nessa call pode tirar qualquer musica

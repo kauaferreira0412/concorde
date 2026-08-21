@@ -1014,6 +1014,17 @@ h3.chat-heading {
   cursor: pointer;
 }
 .music-queue-add-btn:disabled { opacity: 0.5; cursor: default; }
+.music-queue-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: music-queue-spin 0.7s linear infinite;
+}
+@keyframes music-queue-spin {
+  to { transform: rotate(360deg); }
+}
 .music-queue-now-playing {
   display: flex;
   align-items: baseline;
