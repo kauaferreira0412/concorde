@@ -24,6 +24,7 @@ services:
   # ambiente na hora de rodar o Spring Boot.
   music-bot:
     build: ./music-bot
+    restart: unless-stopped
     ports:
       - "4001:4001"
     environment:

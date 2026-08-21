@@ -187,6 +187,14 @@ async function play(channelId, queryRaw) {
     "pipe:1",
   ]);
   ytdlp.stdout.pipe(ffmpeg.stdin);
+  // Quando a musica TROCA ou alguem manda /stop, stopPlayback mata os dois processos com
+  // SIGKILL - se o yt-dlp ainda estiver escrevendo no stdin do ffmpeg bem nesse instante, o
+  // pipe quebra (EPIPE) e, sem um listener de "error" no lado gravavel, o Node trata isso como
+  // erro NAO TRATADO e derruba o processo INTEIRO (matava o bot pra todo mundo, nao so' essa
+  // musica - ja aconteceu). "error" em stream so' precisa de UM listener pra virar seguro.
+  ffmpeg.stdin.on("error", () => {});
+  ytdlp.stdout.on("error", () => {});
+  ffmpeg.stdout.on("error", () => {});
   // --quiet ja' tira o progresso normal do yt-dlp, entao o que sobra no stderr e' erro de
   // verdade (link invalido, video indisponivel, etc) - loga em vez de descartar, senao a
   // "musica" simplesmente fica muda sem nenhuma pista do motivo (ja aconteceu, ver historico).
@@ -297,3 +305,10 @@ async function shutdown() {
 }
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
+
+// Rede de seguranca: um erro nao tratado em QUALQUER lugar (ex: um "error" de stream que a
+// gente esqueceu de tratar em algum processo filho) por padrao derruba o processo Node inteiro
+// - isso ja' aconteceu (EPIPE do ffmpeg) e tirava o bot do ar pra TODOS os canais, nao so' o
+// que estava tocando algo naquele instante. Loga e continua vivo em vez de morrer.
+process.on("uncaughtException", (err) => console.error("Erro não tratado (bot continua no ar):", err));
+process.on("unhandledRejection", (err) => console.error("Promise rejeitada sem catch (bot continua no ar):", err));
