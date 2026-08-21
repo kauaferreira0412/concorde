@@ -116,13 +116,21 @@ async function disconnectSession(channelId) {
 }
 
 /** So' o titulo, sem baixar audio nenhum - pra devolver algo bonito pro usuario ver no chat. */
-function fetchTitle(query) {
+function fetchTitle(channelId, query) {
   return new Promise((resolve) => {
     const p = spawn("yt-dlp", ["--no-playlist", "--print", "%(title)s", "--skip-download", query]);
     let out = "";
+    let err = "";
     p.stdout.on("data", (d) => (out += d.toString()));
-    p.on("error", () => resolve(query));
-    p.on("close", () => resolve(out.trim() || query));
+    p.stderr.on("data", (d) => (err += d.toString()));
+    p.on("error", (e) => {
+      console.error(`[${channelId}] yt-dlp não iniciou (título):`, e.message);
+      resolve(query);
+    });
+    p.on("close", (code) => {
+      if (code !== 0 && err.trim()) console.error(`[${channelId}] yt-dlp (título, código ${code}):`, err.trim());
+      resolve(out.trim() || query);
+    });
   });
 }
 
@@ -140,7 +148,7 @@ async function play(channelId, queryRaw) {
   const session = await getSession(channelId);
   stopPlayback(session);
 
-  const title = await fetchTitle(resolvedQuery);
+  const title = await fetchTitle(channelId, resolvedQuery);
 
   const ytdlp = spawn("yt-dlp", ["--no-playlist", "-f", "bestaudio", "-o", "-", "--quiet", resolvedQuery]);
   const ffmpeg = spawn("ffmpeg", [
@@ -158,9 +166,16 @@ async function play(channelId, queryRaw) {
     "pipe:1",
   ]);
   ytdlp.stdout.pipe(ffmpeg.stdin);
-  ytdlp.stderr.on("data", () => {}); // yt-dlp escreve progresso normal no stderr, so' ignora
-  ytdlp.on("error", (err) => console.error(`[${channelId}] yt-dlp:`, err.message));
-  ffmpeg.on("error", (err) => console.error(`[${channelId}] ffmpeg:`, err.message));
+  // --quiet ja' tira o progresso normal do yt-dlp, entao o que sobra no stderr e' erro de
+  // verdade (link invalido, video indisponivel, etc) - loga em vez de descartar, senao a
+  // "musica" simplesmente fica muda sem nenhuma pista do motivo (ja aconteceu, ver historico).
+  let ytdlpErr = "";
+  ytdlp.stderr.on("data", (d) => (ytdlpErr += d.toString()));
+  ytdlp.on("error", (err) => console.error(`[${channelId}] yt-dlp não iniciou:`, err.message));
+  ytdlp.on("close", (code) => {
+    if (code !== 0 && ytdlpErr.trim()) console.error(`[${channelId}] yt-dlp (código ${code}):`, ytdlpErr.trim());
+  });
+  ffmpeg.on("error", (err) => console.error(`[${channelId}] ffmpeg não iniciou:`, err.message));
 
   session.ytdlp = ytdlp;
   session.ffmpeg = ffmpeg;
