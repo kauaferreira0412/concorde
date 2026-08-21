@@ -56,6 +56,13 @@ app:
     min-version-override: ${DESKTOP_MIN_VERSION:}
     download-url: ${DESKTOP_DOWNLOAD_URL:https://187-127-37-101.sslip.io/login}
 
+  # Bot de musica (ver MusicController/music-bot/index.js) - servico Node.js SEPARADO (nao e'
+  # Spring), o backend so' repassa /play e /stop autenticados pra ele. "localhost" so' funciona
+  # se voce rodar o bot manualmente na sua maquina em dev - em Docker (ver docker-compose*.yml)
+  # o nome do service ("music-bot") resolve sozinho na rede interna.
+  music-bot:
+    url: ${MUSIC_BOT_URL:http://localhost:4001}
+
   # Conta de administrador criada automaticamente na primeira subida (se ainda nao existir).
   # E' o UNICO jeito de ter uma primeira conta, ja que o cadastro publico foi removido:
   # so o ADMIN pode criar outros usuarios e servidores dali em diante.

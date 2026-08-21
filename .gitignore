@@ -18,6 +18,9 @@ frontend/.env
 frontend/release/
 frontend/public/downloads/
 
+# Bot de musica (Node.js separado, ver music-bot/)
+music-bot/node_modules/
+
 # Deploy (producao)
 .env.prod
 

@@ -4,6 +4,7 @@ import { subscribeToChannel, sendChatMessage, editChatMessage, deleteChatMessage
 import { useAuth } from "../context/AuthContext.jsx";
 import { useAlert } from "../context/AlertContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
+import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useServerMembers } from "../utils/useServerMembers";
 import { applyMention, getMentionQuery, mentionsUser } from "../utils/mentions";
 import { parseMarkdownBlocks, renderInline } from "../utils/markdown.jsx";
@@ -19,9 +20,19 @@ import { CheckIcon, MegaphoneIcon, PencilIcon, PlusIcon, ReplyIcon, TrashIcon, X
 const ROLL_COMMAND_RE = /^\/(?:roll|r)\s+(.+)$/i;
 const ROLL_NOTATION_RE = /^(\d{0,2})d(\d{1,3})\s*([+-]\s*\d{1,3})?$/i;
 
-// Autocomplete de "/" (ver getSlashMenuState) - so' o /roll existe por enquanto, mas ja fica
-// numa lista pra dar pra adicionar outros comandos depois sem mexer no resto do mecanismo.
-const SLASH_COMMANDS = [{ name: "roll", description: "Rolar dados de RPG (ex: 2d20+5)" }];
+// /play <link ou busca> e /stop - bot de musica (ver MusicController.java/music-bot/index.js).
+// So' fazem sentido com o usuario CONECTADO numa call de voz (activeChannel, ver handleSend) -
+// e' o canal de voz que recebe o audio, que pode ser diferente do canal de TEXTO onde o
+// comando foi digitado (por isso o feedback e' mandado de volta pro canal de texto atual).
+const PLAY_COMMAND_RE = /^\/play\s+(.+)$/i;
+const STOP_COMMAND_RE = /^\/stop\s*$/i;
+
+// Autocomplete de "/" (ver getSlashMenuState).
+const SLASH_COMMANDS = [
+  { name: "roll", description: "Rolar dados de RPG (ex: 2d20+5)" },
+  { name: "play", description: "Tocar música na sua call (link ou nome da música)" },
+  { name: "stop", description: "Parar a música da sua call" },
+];
 const DICE_SIDES = [4, 6, 8, 10, 12, 20, 100];
 
 /**
@@ -121,6 +132,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
   const { user, isAdmin } = useAuth();
   const { openProfile } = useProfile();
   const { showAlert } = useAlert();
+  const { activeChannel } = useVoiceCall();
   const members = useServerMembers(channel?.serverId, stompClient, stompConnected);
   const memberUsernames = useMemo(() => members.map((m) => m.username), [members]);
 
@@ -336,6 +348,47 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       }
       rollDice(stompClient, channel.id, notation);
       setDraft("");
+      return;
+    }
+
+    // /play <link ou busca> - manda pro bot de musica TOCAR na call de voz em que o usuario
+    // esta agora (activeChannel), e avisa no canal de TEXTO atual (onde o comando foi digitado)
+    // com o titulo que o bot devolveu, igual um card de confirmacao.
+    const playMatch = PLAY_COMMAND_RE.exec(draft.trim());
+    if (playMatch) {
+      if (!activeChannel) {
+        showAlert("Você precisa estar conectado numa call de voz para tocar música");
+        return;
+      }
+      setDraft("");
+      setSending(true);
+      try {
+        const { data } = await api.post(`/api/channels/${activeChannel.id}/music/play`, { query: playMatch[1].trim() });
+        sendChatMessage(stompClient, channel.id, `🎵 Tocando: **${data.title}**`, null, null);
+      } catch (err) {
+        showAlert(err.response?.data?.error || "Não foi possível tocar essa música");
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    // /stop - para a musica que estiver tocando na call de voz atual.
+    if (STOP_COMMAND_RE.test(draft.trim())) {
+      if (!activeChannel) {
+        showAlert("Você precisa estar conectado numa call de voz para parar a música");
+        return;
+      }
+      setDraft("");
+      setSending(true);
+      try {
+        await api.post(`/api/channels/${activeChannel.id}/music/stop`);
+        sendChatMessage(stompClient, channel.id, "⏹️ Música parada.", null, null);
+      } catch (err) {
+        showAlert(err.response?.data?.error || "Não foi possível parar a música");
+      } finally {
+        setSending(false);
+      }
       return;
     }
 
@@ -637,7 +690,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                   ? "Adicionar legenda (opcional)..."
                   : sending
                   ? "Enviando..."
-                  : `Conversar em #${channel.name} (@ pra mencionar, **negrito**, *itálico*, /roll 2d20 pra rolar dado, Ctrl+V cola imagem, Shift+Enter quebra linha)`
+                  : `Conversar em #${channel.name} (@ pra mencionar, **negrito**, *itálico*, /roll 2d20 pra rolar dado, /play pra tocar música, Ctrl+V cola imagem, Shift+Enter quebra linha)`
               }
               disabled={!stompConnected || sending}
             />

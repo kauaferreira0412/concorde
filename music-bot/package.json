@@ -1,0 +1,15 @@
+{
+  "name": "concorde-music-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@livekit/rtc-node": "^0.13.34",
+    "express": "^4.19.2",
+    "livekit-server-sdk": "^2.18.0"
+  }
+}

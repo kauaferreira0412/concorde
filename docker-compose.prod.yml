@@ -58,6 +58,8 @@ services:
       # publicar instalador novo) - vazio por padrao, nesse caso usa o arquivo.
       DESKTOP_MIN_VERSION: ${DESKTOP_MIN_VERSION:-}
       DESKTOP_DOWNLOAD_URL: ${DESKTOP_DOWNLOAD_URL:-https://187-127-37-101.sslip.io/login}
+      # "music-bot" e' o nome do service abaixo - resolve sozinho na rede interna do Docker.
+      MUSIC_BOT_URL: http://music-bot:4001
     # DNS publico explicito - em algumas VPS o /etc/resolv.conf do host aponta pro
     # stub do systemd-resolved (127.0.0.53), que os containers nao conseguem alcancar,
     # e qualquer chamada de rede pra fora (aqui, a API do Google Cloud Storage) falha
@@ -67,6 +69,23 @@ services:
       - 1.1.1.1
     depends_on:
       - postgres
+      - livekit
+      - music-bot
+
+  # Bot de musica (/play, ver MusicController.java/music-bot/index.js) - entra na call como
+  # participante de verdade e publica o audio. Servico Node.js separado do backend (Spring) de
+  # proposito - ver comentario no topo do music-bot/index.js.
+  music-bot:
+    build: ./music-bot
+    restart: unless-stopped
+    environment:
+      LIVEKIT_WS_URL: wss://${DOMAIN}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    depends_on:
       - livekit
 
   gateway:
