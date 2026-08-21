@@ -41,6 +41,6 @@ services:
     # confirm you're not a bot" (mais comum em VPS que na sua maquina, mas pode acontecer aqui
     # tambem). Sem o arquivo, o bot continua funcionando do jeito de sempre.
     volumes:
-      - ./music-bot/data:/app/data:ro
+      - ./music-bot/data:/app/data
     depends_on:
       - livekit

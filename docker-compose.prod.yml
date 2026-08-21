@@ -91,7 +91,7 @@ services:
     # jogar em IP de VPS/datacenter (ver DEPLOY.md pra como gerar esse arquivo). Sem ele, o bot
     # continua funcionando do jeito de sempre - so' fica mais sujeito a esse bloqueio.
     volumes:
-      - ./music-bot/data:/app/data:ro
+      - ./music-bot/data:/app/data
     dns:
       - 8.8.8.8
       - 1.1.1.1
