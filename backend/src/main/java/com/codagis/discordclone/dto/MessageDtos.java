@@ -19,10 +19,16 @@ public class MessageDtos {
      * so' o preview some). */
     public record ReplyPreview(Long id, String authorUsername, String authorAvatarUrl, String content, String imageUrl) {}
 
-    /** Uma mensagem, retornada no historico (REST) e dentro dos eventos do WebSocket. */
+    /** Uma mensagem, retornada no historico (REST) e dentro dos eventos do WebSocket.
+     *  rollNotation/rollSides/rollResultsCsv/rollTotal so' vem preenchidos numa rolagem de
+     *  dado (ver DiceService/DiceController) - null nos 4 = mensagem normal. */
     public record ChatMessage(Long id, Long channelId, Long authorId, String authorUsername, String authorAvatarUrl,
                                String content, String imageUrl, Instant createdAt, Instant editedAt,
-                               Long replyToId, ReplyPreview replyTo) {}
+                               Long replyToId, ReplyPreview replyTo,
+                               String rollNotation, Integer rollSides, String rollResultsCsv, Integer rollTotal) {}
+
+    /** Enviado pelo cliente via STOMP em /app/channel.{channelId}.roll - ex: "2d20+5". */
+    public record RollDiceRequest(String notation) {}
 
     /**
      * O que realmente trafega em /topic/channel.{channelId}: um envelope com o tipo do evento,

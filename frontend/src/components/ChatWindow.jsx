@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/client";
-import { subscribeToChannel, sendChatMessage, editChatMessage, deleteChatMessage } from "../ws/chatSocket";
+import { subscribeToChannel, sendChatMessage, editChatMessage, deleteChatMessage, rollDice } from "../ws/chatSocket";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useAlert } from "../context/AlertContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
 import { useServerMembers } from "../utils/useServerMembers";
 import { applyMention, getMentionQuery, mentionsUser } from "../utils/mentions";
@@ -9,7 +10,14 @@ import { parseMarkdownBlocks, renderInline } from "../utils/markdown.jsx";
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import ImageLightbox from "./ImageLightbox.jsx";
+import DiceRollCard from "./DiceRollCard.jsx";
 import { CheckIcon, MegaphoneIcon, PencilIcon, PlusIcon, ReplyIcon, TrashIcon, XIcon } from "./icons.jsx";
+
+// /roll ou /r seguido de uma notacao de dado (ex: "/roll 2d20+5") - mesma notacao aceita pelo
+// backend (ver DiceService), checada aqui tambem so' pra dar um erro na hora em vez de a
+// mensagem sumir silenciosamente se a notacao for invalida (ver handleSend).
+const ROLL_COMMAND_RE = /^\/(?:roll|r)\s+(.+)$/i;
+const ROLL_NOTATION_RE = /^(\d{0,2})d(\d{1,3})\s*([+-]\s*\d{1,3})?$/i;
 
 /** Renderiza o conteudo da mensagem com markdown "estilo Discord" (negrito/italico/sublinhado/
  *  tachado/codigo/citacao/listas/titulos/links, ver utils/markdown.jsx) + @mencoes clicaveis
@@ -71,6 +79,7 @@ function MessageText({ content, memberUsernames, myUsername, members, openProfil
 export default function ChatWindow({ channel, stompClient, stompConnected, stompError }) {
   const { user, isAdmin } = useAuth();
   const { openProfile } = useProfile();
+  const { showAlert } = useAlert();
   const members = useServerMembers(channel?.serverId, stompClient, stompConnected);
   const memberUsernames = useMemo(() => members.map((m) => m.username), [members]);
 
@@ -228,6 +237,21 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     if (!stompConnected || sending) return;
     if (!draft.trim() && !pendingImage) return;
 
+    // Comando /roll (ou /r) - "notação de mesa" (2d20+5, d6, 1d100-2) em vez de mandar uma
+    // mensagem normal. Validado aqui tambem (nao so' no backend, ver DiceService) pra avisar
+    // na hora se a notação estiver errada, em vez de a mensagem simplesmente nao aparecer.
+    const rollMatch = ROLL_COMMAND_RE.exec(draft.trim());
+    if (rollMatch) {
+      const notation = rollMatch[1].trim();
+      if (!ROLL_NOTATION_RE.test(notation)) {
+        showAlert("Notação de dado inválida. Use algo como: /roll 2d20+5, /roll d6 ou /roll 1d100-2");
+        return;
+      }
+      rollDice(stompClient, channel.id, notation);
+      setDraft("");
+      return;
+    }
+
     setUploadError("");
     setSending(true);
     try {
@@ -370,13 +394,22 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                 </div>
               ) : (
                 <>
-                  <MessageText
-                    content={m.content}
-                    memberUsernames={memberUsernames}
-                    myUsername={user?.username}
-                    members={members}
-                    openProfile={openProfile}
-                  />
+                  {m.rollNotation ? (
+                    <DiceRollCard
+                      notation={m.rollNotation}
+                      sides={m.rollSides}
+                      resultsCsv={m.rollResultsCsv}
+                      total={m.rollTotal}
+                    />
+                  ) : (
+                    <MessageText
+                      content={m.content}
+                      memberUsernames={memberUsernames}
+                      myUsername={user?.username}
+                      members={members}
+                      openProfile={openProfile}
+                    />
+                  )}
                   {m.imageUrl && (
                     <button type="button" className="chat-image-btn" onClick={() => setLightboxImage(m.imageUrl)}>
                       <img src={m.imageUrl} alt="Imagem enviada no chat" className="chat-image" />
@@ -393,9 +426,13 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                 </button>
                 {canModify(m) && (
                   <>
-                    <button className="icon-btn" onClick={() => startEdit(m)} title="Editar mensagem">
-                      <PencilIcon size={15} />
-                    </button>
+                    {/* Editar nao faz sentido numa rolagem de dado - o resultado ja' foi
+                        sorteado, so' da pra apagar (ver DiceRollCard/m.rollNotation). */}
+                    {!m.rollNotation && (
+                      <button className="icon-btn" onClick={() => startEdit(m)} title="Editar mensagem">
+                        <PencilIcon size={15} />
+                      </button>
+                    )}
                     <button className="icon-btn icon-btn-danger" onClick={() => setDeleteTarget(m)} title="Apagar mensagem">
                       <TrashIcon size={15} />
                     </button>
@@ -494,7 +531,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                   ? "Adicionar legenda (opcional)..."
                   : sending
                   ? "Enviando..."
-                  : `Conversar em #${channel.name} (@ pra mencionar, **negrito**, *itálico*, Ctrl+V cola imagem, Shift+Enter quebra linha)`
+                  : `Conversar em #${channel.name} (@ pra mencionar, **negrito**, *itálico*, /roll 2d20 pra rolar dado, Ctrl+V cola imagem, Shift+Enter quebra linha)`
               }
               disabled={!stompConnected || sending}
             />

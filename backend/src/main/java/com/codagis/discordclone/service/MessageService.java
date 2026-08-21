@@ -36,18 +36,7 @@ public class MessageService {
         if (!hasText && !hasImage) {
             throw new IllegalArgumentException("Mensagem vazia - escreva algo ou anexe uma imagem");
         }
-        // Canal "so' admin posta" (ver Channel.adminOnly, ex: "Atualizações") - todo mundo
-        // continua podendo LER (nao bloqueado em history/nem na assinatura do topico), so' o
-        // ENVIO e' restrito ao admin GLOBAL. O frontend ja' esconde a caixa de escrever pra
-        // quem nao e' admin (ver ChatWindow.jsx) - isso aqui e' a garantia de verdade, contra
-        // alguem forcando a mensagem na mao pelo WebSocket.
-        Channel channel = channelRepository.findById(channelId).orElse(null);
-        if (channel != null && channel.isAdminOnly()) {
-            boolean isAdmin = userRepository.findById(authorId).map(u -> u.getRole() == Role.ADMIN).orElse(false);
-            if (!isAdmin) {
-                throw new IllegalStateException("Só administradores podem postar nesse canal");
-            }
-        }
+        assertCanPostIn(channelId, authorId);
         // So aceita responder a uma mensagem que existe DE VERDADE nesse mesmo canal - evita
         // referenciar mensagem de outro canal ou um id inventado.
         Long validReplyToId = null;
@@ -63,6 +52,40 @@ public class MessageService {
                 .content(hasText ? content : "")
                 .imageUrl(hasImage ? imageUrl : null)
                 .replyToId(validReplyToId)
+                .build());
+        return toDto(saved);
+    }
+
+    /**
+     * Salva o resultado de uma rolagem de dado (ver DiceService/ChatController) como uma
+     * mensagem normal - o "content" vira um resumo em texto puro (fallback), e os campos
+     * roll* preenchidos e' o que o frontend usa pra trocar pelo cartao com iconzinho do dado
+     * (ver DiceRollCard.jsx) em vez do texto cru.
+     */
+    @Transactional
+    public ChatMessage saveRoll(Long channelId, Long authorId, DiceService.RollResult roll) {
+        assertCanPostIn(channelId, authorId);
+        StringBuilder resultsCsv = new StringBuilder();
+        StringBuilder resultsReadable = new StringBuilder();
+        for (int i = 0; i < roll.results().length; i++) {
+            if (i > 0) {
+                resultsCsv.append(",");
+                resultsReadable.append(", ");
+            }
+            resultsCsv.append(roll.results()[i]);
+            resultsReadable.append(roll.results()[i]);
+        }
+        String modifierText = roll.modifier() > 0 ? " +" + roll.modifier() : roll.modifier() < 0 ? " " + roll.modifier() : "";
+        String fallback = "🎲 rolou " + roll.notation() + " → [" + resultsReadable + "]" + modifierText + " = **" + roll.total() + "**";
+
+        Message saved = messageRepository.save(Message.builder()
+                .channelId(channelId)
+                .authorId(authorId)
+                .content(fallback)
+                .rollNotation(roll.notation())
+                .rollSides(roll.sides())
+                .rollResultsCsv(resultsCsv.toString())
+                .rollTotal(roll.total())
                 .build());
         return toDto(saved);
     }
@@ -107,6 +130,22 @@ public class MessageService {
         }
     }
 
+    /** Canal "so' admin posta" (ver Channel.adminOnly, ex: "Atualizações") - todo mundo continua
+     *  podendo LER (nao bloqueado em history/nem na assinatura do topico), so' o ENVIO (mensagem
+     *  normal ou rolagem de dado) e' restrito ao admin GLOBAL. O frontend ja' esconde a caixa de
+     *  escrever pra quem nao e' admin (ver ChatWindow.jsx) - isso aqui e' a garantia de verdade,
+     *  contra alguem forcando a mensagem na mao pelo WebSocket. */
+    private void assertCanPostIn(Long channelId, Long authorId) {
+        Channel channel = channelRepository.findById(channelId).orElse(null);
+        if (channel == null || !channel.isAdminOnly()) {
+            return;
+        }
+        boolean isAdmin = userRepository.findById(authorId).map(u -> u.getRole() == Role.ADMIN).orElse(false);
+        if (!isAdmin) {
+            throw new IllegalStateException("Só administradores podem postar nesse canal");
+        }
+    }
+
     public List<ChatMessage> history(Long channelId) {
         return messageRepository.findTop50ByChannelIdOrderByIdDesc(channelId).stream()
                 .sorted(Comparator.comparing(Message::getId))
@@ -120,7 +159,8 @@ public class MessageService {
         String avatarUrl = author != null ? author.getAvatarUrl() : null;
         ReplyPreview replyTo = m.getReplyToId() != null ? buildReplyPreview(m.getReplyToId()) : null;
         return new ChatMessage(m.getId(), m.getChannelId(), m.getAuthorId(), username, avatarUrl, m.getContent(),
-                m.getImageUrl(), m.getCreatedAt(), m.getEditedAt(), m.getReplyToId(), replyTo);
+                m.getImageUrl(), m.getCreatedAt(), m.getEditedAt(), m.getReplyToId(), replyTo,
+                m.getRollNotation(), m.getRollSides(), m.getRollResultsCsv(), m.getRollTotal());
     }
 
     /** null quando a mensagem original ja foi apagada - o cliente mostra "mensagem removida". */

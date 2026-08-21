@@ -931,6 +931,28 @@ h3.chat-heading {
   text-transform: uppercase;
   color: var(--text-muted);
 }
+/* Resultado do comando /roll (ver DiceRollCard.jsx/DiceService no backend) - um cartao com um
+   iconzinho poligono por dado rolado (o numero de lados vira a "forma" do icone, calculada na
+   hora, sem precisar de arte pronta por dado) + o total em destaque. */
+.dice-roll-card {
+  margin-top: 4px;
+  padding: 12px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 100%;
+}
+.dice-roll-dice { display: flex; flex-wrap: wrap; gap: 8px; }
+.die-icon { flex-shrink: 0; }
+.die-icon-shape { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; }
+.die-icon-value { fill: var(--text-primary); font-size: 13px; font-weight: 700; font-family: var(--font-display); }
+.dice-roll-summary { display: flex; align-items: baseline; gap: 10px; }
+.dice-roll-notation { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+.dice-roll-total { font-size: 22px; font-weight: 800; font-family: var(--font-display); color: var(--accent-text); }
+
 /* Botao "invisivel" so' pra dar clique na imagem (ver ImageLightbox.jsx) - reseta todo o
    visual padrao de <button> (fundo, borda, padding), sobra so' a imagem em si. */
 .chat-image-btn { background: none; border: none; padding: 0; display: block; }

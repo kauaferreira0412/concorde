@@ -41,4 +41,17 @@ public class Message {
      * Sem FK de proposito (mesmo padrao do resto do app, ver Membership/Server) - se a
      * mensagem original for apagada depois, so' deixa de aparecer o preview dela na resposta. */
     private Long replyToId;
+
+    // Rolagem de dado (ver DiceService/DiceController) - null nos 3 campos = mensagem normal.
+    // "content" continua preenchido com um resumo em texto puro (fallback pra quem por algum
+    // motivo nao renderizar o cartao especial, ex: historico bruto) - o frontend troca pelo
+    // cartao com os iconzinhos de dado quando rollNotation != null (ver ChatWindow.jsx).
+    /** Ex: "2d20+5" */
+    private String rollNotation;
+    /** Numero de lados do dado rolado (4/6/8/10/12/20/100) - todos os dados de UMA rolagem sao do mesmo tipo. */
+    private Integer rollSides;
+    /** Resultado de cada dado, separado por virgula (ex: "14,7") - sem tabela nova pra isso. */
+    private String rollResultsCsv;
+    /** Soma de todos os dados + modificador. */
+    private Integer rollTotal;
 }

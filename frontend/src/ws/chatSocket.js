@@ -46,6 +46,14 @@ export function deleteChatMessage(client, channelId, messageId) {
   });
 }
 
+/** Comando /roll (ver DiceService no backend pra notacao aceita, ex: "2d20+5"). */
+export function rollDice(client, channelId, notation) {
+  client.publish({
+    destination: `/app/channel.${channelId}.roll`,
+    body: JSON.stringify({ notation }),
+  });
+}
+
 /**
  * Presenca de canal de voz: "quem esta conectado agora" e' visivel para QUALQUER membro
  * do servidor (nao precisa ter entrado na call). Ja o indicador de "quem esta falando"
