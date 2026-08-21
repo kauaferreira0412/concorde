@@ -74,6 +74,7 @@ public class MusicController {
         Channel channel = requireVoiceChannel(channelId);
         assertCanControlMusic(channel);
         Map<String, Object> empty = new HashMap<>();
+        empty.put("active", false);
         empty.put("nowPlaying", null);
         empty.put("queue", List.of());
         try {
@@ -82,6 +83,24 @@ public class MusicController {
         } catch (RestClientException e) {
             return empty;
         }
+    }
+
+    /** So' pode existir UMA fila aberta por canal (pedido explicito do usuario) - recusa se ja'
+     *  tiver uma (ver /open no bot); pra abrir outra, precisa apagar a atual primeiro. */
+    @PostMapping("/{channelId}/music/queue/open")
+    public void openQueue(@PathVariable Long channelId) {
+        Channel channel = requireVoiceChannel(channelId);
+        assertCanControlMusic(channel);
+        callBot("/queue/" + channelId + "/open", Map.of());
+    }
+
+    /** Apaga a fila inteira (descarta tudo que ainda nao tocou) e libera pra abrir uma nova -
+     *  a musica que estiver tocando agora continua, so' as PROXIMAS somem. */
+    @PostMapping("/{channelId}/music/queue/delete")
+    public void deleteQueue(@PathVariable Long channelId) {
+        Channel channel = requireVoiceChannel(channelId);
+        assertCanControlMusic(channel);
+        callBot("/queue/" + channelId + "/delete", Map.of());
     }
 
     /** A fila e' PUBLICA - qualquer membro conectado nessa call pode tirar qualquer musica

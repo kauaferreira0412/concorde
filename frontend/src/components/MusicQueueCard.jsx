@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api/client";
 import { subscribeToMusicQueue } from "../ws/chatSocket";
-import { TrashIcon } from "./icons.jsx";
+import { TrashIcon, PlusIcon, XIcon } from "./icons.jsx";
 
 /** "125" -> "2:05", "3725" -> "1:02:05". null (duracao desconhecida, ex: live) -> "?". */
 function formatDuration(sec) {
@@ -22,11 +22,16 @@ function formatDuration(sec) {
  * canal de texto onde essa mensagem apareceu (podem ser diferentes).
  *
  * A fila e' PUBLICA (pedido explicito do usuario) - qualquer membro conectado nessa call pode
- * tirar qualquer musica dela, sem exigir nenhuma permissao de moderacao.
+ * adicionar, tirar ou apagar a fila inteira, sem exigir nenhuma permissao de moderacao. So'
+ * pode ter UMA fila aberta por canal - "active:false" (ver bot) significa que essa foi apagada
+ * (ou nunca foi aberta) e precisa de um /fila novo pra abrir outra.
  */
 export default function MusicQueueCard({ channelId, stompClient, stompConnected }) {
-  const [state, setState] = useState(null); // { nowPlaying, queue } | null (ainda carregando)
+  const [state, setState] = useState(null); // { active, nowPlaying, queue } | null (carregando)
   const [removingIndex, setRemovingIndex] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [addQuery, setAddQuery] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -37,7 +42,7 @@ export default function MusicQueueCard({ channelId, stompClient, stompConnected 
         if (!cancelled) setState(data);
       })
       .catch(() => {
-        if (!cancelled) setState({ nowPlaying: null, queue: [] });
+        if (!cancelled) setState({ active: false, nowPlaying: null, queue: [] });
       });
     return () => {
       cancelled = true;
@@ -64,15 +69,57 @@ export default function MusicQueueCard({ channelId, stompClient, stompConnected 
     }
   }
 
+  async function deleteQueue() {
+    setError("");
+    setDeleting(true);
+    try {
+      await api.post(`/api/channels/${channelId}/music/queue/delete`);
+    } catch (err) {
+      setError(err.response?.data?.error || "Não foi possível apagar a fila");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function handleAdd(e) {
+    e.preventDefault();
+    const query = addQuery.trim();
+    if (!query) return;
+    setError("");
+    setAdding(true);
+    try {
+      await api.post(`/api/channels/${channelId}/music/play`, { query });
+      setAddQuery("");
+    } catch (err) {
+      setError(err.response?.data?.error || "Não foi possível adicionar essa música");
+    } finally {
+      setAdding(false);
+    }
+  }
+
   if (!state) {
     return <div className="music-queue-card music-queue-loading">🎵 Carregando fila…</div>;
   }
 
-  const { nowPlaying, queue } = state;
+  const { active, nowPlaying, queue } = state;
+
+  if (!active) {
+    return (
+      <div className="music-queue-card music-queue-closed">
+        <p className="music-queue-title">🎵 Fila de música</p>
+        <p className="music-queue-empty">Essa fila foi apagada. Use /fila pra abrir uma nova.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="music-queue-card">
-      <p className="music-queue-title">🎵 Fila de música</p>
+      <div className="music-queue-header">
+        <p className="music-queue-title">🎵 Fila de música</p>
+        <button type="button" className="music-queue-delete-btn" title="Apagar fila" disabled={deleting} onClick={deleteQueue}>
+          <XIcon size={13} /> Apagar fila
+        </button>
+      </div>
 
       {nowPlaying ? (
         <div className="music-queue-now-playing">
@@ -104,6 +151,19 @@ export default function MusicQueueCard({ channelId, stompClient, stompConnected 
           ))}
         </ol>
       )}
+
+      <form className="music-queue-add-form" onSubmit={handleAdd}>
+        <input
+          type="text"
+          placeholder="Link ou nome da música..."
+          value={addQuery}
+          onChange={(e) => setAddQuery(e.target.value)}
+          disabled={adding}
+        />
+        <button type="submit" className="music-queue-add-btn" disabled={adding || !addQuery.trim()} title="Adicionar à fila">
+          <PlusIcon size={14} />
+        </button>
+      </form>
 
       {error && <p className="music-queue-error">{error}</p>}
     </div>

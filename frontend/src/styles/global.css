@@ -970,7 +970,50 @@ h3.chat-heading {
 }
 .music-queue-loading { color: var(--text-muted); font-size: 13px; }
 .music-queue-title { font-size: 12.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.music-queue-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.music-queue-delete-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 3px 8px;
+  background: none;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.music-queue-delete-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--danger, #ed4245); border-color: var(--danger, #ed4245); }
+.music-queue-delete-btn:disabled { opacity: 0.5; cursor: default; }
+.music-queue-closed { gap: 4px; }
 .music-queue-empty { font-size: 13px; color: var(--text-muted); margin: 0; }
+.music-queue-add-form { display: flex; gap: 6px; margin-top: 2px; }
+.music-queue-add-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 9px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+.music-queue-add-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  cursor: pointer;
+}
+.music-queue-add-btn:disabled { opacity: 0.5; cursor: default; }
 .music-queue-now-playing {
   display: flex;
   align-items: baseline;

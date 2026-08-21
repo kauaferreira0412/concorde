@@ -374,7 +374,12 @@ export default function ChannelSidebar({
                     {(presenceByChannel[c.id] || []).length > 0 && (
                       <div className="channel-voice-participants">
                         {presenceByChannel[c.id].map((p) => {
-                          const identity = `user-${p.userId}`;
+                          // Bot de musica (userId sintetico NEGATIVO, ver VoicePresenceService.
+                          // joinBot) publica no LiveKit com a identidade "musicbot-{channelId}",
+                          // NAO "user-{id}" como todo mundo - sem esse caso especial, o slider de
+                          // volume nunca encontrava o participante de verdade (canAdjustVolume
+                          // sempre false) e o Melodion nao podia ser ajustado como os outros.
+                          const identity = p.userId < 0 ? `musicbot-${c.id}` : `user-${p.userId}`;
                           const isMe = p.userId === user?.id;
                           // Volume so' da pra ajustar de dentro da MESMA call (e' o LiveKit
                           // que controla isso) e nunca pra voce mesmo. Moderacao funciona sem

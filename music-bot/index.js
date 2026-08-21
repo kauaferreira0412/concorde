@@ -87,6 +87,11 @@ async function connectSession(channelId) {
     forceMuted: false, paused: false, resumePause: null,
     nowPlaying: null, // { title, durationSec } da musica TOCANDO agora, ou null
     queue: [], // [{ title, durationSec, resolvedQuery }, ...] - proximas na fila (ver /fila)
+    // So' pode ter UMA fila "aberta" (o card do /fila) por vez nesse canal - pra abrir outra,
+    // precisa apagar essa primeiro (ver POST /queue/:channelId/open e /delete). Nao trava o
+    // /play (que continua enfileirando normalmente mesmo sem nenhuma fila aberta) - e' so' o
+    // controle de "quantos cards distintos existem", pra nao duplicar o card no chat.
+    queueOpen: false,
   };
   sessions.set(channelId, session);
   console.log(`[${channelId}] bot entrou em channel-${channelId}`);
@@ -185,6 +190,7 @@ async function disconnectSession(channelId) {
   stopPlayback(session);
   session.nowPlaying = null;
   session.queue = [];
+  session.queueOpen = false;
   try {
     await session.track.close();
     await session.room.disconnect();
@@ -351,6 +357,7 @@ function advanceNext(session) {
 async function broadcastQueue(session) {
   const channelId = session.channelId;
   const payload = {
+    active: session.queueOpen,
     nowPlaying: session.nowPlaying
       ? { title: session.nowPlaying.title, durationSec: session.nowPlaying.durationSec }
       : null,
@@ -438,13 +445,45 @@ app.post("/play", async (req, res) => {
  *  MusicQueueCard.jsx); as atualizações AO VIVO depois disso vêm via WebSocket (broadcastQueue). */
 app.get("/queue/:channelId", (req, res) => {
   const session = sessions.get(req.params.channelId);
-  if (!session) return res.json({ nowPlaying: null, queue: [] });
+  if (!session) return res.json({ active: false, nowPlaying: null, queue: [] });
   res.json({
+    active: session.queueOpen,
     nowPlaying: session.nowPlaying
       ? { title: session.nowPlaying.title, durationSec: session.nowPlaying.durationSec }
       : null,
     queue: session.queue.map((item) => ({ title: item.title, durationSec: item.durationSec })),
   });
+});
+
+/** Abre a fila desse canal (ver /fila em ChatWindow.jsx) - so' UMA por vez: se ja tiver uma
+ *  aberta, recusa (o usuario precisa apagar a atual primeiro, ver /delete abaixo). Entra na
+ *  call se ainda nao tiver entrado (getSession), mesmo sem nenhuma musica tocando ainda -
+ *  a fila pode ser criada "vazia" e ir recebendo musicas depois. */
+app.post("/queue/:channelId/open", async (req, res) => {
+  try {
+    const session = await getSession(req.params.channelId);
+    if (session.queueOpen) {
+      return res.status(400).json({ error: "Já existe uma fila ativa nesse canal - apague-a antes de criar outra" });
+    }
+    session.queueOpen = true;
+    broadcastQueue(session);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(`Falha ao abrir fila no canal ${req.params.channelId}:`, err);
+    res.status(500).json({ error: err.message || "Falha ao abrir a fila" });
+  }
+});
+
+/** Apaga a fila desse canal por completo - descarta TODAS as musicas que ainda nao tocaram
+ *  (a que esta tocando agora continua, so' as proximas somem) e libera pra criar uma fila NOVA
+ *  (ver /open acima). NAO desconecta o bot da call. */
+app.post("/queue/:channelId/delete", (req, res) => {
+  const session = sessions.get(req.params.channelId);
+  if (!session) return res.status(400).json({ error: "Não tem nenhuma fila nesse canal" });
+  session.queue = [];
+  session.queueOpen = false;
+  broadcastQueue(session);
+  res.json({ ok: true });
 });
 
 /** Remove UMA musica da fila pelo indice (0 = proxima a tocar) - NAO mexe na que esta tocando

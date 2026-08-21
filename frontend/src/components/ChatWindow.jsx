@@ -391,15 +391,25 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     }
 
     // /fila - manda um card AO VIVO da fila de musica pro chat (ver MUSIC_QUEUE_MARKER_RE/
-    // MusicQueueCard.jsx). Nao precisa chamar o bot aqui - o proprio card busca o estado dele
-    // sozinho assim que aparece na tela.
+    // MusicQueueCard.jsx). So' pode ter UMA fila aberta por canal (pedido explicito do usuario)
+    // - por isso "abre" no backend ANTES de postar o card; se ja' tiver uma aberta, o backend
+    // recusa e a gente avisa em vez de duplicar o card (precisa apagar a fila atual primeiro,
+    // ver o botão "Apagar fila" dentro do MusicQueueCard.jsx).
     if (FILA_COMMAND_RE.test(draft.trim())) {
       if (!activeChannel) {
         showAlert("Você precisa estar conectado numa call de voz para ver a fila de música");
         return;
       }
       setDraft("");
-      sendChatMessage(stompClient, channel.id, `[[MUSIC_QUEUE:${activeChannel.id}]]`, null, null);
+      setSending(true);
+      try {
+        await api.post(`/api/channels/${activeChannel.id}/music/queue/open`);
+        sendChatMessage(stompClient, channel.id, `[[MUSIC_QUEUE:${activeChannel.id}]]`, null, null);
+      } catch (err) {
+        showAlert(err.response?.data?.error || "Não foi possível abrir a fila de música");
+      } finally {
+        setSending(false);
+      }
       return;
     }
 
