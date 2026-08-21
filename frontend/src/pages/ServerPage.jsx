@@ -37,9 +37,10 @@ export default function ServerPage() {
   const selectedServerId = serverId ? Number(serverId) : null;
   const selectedServer = servers.find((s) => s.id === selectedServerId);
   // Esse projeto inteiro e' um presente de aniversario pro grupo "Potato Mafia" (pedido
-  // explicito do usuario) - confete + cantinho comemorativo so' aparecem no servidor com
-  // esse nome, pra nao "vazar" pra outros servidores que existam/venham a existir.
-  const isPotatoMafiaServer = selectedServer?.name?.trim().toLowerCase() === "potato mafia";
+  // explicito do usuario) - confete + cantinho comemorativo so' aparecem em servidores com
+  // "potato" no nome (cobre "Potato", "Potato Mafia", etc - o nome de verdade do servidor
+  // deles pode variar um pouco), pra nao "vazar" pra outros servidores sem nada a ver.
+  const isPotatoMafiaServer = (selectedServer?.name || "").toLowerCase().includes("potato");
 
   // Conecta o WebSocket de chat uma vez, assim que autenticado
   useEffect(() => {
