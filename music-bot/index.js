@@ -179,24 +179,7 @@ async function play(channelId, queryRaw) {
 
   session.ytdlp = ytdlp;
   session.ffmpeg = ffmpeg;
-
-  // PCM s16le = 2 bytes por amostra - um pedaco do stream pode cortar no meio de uma amostra,
-  // entao guarda o resto (0 ou 1 byte) pra grudar na frente do proximo pedaco.
-  let leftover = Buffer.alloc(0);
-  ffmpeg.stdout.on("data", (chunk) => {
-    const data = leftover.length ? Buffer.concat([leftover, chunk]) : chunk;
-    const usableLength = data.length - (data.length % 2);
-    leftover = Buffer.from(data.subarray(usableLength));
-    if (usableLength === 0) return;
-    const int16 = new Int16Array(data.buffer, data.byteOffset, usableLength / 2);
-    const frame = new AudioFrame(int16, SAMPLE_RATE, CHANNELS, int16.length);
-    session.source.captureFrame(frame).catch(() => {
-      // Sessao pode ja ter sido fechada (alguem mandou /stop no meio) - ignora, o proprio
-      // processo do ffmpeg vai ser morto (stopPlayback) em seguida.
-    });
-  });
-
-  ffmpeg.on("close", () => {
+  pumpAudio(channelId, session, ffmpeg).finally(() => {
     if (session.ffmpeg !== ffmpeg) return; // uma musica nova ja comecou - isso e' resto da antiga
     session.ffmpeg = null;
     session.ytdlp = null;
@@ -204,6 +187,42 @@ async function play(channelId, queryRaw) {
   });
 
   return title;
+}
+
+/**
+ * Le o PCM que o ffmpeg vai cuspindo e publica na call, um frame de cada vez - PACEADO em
+ * tempo real (ver AHEAD_MS abaixo). Sem isso, o ffmpeg entrega o audio MUITO mais rapido do
+ * que a duracao real da musica (nao tem nenhum "player" do lado dele te esperando), entao a
+ * musica inteira seria empurrada pro AudioSource do LiveKit em poucos segundos - o buffer
+ * interno dele so' segura ~1s por padrao, entao quase tudo seria descartado e a call ficaria
+ * quase muda (foi exatamente o bug: o bot entrava, mas nao saia som nenhum).
+ */
+async function pumpAudio(channelId, session, ffmpeg) {
+  const AHEAD_MS = 300; // quanto de audio deixa "adiantado" na fila antes de pausar a leitura
+  let leftover = Buffer.alloc(0);
+  try {
+    for await (const chunk of ffmpeg.stdout) {
+      if (session.ffmpeg !== ffmpeg) return; // trocou de musica no meio - para de bombear a antiga
+      const data = leftover.length ? Buffer.concat([leftover, chunk]) : chunk;
+      const usableLength = data.length - (data.length % 2);
+      leftover = Buffer.from(data.subarray(usableLength));
+      if (usableLength === 0) continue;
+      const int16 = new Int16Array(data.buffer, data.byteOffset, usableLength / 2);
+      const frame = new AudioFrame(int16, SAMPLE_RATE, CHANNELS, int16.length);
+      try {
+        await session.source.captureFrame(frame);
+      } catch {
+        // Sessao pode ja ter sido fechada (alguem mandou /stop no meio) - so' para de bombear.
+        return;
+      }
+      const queued = session.source.queuedDuration;
+      if (queued > AHEAD_MS) {
+        await new Promise((resolve) => setTimeout(resolve, queued - AHEAD_MS));
+      }
+    }
+  } catch (err) {
+    console.error(`[${channelId}] erro lendo áudio do ffmpeg:`, err.message);
+  }
 }
 
 const app = express();
