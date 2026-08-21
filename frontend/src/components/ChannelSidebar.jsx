@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
+import { useAlert } from "../context/AlertContext.jsx";
 import api from "../api/client";
 import { subscribeToVoicePresence } from "../ws/chatSocket";
 import { useUnreadMessages } from "../utils/useUnreadMessages";
@@ -24,6 +25,7 @@ import {
   ScreenShareIcon,
   SettingsIcon,
   ShieldIcon,
+  TrashIcon,
   VolumeIcon,
 } from "./icons.jsx";
 import Avatar from "./Avatar.jsx";
@@ -39,6 +41,7 @@ export default function ChannelSidebar({
   selectedChannelId,
   onSelectChannel,
   onCreateChannel,
+  onDeleteChannel,
   onOpenSettings,
   onEditServer,
   onOpenRoles,
@@ -49,6 +52,7 @@ export default function ChannelSidebar({
 }) {
   const { isAdmin } = useAuth();
   const { openProfile } = useProfile();
+  const { showAlert } = useAlert();
   const {
     activeChannel,
     micEnabled,
@@ -96,7 +100,17 @@ export default function ChannelSidebar({
   // na call, so' depende de permissao - ver ServerPermission no backend).
   const [participantMenu, setParticipantMenu] = useState(null); // { channelId, userId, identity, username, x, y }
   const participantMenuRef = useRef(null);
+  // Menu de botao direito num CANAL (texto ou voz) - so' tem uma opcao (excluir), oferecida
+  // pra quem tem MANAGE_CHANNELS (ver canManageChannels acima). Segue o mesmo padrao do
+  // participantMenu (fecha ao clicar fora/Esc), so' que mais simples.
+  const [channelMenu, setChannelMenu] = useState(null); // { id, name, x, y }
+  const channelMenuRef = useRef(null);
+  const [deletingChannel, setDeletingChannel] = useState(null); // canal com o ConfirmModal aberto
   const [myServerPermissions, setMyServerPermissions] = useState(new Set());
+  // Criar/apagar canal (ver "+ canal de texto/voz" mais abaixo e o menu de botao direito em
+  // cada canal) - mesma permissao MANAGE_CHANNELS pros dois, pode ser concedida pra qualquer
+  // membro via Perfis (ver ServerRolesModal.jsx), nao e' so' o admin/dono.
+  const canManageChannels = isAdmin || myServerPermissions.has("MANAGE_CHANNELS");
   const canMove = myServerPermissions.has("MOVE_MEMBERS");
   const hasAnyModPermission =
     canMove ||
@@ -142,6 +156,33 @@ export default function ChannelSidebar({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [participantMenu]);
+
+  useEffect(() => {
+    if (!channelMenu) return;
+    function handlePointerDown(e) {
+      if (channelMenuRef.current && !channelMenuRef.current.contains(e.target)) setChannelMenu(null);
+    }
+    function handleKeyDown(e) {
+      if (e.key === "Escape") setChannelMenu(null);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [channelMenu]);
+
+  // ConfirmModal fecha sozinho assim que onConfirm() e' chamado (nao espera ele terminar, ver
+  // ConfirmModal.jsx) - por isso o erro, se der, aparece num alerta em vez de dentro do modal
+  // (que ja' nao esta mais na tela quando o "await" resolve).
+  async function handleConfirmDeleteChannel(channel) {
+    try {
+      await onDeleteChannel(channel.id);
+    } catch (err) {
+      showAlert(err.response?.data?.error || "Não foi possível excluir esse canal");
+    }
+  }
 
   // Painel inteiro (canais, call, icones) pode recolher pra dar mais espaco pro chat -
   // fica lembrado entre sessoes.
@@ -306,6 +347,11 @@ export default function ChannelSidebar({
                     key={c.id}
                     className={"channel-item" + (c.id === selectedChannelId ? " active" : "")}
                     onClick={() => onSelectChannel(c)}
+                    onContextMenu={(e) => {
+                      if (!canManageChannels) return;
+                      e.preventDefault();
+                      setChannelMenu({ id: c.id, name: c.name, x: e.clientX, y: e.clientY });
+                    }}
                   >
                     {c.adminOnly ? (
                       <MegaphoneIcon size={16} className="channel-item-icon" />
@@ -327,7 +373,7 @@ export default function ChannelSidebar({
                     )}
                   </button>
                 ))}
-                {(isAdmin || myServerPermissions.has("MANAGE_CHANNELS")) && (
+                {canManageChannels && (
                   <button className="channel-item add" onClick={() => onCreateChannel("TEXT")}>
                     + canal de texto
                   </button>
@@ -351,6 +397,11 @@ export default function ChannelSidebar({
                         (dragOverChannelId === c.id ? " drop-target" : "")
                       }
                       onClick={() => onSelectChannel(c)}
+                      onContextMenu={(e) => {
+                        if (!canManageChannels) return;
+                        e.preventDefault();
+                        setChannelMenu({ id: c.id, name: c.name, x: e.clientX, y: e.clientY });
+                      }}
                       // Arrastar alguem da lista de "quem esta na call" (abaixo) e soltar aqui
                       // move essa pessoa pra este canal - so' aceita o drop se voce tiver
                       // permissao de mover gente (ver canMove/handleDropMove).
@@ -450,7 +501,7 @@ export default function ChannelSidebar({
                     )}
                   </div>
                 ))}
-                {(isAdmin || myServerPermissions.has("MANAGE_CHANNELS")) && (
+                {canManageChannels && (
                   <button className="channel-item add" onClick={() => onCreateChannel("VOICE")}>
                     + canal de voz
                   </button>
@@ -544,6 +595,42 @@ export default function ChannelSidebar({
         </div>
       </div>
       </div>
+
+      {channelMenu && (
+        <div
+          className="volume-popover"
+          ref={channelMenuRef}
+          style={{
+            left: Math.min(channelMenu.x, window.innerWidth - 200),
+            top: Math.min(channelMenu.y, window.innerHeight - 70),
+          }}
+        >
+          <p className="volume-popover-title">#{channelMenu.name}</p>
+          <div className="participant-mod-actions">
+            <button
+              type="button"
+              className="participant-mod-btn danger"
+              onClick={() => {
+                setDeletingChannel(channelMenu);
+                setChannelMenu(null);
+              }}
+            >
+              <TrashIcon size={14} /> Excluir canal
+            </button>
+          </div>
+        </div>
+      )}
+
+      {deletingChannel && (
+        <ConfirmModal
+          title="Excluir canal"
+          message={`Tem certeza que quer excluir "#${deletingChannel.name}"? Todas as mensagens desse canal serão apagadas junto - não dá pra desfazer.`}
+          confirmLabel="Excluir"
+          danger
+          onClose={() => setDeletingChannel(null)}
+          onConfirm={() => handleConfirmDeleteChannel(deletingChannel)}
+        />
+      )}
 
       {participantMenu &&
         (() => {

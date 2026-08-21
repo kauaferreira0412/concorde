@@ -166,7 +166,7 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
         <p className="music-queue-empty">Nada tocando no momento.</p>
       )}
 
-      {queue.length > 0 && (
+      {queue.length > 0 ? (
         <ol className="music-queue-list">
           {queue.map((item, i) => (
             <li key={i} className="music-queue-item">
@@ -185,6 +185,11 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
             </li>
           ))}
         </ol>
+      ) : (
+        // Separado do "nada tocando" acima de proposito - sao coisas diferentes: pode MUITO
+        // bem ter uma musica tocando agora e a fila (o que vem DEPOIS) estar vazia, que e' o
+        // caso normal quando a ultima da fila acabou de comecar a tocar.
+        <p className="music-queue-empty">Não há mais músicas na fila.</p>
       )}
 
       <form className="music-queue-add-form" onSubmit={handleAdd}>

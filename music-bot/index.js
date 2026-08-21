@@ -349,7 +349,13 @@ async function startPlayback(session, item) {
 function advanceNext(session) {
   const next = session.queue.shift();
   if (next) {
-    broadcastQueue(session);
+    // NAO broadcasta aqui antes do startPlayback - broadcastQueue e' um fetch() disparado sem
+    // esperar (fire-and-forget), e startPlayback tambem chama broadcastQueue logo em seguida
+    // (com nowPlaying ja preenchido). Duas chamadas soltas assim podem chegar no backend/cliente
+    // FORA de ordem: se essa daqui (com nowPlaying ainda null, ja sem o "next" na fila) chegasse
+    // DEPOIS da de startPlayback, o card ficava travado mostrando "nada tocando" mesmo com a
+    // musica realmente tocando (bug relatado). So' um broadcast por transicao, sempre com o
+    // estado ja completo.
     startPlayback(session, next).catch((err) => {
       console.error(`[${session.channelId}] falha ao tocar a proxima da fila:`, err.message);
       advanceNext(session); // essa deu errado - tenta a de depois em vez de travar a fila inteira

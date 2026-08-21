@@ -13,6 +13,8 @@ import CreateChannelModal from "../components/CreateChannelModal.jsx";
 import EditServerModal from "../components/EditServerModal.jsx";
 import ServerRolesModal from "../components/ServerRolesModal.jsx";
 import SettingsModal from "../components/SettingsModal.jsx";
+import PartyConfetti from "../components/PartyConfetti.jsx";
+import PotatoMafiaBanner from "../components/PotatoMafiaBanner.jsx";
 import { VoiceCallProvider } from "../context/VoiceCallContext.jsx";
 
 export default function ServerPage() {
@@ -34,6 +36,10 @@ export default function ServerPage() {
 
   const selectedServerId = serverId ? Number(serverId) : null;
   const selectedServer = servers.find((s) => s.id === selectedServerId);
+  // Esse projeto inteiro e' um presente de aniversario pro grupo "Potato Mafia" (pedido
+  // explicito do usuario) - confete + cantinho comemorativo so' aparecem no servidor com
+  // esse nome, pra nao "vazar" pra outros servidores que existam/venham a existir.
+  const isPotatoMafiaServer = selectedServer?.name?.trim().toLowerCase() === "potato mafia";
 
   // Conecta o WebSocket de chat uma vez, assim que autenticado
   useEffect(() => {
@@ -114,8 +120,28 @@ export default function ServerPage() {
     setChannels((prev) => [...prev, data]);
   }
 
+  /** Precisa de MANAGE_CHANNELS (ver ChannelSidebar.jsx) - deixa o erro escapar pra quem chamou
+   *  mostrar (ConfirmModal ja' fecha sozinho antes desse await terminar). */
+  async function handleDeleteChannel(channelId) {
+    await api.delete(`/api/servers/${selectedServerId}/channels/${channelId}`);
+    setChannels((prev) => prev.filter((c) => c.id !== channelId));
+    // Se o canal excluido era o que estava aberto, volta pro primeiro canal de texto que sobrou
+    // (senao o chat ficava preso olhando pra um canal que nao existe mais).
+    setSelectedChannel((prev) => {
+      if (prev?.id !== channelId) return prev;
+      const remaining = channels.filter((c) => c.id !== channelId);
+      return remaining.find((c) => c.type === "TEXT") || null;
+    });
+  }
+
   return (
     <VoiceCallProvider stompClient={stompClient} stompConnected={stompConnected}>
+      {isPotatoMafiaServer && (
+        <>
+          <PartyConfetti />
+          <PotatoMafiaBanner />
+        </>
+      )}
       <div className="app-shell">
         <ServerSidebar
           servers={servers}
@@ -129,6 +155,7 @@ export default function ServerPage() {
           selectedChannelId={selectedChannel?.id}
           onSelectChannel={setSelectedChannel}
           onCreateChannel={openCreateChannel}
+          onDeleteChannel={handleDeleteChannel}
           onOpenSettings={() => setShowSettings(true)}
           onEditServer={setEditingServer}
           onOpenRoles={setRolesServer}

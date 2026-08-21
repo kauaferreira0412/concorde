@@ -23,19 +23,22 @@ public class ServerService {
     private final MembershipRepository membershipRepository;
     private final UserRepository userRepository;
     private final ServerRoleRepository serverRoleRepository;
+    private final MessageRepository messageRepository;
     private final AdminGuard adminGuard;
     private final OnlinePresenceService presenceService;
     private final PermissionService permissionService;
 
     public ServerService(ServerRepository serverRepository, ChannelRepository channelRepository,
                           MembershipRepository membershipRepository, UserRepository userRepository,
-                          ServerRoleRepository serverRoleRepository, AdminGuard adminGuard,
-                          OnlinePresenceService presenceService, PermissionService permissionService) {
+                          ServerRoleRepository serverRoleRepository, MessageRepository messageRepository,
+                          AdminGuard adminGuard, OnlinePresenceService presenceService,
+                          PermissionService permissionService) {
         this.serverRepository = serverRepository;
         this.channelRepository = channelRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
         this.serverRoleRepository = serverRoleRepository;
+        this.messageRepository = messageRepository;
         this.adminGuard = adminGuard;
         this.presenceService = presenceService;
         this.permissionService = permissionService;
@@ -179,6 +182,21 @@ public class ServerService {
                 .type(req.type() == null ? ChannelType.TEXT : req.type())
                 .build());
         return toResponse(channel);
+    }
+
+    /** Apaga um canal (texto ou voz) e o historico de mensagens dele - mesma permissao de criar
+     *  (MANAGE_CHANNELS). Nao tem como desfazer, o frontend confirma antes (ver ChannelSidebar.jsx). */
+    @Transactional
+    public void deleteChannel(Long serverId, Long userId, Long channelId) {
+        assertMember(serverId, userId);
+        permissionService.assertHas(serverId, userId, ServerPermission.MANAGE_CHANNELS);
+        Channel channel = channelRepository.findById(channelId)
+                .orElseThrow(() -> new IllegalArgumentException("Canal não encontrado"));
+        if (!channel.getServerId().equals(serverId)) {
+            throw new IllegalArgumentException("Canal não pertence a esse servidor");
+        }
+        messageRepository.deleteByChannelId(channelId);
+        channelRepository.delete(channel);
     }
 
     // ============================================================

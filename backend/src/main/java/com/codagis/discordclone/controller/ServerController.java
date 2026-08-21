@@ -79,6 +79,11 @@ public class ServerController {
         return serverService.createChannel(serverId, currentUser.id(), req);
     }
 
+    @DeleteMapping("/{serverId}/channels/{channelId}")
+    public void deleteChannel(@PathVariable Long serverId, @PathVariable Long channelId) {
+        serverService.deleteChannel(serverId, currentUser.id(), channelId);
+    }
+
     // ============================================================
     // Moderacao de membros (MANAGE_MEMBERS)
     // ============================================================

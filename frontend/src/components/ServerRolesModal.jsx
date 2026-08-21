@@ -31,7 +31,7 @@ function RoleForm({ initial, onCancel, onSave, saving, error }) {
   }
 
   return (
-    <div className="settings-field" style={{ background: "var(--bg-panel-2)", padding: 12, borderRadius: "var(--radius-md)" }}>
+    <div className="settings-field role-form-card">
       <label className="settings-label">Nome do perfil</label>
       <input value={name} onChange={(e) => setName(e.target.value)} maxLength={32} placeholder="Ex: Moderador" autoFocus />
 
@@ -181,115 +181,119 @@ export default function ServerRolesModal({ server, stompClient, stompConnected, 
         <div className="settings-content" style={{ padding: "20px 24px" }}>
           {loadError && <p className="auth-error">{loadError}</p>}
 
-          <p className="settings-section-title">Perfis existentes</p>
-          <p className="admin-hint">
-            Cada perfil é um pacote nomeado de permissões - atribua um ou mais a um membro na seção abaixo.
-          </p>
+          <div className="roles-section-card">
+            <div>
+              <p className="settings-section-title">Perfis existentes</p>
+              <p className="admin-hint" style={{ margin: "4px 0 0" }}>
+                Cada perfil é um pacote nomeado de permissões - atribua um ou mais a um membro na seção abaixo.
+              </p>
+            </div>
 
-          {roles.length === 0 && !creating && (
-            <p className="admin-hint" style={{ margin: "8px 0" }}>
-              Nenhum perfil criado ainda nesse servidor.
-            </p>
-          )}
+            {roles.length === 0 && !creating && (
+              <p className="admin-hint" style={{ margin: 0 }}>
+                Nenhum perfil criado ainda nesse servidor.
+              </p>
+            )}
 
-          <div className="role-list">
-            {roles.map((role) =>
-              editingRoleId === role.id ? (
-                <RoleForm
-                  key={role.id}
-                  initial={role}
-                  saving={saving}
-                  error={formError}
-                  onCancel={() => {
-                    setEditingRoleId(null);
-                    setFormError("");
-                  }}
-                  onSave={(payload) => handleUpdate(role.id, payload)}
-                />
-              ) : (
-                <div key={role.id} className="role-row">
-                  <span className="role-row-name">{role.name}</span>
-                  <span className="role-row-count">{role.permissions.length} permissões</span>
-                  <button type="button" className="icon-btn" onClick={() => setEditingRoleId(role.id)} title="Editar perfil">
-                    <PencilIcon size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-btn icon-btn-danger"
-                    onClick={() => setDeleteTarget(role)}
-                    title="Apagar perfil"
-                  >
-                    <TrashIcon size={14} />
-                  </button>
-                </div>
-              )
+            <div className="role-list">
+              {roles.map((role) =>
+                editingRoleId === role.id ? (
+                  <RoleForm
+                    key={role.id}
+                    initial={role}
+                    saving={saving}
+                    error={formError}
+                    onCancel={() => {
+                      setEditingRoleId(null);
+                      setFormError("");
+                    }}
+                    onSave={(payload) => handleUpdate(role.id, payload)}
+                  />
+                ) : (
+                  <div key={role.id} className="role-row">
+                    <span className="role-row-name">{role.name}</span>
+                    <span className="role-row-count">{role.permissions.length} permissões</span>
+                    <button type="button" className="icon-btn" onClick={() => setEditingRoleId(role.id)} title="Editar perfil">
+                      <PencilIcon size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn icon-btn-danger"
+                      onClick={() => setDeleteTarget(role)}
+                      title="Apagar perfil"
+                    >
+                      <TrashIcon size={14} />
+                    </button>
+                  </div>
+                )
+              )}
+            </div>
+
+            {creating ? (
+              <RoleForm
+                saving={saving}
+                error={formError}
+                onCancel={() => {
+                  setCreating(false);
+                  setFormError("");
+                }}
+                onSave={handleCreate}
+              />
+            ) : (
+              <button type="button" className="link-btn" onClick={() => setCreating(true)} style={{ marginTop: 2 }}>
+                + Criar novo perfil
+              </button>
             )}
           </div>
 
-          {creating ? (
-            <RoleForm
-              saving={saving}
-              error={formError}
-              onCancel={() => {
-                setCreating(false);
-                setFormError("");
-              }}
-              onSave={handleCreate}
-            />
-          ) : (
-            <button type="button" className="link-btn" onClick={() => setCreating(true)} style={{ marginTop: 6 }}>
-              + Criar novo perfil
-            </button>
-          )}
+          <div className="roles-section-card">
+            <p className="settings-section-title">Atribuir perfis a um membro</p>
+            <div className="settings-field">
+              <label className="settings-label">Membro</label>
+              <select value={selectedMemberId} onChange={(e) => setSelectedMemberId(e.target.value)}>
+                <option value="">Escolha um membro...</option>
+                {members.map((m) => (
+                  <option key={m.userId} value={m.userId}>
+                    {m.nickname || m.username}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div className="settings-divider" />
-
-          <p className="settings-section-title">Atribuir perfis a um membro</p>
-          <div className="settings-field">
-            <label className="settings-label">Membro</label>
-            <select value={selectedMemberId} onChange={(e) => setSelectedMemberId(e.target.value)}>
-              <option value="">Escolha um membro...</option>
-              {members.map((m) => (
-                <option key={m.userId} value={m.userId}>
-                  {m.nickname || m.username}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {selectedMemberId && (
-            <>
-              <div className="role-permission-list">
-                {roles.length === 0 ? (
-                  <p className="admin-hint" style={{ margin: 0 }}>
-                    Crie um perfil primeiro pra poder atribuir.
+            {selectedMemberId && (
+              <>
+                <div className="role-permission-list">
+                  {roles.length === 0 ? (
+                    <p className="admin-hint" style={{ margin: 0 }}>
+                      Crie um perfil primeiro pra poder atribuir.
+                    </p>
+                  ) : (
+                    roles.map((role) => (
+                      <label key={role.id} className="settings-checkbox-row">
+                        <input
+                          type="checkbox"
+                          checked={memberRoleIds.has(role.id)}
+                          onChange={() => toggleMemberRole(role.id)}
+                        />
+                        {role.name}
+                      </label>
+                    ))
+                  )}
+                </div>
+                <div className="settings-inline-save" style={{ marginTop: 4 }}>
+                  <button type="button" onClick={handleSaveAssignment} disabled={assignSaving || roles.length === 0}>
+                    {assignSaving ? "Salvando..." : "Salvar perfis desse membro"}
+                  </button>
+                </div>
+                {assignSaved && (
+                  <p className="admin-hint" style={{ margin: 0, color: "var(--success)" }}>
+                    Perfis atualizados.
                   </p>
-                ) : (
-                  roles.map((role) => (
-                    <label key={role.id} className="settings-checkbox-row">
-                      <input
-                        type="checkbox"
-                        checked={memberRoleIds.has(role.id)}
-                        onChange={() => toggleMemberRole(role.id)}
-                      />
-                      {role.name}
-                    </label>
-                  ))
                 )}
-              </div>
-              <div className="settings-inline-save" style={{ marginTop: 10 }}>
-                <button type="button" onClick={handleSaveAssignment} disabled={assignSaving || roles.length === 0}>
-                  {assignSaving ? "Salvando..." : "Salvar perfis desse membro"}
-                </button>
-              </div>
-              {assignSaved && (
-                <p className="admin-hint" style={{ margin: "6px 0 0", color: "var(--success)" }}>
-                  Perfis atualizados.
-                </p>
-              )}
-              {assignError && <p className="auth-error">{assignError}</p>}
-            </>
-          )}
+                {assignError && <p className="auth-error">{assignError}</p>}
+              </>
+            )}
+          </div>
         </div>
       </div>
 

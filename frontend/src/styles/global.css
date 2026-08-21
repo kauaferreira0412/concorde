@@ -2129,24 +2129,73 @@ h3.chat-heading {
   background: var(--bg-panel-2);
 }
 
-/* Perfis do servidor (ServerRolesModal.jsx). */
-.role-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
-.role-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 9px 12px;
-  border-radius: var(--radius-md);
+/* Perfis do servidor (ServerRolesModal.jsx) - cada secao (lista de perfis, formulario de
+   criar/editar, atribuir a um membro) fica dentro de um "cartao" proprio, mais facil de
+   escanear visualmente do que tudo solto na mesma coluna. */
+.roles-section-card {
   background: var(--bg-panel-2);
   border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
+.role-list { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.role-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--accent);
+  transition: border-color 0.15s, background 0.15s;
+}
+.role-row:hover { background: var(--bg-hover); }
 .role-row-name { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
-.role-row-count { font-size: 11.5px; color: var(--text-muted); margin-right: auto; }
-.role-permission-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.role-row-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  padding: 3px 9px;
+  border-radius: 999px;
+  margin-right: auto;
+}
+.role-form-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  padding: 14px;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* Grade de 2 colunas em telas largas o bastante (o modal tem 620px+) - cada permissao vira um
+   "chip" selecionavel em vez de uma lista vertical crua de checkbox + texto. */
+.role-permission-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px;
+  margin-top: 4px;
+}
 .settings-checkbox-row {
   display: flex; align-items: center; gap: 8px;
-  font-size: 13px; font-weight: 500; color: var(--text-secondary);
+  font-size: 12.5px; font-weight: 500; color: var(--text-secondary);
   cursor: pointer;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  background: var(--bg-panel-2);
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
-.settings-checkbox-row input[type="checkbox"] { width: auto; accent-color: var(--accent); cursor: pointer; }
+.settings-checkbox-row:hover { border-color: var(--border-strong); }
+.settings-checkbox-row:has(input:checked) {
+  background: var(--accent-soft);
+  border-color: rgba(47, 107, 255, 0.4);
+  color: var(--accent-text);
+}
+.settings-checkbox-row input[type="checkbox"] { width: auto; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
 
 .shortcut-row { display: flex; align-items: center; gap: 10px; }
 .shortcut-kbd {
@@ -2247,3 +2296,77 @@ h3.chat-heading {
   color: var(--text-primary); padding: 10px 13px; font-size: 14px; font-family: inherit; resize: vertical;
 }
 .profile-modal textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ============================================================
+   Comemoracao "Potato Mafia" (PartyConfetti.jsx/PotatoMafiaBanner.jsx) - presente de
+   aniversario do grupo, so' aparece no servidor com esse nome (ver ServerPage.jsx). So' CSS
+   (@keyframes), nada de JS rodando por frame - o navegador compoe isso na GPU.
+   ============================================================ */
+.party-confetti {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 9999;
+}
+.confetti-piece {
+  position: absolute;
+  top: -20px;
+  width: 8px;
+  height: 14px;
+  opacity: 0.95;
+  animation-name: confetti-fall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  will-change: transform;
+}
+@keyframes confetti-fall {
+  0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(105vh) rotate(600deg); opacity: 0.85; }
+}
+
+.potato-mafia-banner {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 14px;
+  background: linear-gradient(135deg, #2f6bff, #c77dff);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  animation: potato-mafia-float 3s ease-in-out infinite;
+}
+.potato-mafia-emoji {
+  font-size: 26px;
+  line-height: 1;
+  display: inline-block;
+  animation: potato-mafia-wobble 4s ease-in-out infinite;
+}
+.potato-mafia-text { display: flex; flex-direction: column; line-height: 1.25; }
+.potato-mafia-text strong { font-size: 13.5px; font-family: var(--font-display); }
+.potato-mafia-text span { font-size: 11.5px; opacity: 0.92; }
+.potato-mafia-close {
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  opacity: 0.85;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+.potato-mafia-close:hover { opacity: 1; background: rgba(255, 255, 255, 0.28); }
+@keyframes potato-mafia-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes potato-mafia-wobble {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
