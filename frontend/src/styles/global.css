@@ -953,6 +953,57 @@ h3.chat-heading {
 .dice-roll-notation { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
 .dice-roll-total { font-size: 22px; font-weight: 800; font-family: var(--font-display); color: var(--accent-text); }
 
+/* Card ao vivo da fila de musica (ver /fila em ChatWindow.jsx / MusicQueueCard.jsx) - mesmo
+   visual "elevado" do dice-roll-card, mas ocupa mais largura pra caber titulo + duracao +
+   botao de remover numa linha por musica. */
+.music-queue-card {
+  margin-top: 4px;
+  padding: 12px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+}
+.music-queue-loading { color: var(--text-muted); font-size: 13px; }
+.music-queue-title { font-size: 12.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.music-queue-empty { font-size: 13px; color: var(--text-muted); margin: 0; }
+.music-queue-now-playing {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-soft);
+  flex-wrap: wrap;
+}
+.music-queue-now-label { font-size: 11px; font-weight: 700; color: var(--accent-text); text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0; }
+.music-queue-now-title { font-size: 13.5px; font-weight: 600; color: var(--text-primary); flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.music-queue-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.music-queue-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.music-queue-position { flex-shrink: 0; width: 18px; text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.music-queue-item-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
+.music-queue-duration { flex-shrink: 0; color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.music-queue-remove-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.music-queue-remove-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--danger, #ed4245); }
+.music-queue-remove-btn:disabled { opacity: 0.5; cursor: default; }
+.music-queue-error { font-size: 12px; color: var(--danger, #ed4245); margin: 0; }
+
 /* Botao "invisivel" so' pra dar clique na imagem (ver ImageLightbox.jsx) - reseta todo o
    visual padrao de <button> (fundo, borda, padding), sobra so' a imagem em si. */
 .chat-image-btn { background: none; border: none; padding: 0; display: block; }

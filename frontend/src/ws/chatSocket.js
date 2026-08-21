@@ -137,3 +137,16 @@ export function publishVoiceForceDeafen(client, channelId, targetUserId, deafene
     body: JSON.stringify({ targetUserId, deafened }),
   });
 }
+
+/**
+ * Fila de musica (ver MusicQueueCard.jsx/MusicBotInternalController.java) - o proprio bot
+ * (music-bot/index.js) manda um snapshot completo { nowPlaying, queue } toda vez que ela muda
+ * (musica trocou, alguem adicionou/removeu), o backend so' retransmite. channelId aqui e' o
+ * canal de VOZ onde o bot esta tocando (pode ser diferente do canal de texto onde o /fila foi
+ * digitado - ver ChatWindow.jsx).
+ */
+export function subscribeToMusicQueue(client, channelId, onUpdate) {
+  return client.subscribe(`/topic/channel.${channelId}.music.queue`, (frame) => {
+    onUpdate(JSON.parse(frame.body));
+  });
+}

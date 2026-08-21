@@ -12,6 +12,8 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -41,9 +43,14 @@ public class MusicController {
     }
 
     public record PlayRequest(String query) {}
-    public record PlayResponse(String title) {}
+    /** queued=true quando so' entrou na FILA (ja' tinha algo tocando nesse canal) - false
+     *  quando comecou a tocar na hora (ver MusicController.play/music-bot/index.js enqueue). */
+    public record PlayResponse(String title, Integer durationSec, boolean queued) {}
+    public record RemoveFromQueueRequest(int index) {}
 
-    /** Link (YouTube/etc, o que o yt-dlp suportar) ou busca livre (o bot resolve pro primeiro resultado). */
+    /** Link (YouTube/etc, o que o yt-dlp suportar) ou busca livre (o bot resolve pro primeiro
+     *  resultado) - entra tocando na hora se a call estiver ociosa, ou no FIM da fila se ja'
+     *  tiver algo tocando (ver /fila no ChatWindow.jsx e MusicQueueCard.jsx). */
     @PostMapping("/{channelId}/music/play")
     public PlayResponse play(@PathVariable Long channelId, @RequestBody PlayRequest req) {
         Channel channel = requireVoiceChannel(channelId);
@@ -53,7 +60,37 @@ public class MusicController {
         }
         Map<String, Object> body = Map.of("channelId", channelId, "query", req.query());
         Map<?, ?> response = callBot("/play", body);
-        return new PlayResponse((String) response.get("title"));
+        Object durationRaw = response.get("durationSec");
+        Integer durationSec = durationRaw == null ? null : ((Number) durationRaw).intValue();
+        boolean queued = Boolean.TRUE.equals(response.get("queued"));
+        return new PlayResponse((String) response.get("title"), durationSec, queued);
+    }
+
+    /** Estado atual da fila (o que esta tocando + o que vem depois) - so' pro card carregar
+     *  quando abre (ver MusicQueueCard.jsx); atualizacoes ao vivo depois disso vem por
+     *  WebSocket (ver MusicBotInternalController.queue). */
+    @GetMapping("/{channelId}/music/queue")
+    public Map<?, ?> queue(@PathVariable Long channelId) {
+        Channel channel = requireVoiceChannel(channelId);
+        assertCanControlMusic(channel);
+        Map<String, Object> empty = new HashMap<>();
+        empty.put("nowPlaying", null);
+        empty.put("queue", List.of());
+        try {
+            Map<?, ?> response = restTemplate.getForObject(musicBotUrl + "/queue/" + channelId, Map.class);
+            return response == null ? empty : response;
+        } catch (RestClientException e) {
+            return empty;
+        }
+    }
+
+    /** A fila e' PUBLICA - qualquer membro conectado nessa call pode tirar qualquer musica
+     *  dela, sem exigir nenhuma permissao especial de moderacao (pedido explicito do usuario). */
+    @PostMapping("/{channelId}/music/queue/remove")
+    public void removeFromQueue(@PathVariable Long channelId, @RequestBody RemoveFromQueueRequest req) {
+        Channel channel = requireVoiceChannel(channelId);
+        assertCanControlMusic(channel);
+        callBot("/queue/" + channelId + "/remove", Map.of("index", req.index()));
     }
 
     @PostMapping("/{channelId}/music/stop")

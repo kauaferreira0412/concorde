@@ -85,6 +85,8 @@ async function connectSession(channelId) {
   const session = {
     channelId, room, source, track, ytdlp: null, ffmpeg: null, idleTimer: null,
     forceMuted: false, paused: false, resumePause: null,
+    nowPlaying: null, // { title, durationSec } da musica TOCANDO agora, ou null
+    queue: [], // [{ title, durationSec, resolvedQuery }, ...] - proximas na fila (ver /fila)
   };
   sessions.set(channelId, session);
   console.log(`[${channelId}] bot entrou em channel-${channelId}`);
@@ -181,6 +183,8 @@ async function disconnectSession(channelId) {
   sessions.delete(channelId);
   if (session.idleTimer) clearTimeout(session.idleTimer);
   stopPlayback(session);
+  session.nowPlaying = null;
+  session.queue = [];
   try {
     await session.track.close();
     await session.room.disconnect();
@@ -189,44 +193,94 @@ async function disconnectSession(channelId) {
   }
   console.log(`[${channelId}] bot saiu da call`);
   notifyBackendPresence(channelId, false);
+  broadcastQueue(session); // avisa o card no chat que esvaziou (bot saiu = fila acabou tambem)
 }
 
-/** So' o titulo, sem baixar audio nenhum - pra devolver algo bonito pro usuario ver no chat. */
-function fetchTitle(channelId, query) {
+/** Titulo + duracao, sem baixar audio nenhum - pra devolver/mostrar algo bonito na fila (ver
+ *  MusicQueueCard.jsx) sem precisar rodar o pipeline inteiro so' pra descobrir isso. */
+function fetchMetadata(channelId, query) {
   return new Promise((resolve) => {
-    const p = spawn("yt-dlp", ["--no-playlist", "--print", "%(title)s", "--skip-download", query]);
+    const p = spawn("yt-dlp", [
+      "--no-playlist",
+      "--print",
+      "%(title)s",
+      "--print",
+      "%(duration)s",
+      "--skip-download",
+      query,
+    ]);
     let out = "";
     let err = "";
     p.stdout.on("data", (d) => (out += d.toString()));
     p.stderr.on("data", (d) => (err += d.toString()));
     p.on("error", (e) => {
-      console.error(`[${channelId}] yt-dlp não iniciou (título):`, e.message);
-      resolve(query);
+      console.error(`[${channelId}] yt-dlp não iniciou (metadados):`, e.message);
+      resolve({ title: query, durationSec: null });
     });
     p.on("close", (code) => {
-      if (code !== 0 && err.trim()) console.error(`[${channelId}] yt-dlp (título, código ${code}):`, err.trim());
-      resolve(out.trim() || query);
+      if (code !== 0 && err.trim()) console.error(`[${channelId}] yt-dlp (metadados, código ${code}):`, err.trim());
+      const [titleLine, durationLine] = out.trim().split("\n");
+      const durationSec = Number(durationLine);
+      resolve({
+        title: titleLine?.trim() || query,
+        durationSec: Number.isFinite(durationSec) && durationSec > 0 ? Math.round(durationSec) : null,
+      });
     });
   });
 }
 
+// Limite bem folgado so' pra alguem nao conseguir enfileirar milhares de musicas por engano
+// (ou de proposito) - a fila em si e' so' uma lista de titulos/duracoes em memoria (bem leve),
+// isso aqui e' mais bom-senso do que uma questao de peso na VPS.
+const MAX_QUEUE = 50;
+
 /**
- * Toca UMA musica na sessao desse canal - se ja tiver algo tocando, troca na hora (sem fila
- * por enquanto, e' "pedir uma musica nova" = "trocar a que esta rolando", igual apertar
- * next). Link direto (YouTube, SoundCloud, etc - o que o yt-dlp suportar) ou busca livre
- * (vira "ytsearch1:<busca>" pro proprio yt-dlp resolver o primeiro resultado).
+ * Pedido de tocar uma musica (link ou busca livre, vira "ytsearch1:<busca>" pro proprio
+ * yt-dlp resolver o primeiro resultado) - se NAO tiver nada tocando nesse canal agora, comeca
+ * na hora; se ja' tiver, entra no FIM da fila (ver MAX_QUEUE) e toca sozinha quando chegar a
+ * vez dela (ver advanceNext). Devolve {title, durationSec, queued} - queued=true quando so'
+ * entrou na fila (nao comecou a tocar ainda).
  */
-async function play(channelId, queryRaw) {
+async function enqueue(channelId, queryRaw) {
   const query = queryRaw.trim();
   if (!query) throw new Error("Link ou nome da música vazio");
   const resolvedQuery = /^https?:\/\//i.test(query) ? query : `ytsearch1:${query}`;
 
   const session = await getSession(channelId);
+  // Decide AGORA (sincrono, antes do yt-dlp resolver os metadados - que pode levar ~1s) se essa
+  // musica vai tocar na hora ou entrar na fila, RESERVANDO a vaga de "tocando agora" na hora.
+  // Sem isso, dois /play quase simultaneos numa call ociosa podiam os dois se acharem "livres
+  // pra tocar" (nenhum via o outro ainda tocando, porque nenhum tinha COMECADO a tocar de
+  // verdade ainda) e chamar startPlayback ao mesmo tempo, spawnando dois pipelines por cima
+  // um do outro.
+  const playNow = !session.ffmpeg && !session.nowPlaying;
+  if (playNow) {
+    session.nowPlaying = { title: query, durationSec: null, resolvedQuery }; // placeholder ate' resolver
+  } else if (session.queue.length >= MAX_QUEUE) {
+    throw new Error(`Fila cheia (máximo ${MAX_QUEUE} músicas) - remova alguma antes de adicionar mais`);
+  }
+
+  const { title, durationSec } = await fetchMetadata(channelId, resolvedQuery);
+  const item = { title, durationSec, resolvedQuery };
+
+  if (playNow) {
+    await startPlayback(session, item);
+    return { title, durationSec, queued: false };
+  }
+  session.queue.push(item);
+  broadcastQueue(session);
+  return { title, durationSec, queued: true };
+}
+
+/** Toca UM item (ja' com titulo/duracao resolvidos) - troca o que estiver tocando agora, se
+ *  houver (usado tanto pelo primeiro /play quanto por advanceNext, pra puxar o proximo da fila). */
+async function startPlayback(session, item) {
+  const channelId = session.channelId;
   stopPlayback(session);
+  session.nowPlaying = item;
+  broadcastQueue(session);
 
-  const title = await fetchTitle(channelId, resolvedQuery);
-
-  const ytdlp = spawn("yt-dlp", ["--no-playlist", "-f", "bestaudio", "-o", "-", "--quiet", resolvedQuery]);
+  const ytdlp = spawn("yt-dlp", ["--no-playlist", "-f", "bestaudio", "-o", "-", "--quiet", item.resolvedQuery]);
   const ffmpeg = spawn("ffmpeg", [
     "-loglevel",
     "error",
@@ -268,12 +322,49 @@ async function play(channelId, queryRaw) {
     if (session.ffmpeg !== ffmpeg) return; // uma musica nova ja comecou - isso e' resto da antiga
     session.ffmpeg = null;
     session.ytdlp = null;
-    // session.channelId (nao o "channelId" capturado aqui em cima) porque o bot pode ter sido
-    // MOVIDO de canal (ver moveSession) enquanto essa musica tocava.
-    session.idleTimer = setTimeout(() => disconnectSession(session.channelId), IDLE_DISCONNECT_MS);
+    session.nowPlaying = null;
+    advanceNext(session);
   });
+}
 
-  return title;
+/** Musica atual acabou (ou foi parada) - se tiver mais alguma na fila, toca a proxima na hora;
+ *  senao, so' fica esperando quieto ate' o timeout de inatividade (ver IDLE_DISCONNECT_MS). */
+function advanceNext(session) {
+  const next = session.queue.shift();
+  if (next) {
+    broadcastQueue(session);
+    startPlayback(session, next).catch((err) => {
+      console.error(`[${session.channelId}] falha ao tocar a proxima da fila:`, err.message);
+      advanceNext(session); // essa deu errado - tenta a de depois em vez de travar a fila inteira
+    });
+    return;
+  }
+  broadcastQueue(session);
+  // session.channelId (nao uma variavel capturada la' em cima) porque o bot pode ter sido
+  // MOVIDO de canal (ver moveSession) enquanto essa musica tocava.
+  session.idleTimer = setTimeout(() => disconnectSession(session.channelId), IDLE_DISCONNECT_MS);
+}
+
+/** Avisa o backend o estado atual da fila (o que esta tocando + o que vem depois), pra ele
+ *  repassar pro card ao vivo no chat (ver MusicBotInternalController/MusicQueueCard.jsx) -
+ *  melhor esforco, igual notifyBackendPresence. */
+async function broadcastQueue(session) {
+  const channelId = session.channelId;
+  const payload = {
+    nowPlaying: session.nowPlaying
+      ? { title: session.nowPlaying.title, durationSec: session.nowPlaying.durationSec }
+      : null,
+    queue: session.queue.map((item) => ({ title: item.title, durationSec: item.durationSec })),
+  };
+  try {
+    await fetch(`${BACKEND_URL}/internal/music-bot/${channelId}/queue`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.warn(`[${channelId}] falha ao avisar fila pro backend:`, err.message);
+  }
 }
 
 /**
@@ -335,12 +426,39 @@ app.post("/play", async (req, res) => {
   const { channelId, query } = req.body || {};
   if (!channelId || !query) return res.status(400).json({ error: "channelId e query são obrigatórios" });
   try {
-    const title = await play(String(channelId), String(query));
-    res.json({ title });
+    const { title, durationSec, queued } = await enqueue(String(channelId), String(query));
+    res.json({ title, durationSec, queued });
   } catch (err) {
-    console.error(`Falha ao tocar no canal ${channelId}:`, err);
+    console.error(`Falha ao tocar/enfileirar no canal ${channelId}:`, err);
     res.status(500).json({ error: err.message || "Falha ao tocar a música" });
   }
+});
+
+/** Estado atual da fila desse canal - usado pro card carregar quando abre (ver
+ *  MusicQueueCard.jsx); as atualizações AO VIVO depois disso vêm via WebSocket (broadcastQueue). */
+app.get("/queue/:channelId", (req, res) => {
+  const session = sessions.get(req.params.channelId);
+  if (!session) return res.json({ nowPlaying: null, queue: [] });
+  res.json({
+    nowPlaying: session.nowPlaying
+      ? { title: session.nowPlaying.title, durationSec: session.nowPlaying.durationSec }
+      : null,
+    queue: session.queue.map((item) => ({ title: item.title, durationSec: item.durationSec })),
+  });
+});
+
+/** Remove UMA musica da fila pelo indice (0 = proxima a tocar) - NAO mexe na que esta tocando
+ *  agora, so' nas que ainda estao esperando (ver MusicQueueCard.jsx). */
+app.post("/queue/:channelId/remove", (req, res) => {
+  const session = sessions.get(req.params.channelId);
+  const { index } = req.body || {};
+  if (!session) return res.status(400).json({ error: "Não tem nenhuma fila nesse canal" });
+  if (typeof index !== "number" || index < 0 || index >= session.queue.length) {
+    return res.status(400).json({ error: "Posição inválida na fila" });
+  }
+  session.queue.splice(index, 1);
+  broadcastQueue(session);
+  res.json({ ok: true });
 });
 
 app.post("/stop", async (req, res) => {

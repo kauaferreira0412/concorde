@@ -12,6 +12,7 @@ import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import ImageLightbox from "./ImageLightbox.jsx";
 import DiceRollCard from "./DiceRollCard.jsx";
+import MusicQueueCard from "./MusicQueueCard.jsx";
 import { CheckIcon, MegaphoneIcon, PencilIcon, PlusIcon, ReplyIcon, TrashIcon, XIcon } from "./icons.jsx";
 
 // /roll ou /r seguido de uma notacao de dado (ex: "/roll 2d20+5") - mesma notacao aceita pelo
@@ -28,11 +29,20 @@ const PLAY_COMMAND_RE = /^\/play\s+(.+)$/i;
 const STOP_COMMAND_RE = /^\/stop\s*$/i;
 const PAUSE_COMMAND_RE = /^\/pause\s*$/i;
 const CONTINUE_COMMAND_RE = /^\/continue\s*$/i;
+const FILA_COMMAND_RE = /^\/fila\s*$/i;
+// Marcador especial no CONTEUDO da mensagem (ver /fila abaixo) - em vez de mandar texto pro
+// chat, /fila manda essa mensagem "magica" com o id do canal de VOZ embutido; ao renderizar
+// (ver MessageText/DiceRollCard mais abaixo) qualquer mensagem com esse conteudo exato vira um
+// MusicQueueCard AO VIVO em vez de texto normal. Evita precisar de uma coluna nova no banco so'
+// pra isso (mesma logica de reaproveitamento que o /roll usa colunas dedicadas, mas aqui nem
+// isso e' necessario - o card busca o estado dele sozinho via REST/WebSocket, ver MusicQueueCard.jsx).
+const MUSIC_QUEUE_MARKER_RE = /^\[\[MUSIC_QUEUE:(\d+)\]\]$/;
 
 // Autocomplete de "/" (ver getSlashMenuState).
 const SLASH_COMMANDS = [
   { name: "roll", description: "Rolar dados de RPG (ex: 2d20+5)" },
-  { name: "play", description: "Tocar música na sua call (link ou nome da música)" },
+  { name: "play", description: "Tocar música (ou adicionar à fila) na sua call" },
+  { name: "fila", description: "Mostrar a fila de música ao vivo no chat" },
   { name: "pause", description: "Pausar a música da sua call" },
   { name: "continue", description: "Continuar a música pausada" },
   { name: "stop", description: "Parar a música da sua call" },
@@ -368,12 +378,28 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       setSending(true);
       try {
         const { data } = await api.post(`/api/channels/${activeChannel.id}/music/play`, { query: playMatch[1].trim() });
-        sendChatMessage(stompClient, channel.id, `🎵 Tocando: **${data.title}**`, null, null);
+        const feedback = data.queued
+          ? `➕ Adicionado à fila: **${data.title}**`
+          : `🎵 Tocando: **${data.title}**`;
+        sendChatMessage(stompClient, channel.id, feedback, null, null);
       } catch (err) {
         showAlert(err.response?.data?.error || "Não foi possível tocar essa música");
       } finally {
         setSending(false);
       }
+      return;
+    }
+
+    // /fila - manda um card AO VIVO da fila de musica pro chat (ver MUSIC_QUEUE_MARKER_RE/
+    // MusicQueueCard.jsx). Nao precisa chamar o bot aqui - o proprio card busca o estado dele
+    // sozinho assim que aparece na tela.
+    if (FILA_COMMAND_RE.test(draft.trim())) {
+      if (!activeChannel) {
+        showAlert("Você precisa estar conectado numa call de voz para ver a fila de música");
+        return;
+      }
+      setDraft("");
+      sendChatMessage(stompClient, channel.id, `[[MUSIC_QUEUE:${activeChannel.id}]]`, null, null);
       return;
     }
 
@@ -566,6 +592,12 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                       resultsCsv={m.rollResultsCsv}
                       total={m.rollTotal}
                     />
+                  ) : MUSIC_QUEUE_MARKER_RE.test(m.content || "") ? (
+                    <MusicQueueCard
+                      channelId={Number(MUSIC_QUEUE_MARKER_RE.exec(m.content)[1])}
+                      stompClient={stompClient}
+                      stompConnected={stompConnected}
+                    />
                   ) : (
                     <MessageText
                       content={m.content}
@@ -591,9 +623,10 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                 </button>
                 {canModify(m) && (
                   <>
-                    {/* Editar nao faz sentido numa rolagem de dado - o resultado ja' foi
-                        sorteado, so' da pra apagar (ver DiceRollCard/m.rollNotation). */}
-                    {!m.rollNotation && (
+                    {/* Editar nao faz sentido numa rolagem de dado (resultado ja' sorteado) nem
+                        num card de fila (editar o marcador especial so' quebraria o card) -
+                        so' da pra apagar os dois (ver DiceRollCard/MusicQueueCard acima). */}
+                    {!m.rollNotation && !MUSIC_QUEUE_MARKER_RE.test(m.content || "") && (
                       <button className="icon-btn" onClick={() => startEdit(m)} title="Editar mensagem">
                         <PencilIcon size={15} />
                       </button>
