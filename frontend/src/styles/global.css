@@ -1556,13 +1556,16 @@ img.chat-header-avatar { object-fit: cover; }
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  width: 120px;
+  width: 168px;
 }
-/* Quadrado, igual o tile de camera ligada (nao mais redondo) - e' bem maior tambem, pra dar
-   pra reconhecer o rosto/nome numa tela grande, nao so' um circulozinho minusculo. */
+/* Retangulo (nao quadrado nem circulo) - mesma proporcao do tile de camera ligada normal
+   (.camera-tile-md, 168x94, ver VoiceChannel.jsx) pra ficar consistente com o resto do app. O
+   video (FullscreenParticipantCamera) preenche o retangulo INTEIRO via object-fit:cover - se
+   aparecer pequeno/sobrando fundo, e' o conteudo de origem em si (ex: placeholder da OBS
+   Virtual Camera quando nenhuma cena esta ativa), nao um recorte feito aqui. */
 .fullscreen-participant-avatar {
-  width: 120px;
-  height: 120px;
+  width: 168px;
+  height: 94px;
   border-radius: var(--radius-md);
   object-fit: cover;
   background: linear-gradient(135deg, var(--accent), var(--intel));
@@ -1570,7 +1573,7 @@ img.chat-header-avatar { object-fit: cover; }
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 700;
   border: 3px solid transparent;
   transition: border-color 0.12s ease;
