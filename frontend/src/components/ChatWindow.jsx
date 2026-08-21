@@ -305,7 +305,11 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
               if (el) messageRefs.current.set(m.id, el);
               else messageRefs.current.delete(m.id);
             }}
-            className={"chat-message" + (mentionsUser(m.content, user?.username) ? " mentioned" : "")}
+            className={
+              "chat-message" +
+              (mentionsUser(m.content, user?.username) ? " mentioned" : "") +
+              (channel.adminOnly ? " announcement" : "")
+            }
           >
             <button type="button" className="chat-avatar-btn" onClick={() => openProfile(m.authorId)} title={`Ver perfil de ${m.authorUsername}`}>
               <Avatar name={m.authorUsername} url={m.authorAvatarUrl} className="chat-avatar" />

@@ -836,6 +836,19 @@ img.chat-header-avatar { object-fit: cover; }
   transition: background 0.1s ease;
 }
 .chat-message:hover { background: var(--bg-panel); }
+/* Mensagem no canal "Atualizações" (ver Channel.adminOnly) - cartao proprio, mais "planejado"
+   que uma linha comum de chat: fundo levemente destacado, borda, barra de acento na lateral
+   e mais respiro por dentro - da pra bater o olho e saber na hora que e' um anuncio. */
+.chat-message.announcement {
+  margin: 10px 0;
+  padding: 14px 16px 14px 14px;
+  background: linear-gradient(135deg, var(--accent-soft), transparent 60%);
+  border: 1px solid rgba(47, 107, 255, 0.25);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+}
+.chat-message.announcement:hover { background: linear-gradient(135deg, var(--accent-soft), transparent 60%); }
+.chat-message.announcement .chat-markdown { margin-top: 4px; }
 .chat-avatar { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; margin-top: 2px; }
 .chat-avatar-btn { background: transparent; border: none; padding: 0; flex-shrink: 0; align-self: flex-start; }
 .chat-avatar-btn:hover .chat-avatar { filter: brightness(1.12); }
@@ -891,10 +904,33 @@ img.chat-header-avatar { object-fit: cover; }
 }
 .chat-markdown ul, .chat-markdown ol { padding-left: 22px; font-size: 14.5px; line-height: 1.5; color: var(--text-primary); }
 .chat-markdown li { margin: 2px 0; }
-.chat-heading { margin: 6px 0 0; font-family: var(--font-display); font-weight: 700; color: var(--text-primary); }
-h1.chat-heading { font-size: 19px; }
-h2.chat-heading { font-size: 17px; }
-h3.chat-heading { font-size: 15px; }
+.chat-heading { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.01em; color: var(--text-primary); }
+/* h1: titulo de secao "de verdade" - maior, com linha divisoria embaixo pra separar bem do
+   texto anterior/seguinte (bate mais com "algo mais planejado", em vez de so' negrito maior). */
+h1.chat-heading {
+  margin: 16px 0 8px;
+  padding-bottom: 8px;
+  font-size: 20px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.chat-markdown > h1.chat-heading:first-child { margin-top: 2px; }
+/* h2: barra de destaque na cor de acento a esquerda, como um "chip" de subtitulo. */
+h2.chat-heading {
+  margin: 14px 0 6px;
+  padding-left: 10px;
+  font-size: 16.5px;
+  color: var(--accent-text);
+  border-left: 3px solid var(--accent);
+}
+/* h3: pequeno e em caixa alta, tipo "eyebrow" - rotulo discreto acima de um paragrafo. */
+h3.chat-heading {
+  margin: 10px 0 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
 /* Botao "invisivel" so' pra dar clique na imagem (ver ImageLightbox.jsx) - reseta todo o
    visual padrao de <button> (fundo, borda, padding), sobra so' a imagem em si. */
 .chat-image-btn { background: none; border: none; padding: 0; display: block; }
