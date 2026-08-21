@@ -29,6 +29,7 @@ const PLAY_COMMAND_RE = /^\/play\s+(.+)$/i;
 const STOP_COMMAND_RE = /^\/stop\s*$/i;
 const PAUSE_COMMAND_RE = /^\/pause\s*$/i;
 const CONTINUE_COMMAND_RE = /^\/continue\s*$/i;
+const SKIP_COMMAND_RE = /^\/skip\s*$/i;
 // Nome e' opcional ("/fila" sozinho tambem funciona, so' fica sem titulo) - so' cosmetico,
 // aparece no topo do card (ver MusicQueueCard.jsx).
 const FILA_COMMAND_RE = /^\/fila(?:\s+(.+))?$/i;
@@ -47,6 +48,7 @@ const SLASH_COMMANDS = [
   { name: "fila", description: "Criar a fila de música ao vivo no chat (nome opcional)" },
   { name: "pause", description: "Pausar a música da sua call" },
   { name: "continue", description: "Continuar a música pausada" },
+  { name: "skip", description: "Pular pra próxima música da fila" },
   { name: "stop", description: "Parar a música da sua call" },
 ];
 const DICE_SIDES = [4, 6, 8, 10, 12, 20, 100];
@@ -429,6 +431,27 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
         sendChatMessage(stompClient, channel.id, "⏹️ Música parada.", null, null);
       } catch (err) {
         showAlert(err.response?.data?.error || "Não foi possível parar a música");
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    // /skip - pula pra proxima musica da fila (PUBLICO, qualquer um pode pular, nao so' quem
+    // pediu a musica atual - pedido explicito do usuario). Mesma acao do botão "Pular" dentro
+    // do MusicQueueCard.jsx.
+    if (SKIP_COMMAND_RE.test(draft.trim())) {
+      if (!activeChannel) {
+        showAlert("Você precisa estar conectado numa call de voz para pular a música");
+        return;
+      }
+      setDraft("");
+      setSending(true);
+      try {
+        await api.post(`/api/channels/${activeChannel.id}/music/skip`);
+        sendChatMessage(stompClient, channel.id, "⏭️ Música pulada.", null, null);
+      } catch (err) {
+        showAlert(err.response?.data?.error || "Não foi possível pular a música");
       } finally {
         setSending(false);
       }

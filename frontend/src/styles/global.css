@@ -1024,6 +1024,21 @@ h3.chat-heading {
 }
 .music-queue-now-label { font-size: 11px; font-weight: 700; color: var(--accent-text); text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0; }
 .music-queue-now-title { font-size: 13.5px; font-weight: 600; color: var(--text-primary); flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.music-queue-skip-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: 3px 8px;
+  background: none;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.music-queue-skip-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--accent-text); border-color: var(--accent); }
+.music-queue-skip-btn:disabled { opacity: 0.5; cursor: default; }
 .music-queue-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .music-queue-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .music-queue-position { flex-shrink: 0; width: 18px; text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }

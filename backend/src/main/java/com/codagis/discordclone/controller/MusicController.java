@@ -123,6 +123,16 @@ public class MusicController {
         callBot("/stop", Map.of("channelId", channelId));
     }
 
+    /** Pula pra proxima musica da fila (ou fica quieto se estiver vazia) - PUBLICO, qualquer
+     *  membro conectado na call pode pular, nao so' quem pediu a musica atual (pedido explicito
+     *  do usuario, mesma regra da fila em si). */
+    @PostMapping("/{channelId}/music/skip")
+    public void skip(@PathVariable Long channelId) {
+        Channel channel = requireVoiceChannel(channelId);
+        assertCanControlMusic(channel);
+        callBot("/skip", Map.of("channelId", channelId));
+    }
+
     @PostMapping("/{channelId}/music/pause")
     public void pause(@PathVariable Long channelId) {
         Channel channel = requireVoiceChannel(channelId);

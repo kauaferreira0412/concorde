@@ -515,6 +515,26 @@ app.post("/stop", async (req, res) => {
   res.json({ ok: true });
 });
 
+/** Pula a musica ATUAL e toca a proxima da fila (ou fica quieto se a fila estiver vazia,
+ *  mesmo comportamento de quando uma musica termina sozinha - ver advanceNext). */
+app.post("/skip", (req, res) => {
+  const { channelId } = req.body || {};
+  if (!channelId) return res.status(400).json({ error: "channelId é obrigatório" });
+  const session = sessions.get(String(channelId));
+  if (!session || !session.nowPlaying) {
+    return res.status(400).json({ error: "Não tem nenhuma música tocando pra pular" });
+  }
+  // stopPlayback mata o ffmpeg/yt-dlp atual - o .finally() do pumpAudio (ver startPlayback) que
+  // acompanhava ESSE processo vai reparar que session.ffmpeg ja nao bate mais com o que ele
+  // tinha capturado e vai so' retornar sem fazer nada (esse guard existe pra evitar avancar
+  // DUAS vezes quando uma musica nova ja assumiu no meio) - por isso quem chama advanceNext
+  // aqui e' a gente mesmo, na hora, em vez de esperar aquele callback perceber sozinho.
+  stopPlayback(session);
+  session.nowPlaying = null;
+  advanceNext(session);
+  res.json({ ok: true });
+});
+
 /** Chamado pelo VoiceModerationController quando um moderador força mute/desmute NO BOT (o
  *  alvo do force-mute e' o userId sintetico do bot, ver VoicePresenceService.joinBot) - so'
  *  silencia os PROXIMOS frames (ver pumpAudio), nao mexe no processo/sessao em si. */

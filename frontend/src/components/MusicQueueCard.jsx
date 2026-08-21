@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api/client";
 import { subscribeToMusicQueue } from "../ws/chatSocket";
-import { TrashIcon, PlusIcon, XIcon } from "./icons.jsx";
+import { TrashIcon, PlusIcon, XIcon, ChevronsRightIcon } from "./icons.jsx";
 
 /** "125" -> "2:05", "3725" -> "1:02:05". null (duracao desconhecida, ex: live) -> "?". */
 function formatDuration(sec) {
@@ -30,6 +30,7 @@ export default function MusicQueueCard({ channelId, stompClient, stompConnected 
   const [state, setState] = useState(null); // { active, nowPlaying, queue } | null (carregando)
   const [removingIndex, setRemovingIndex] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [skipping, setSkipping] = useState(false);
   const [adding, setAdding] = useState(false);
   const [addQuery, setAddQuery] = useState("");
   const [error, setError] = useState("");
@@ -81,6 +82,19 @@ export default function MusicQueueCard({ channelId, stompClient, stompConnected 
     }
   }
 
+  async function skipSong() {
+    setError("");
+    setSkipping(true);
+    try {
+      await api.post(`/api/channels/${channelId}/music/skip`);
+      // Estado (nowPlaying/queue) atualiza sozinho pelo WebSocket, igual as outras acoes.
+    } catch (err) {
+      setError(err.response?.data?.error || "Não foi possível pular essa música");
+    } finally {
+      setSkipping(false);
+    }
+  }
+
   async function handleAdd(e) {
     e.preventDefault();
     const query = addQuery.trim();
@@ -127,6 +141,15 @@ export default function MusicQueueCard({ channelId, stompClient, stompConnected 
           <span className="music-queue-now-label">Tocando agora</span>
           <span className="music-queue-now-title">{nowPlaying.title}</span>
           <span className="music-queue-duration">{formatDuration(nowPlaying.durationSec)}</span>
+          <button
+            type="button"
+            className="music-queue-skip-btn"
+            title="Pular pra próxima música"
+            disabled={skipping}
+            onClick={skipSong}
+          >
+            <ChevronsRightIcon size={14} /> Pular
+          </button>
         </div>
       ) : (
         <p className="music-queue-empty">Nada tocando no momento.</p>
