@@ -8,6 +8,7 @@ import {
   MicIcon,
   MicOffIcon,
   ScreenShareIcon,
+  UsersIcon,
   VolumeIcon,
   WidenIcon,
   ZoomInIcon,
@@ -15,6 +16,7 @@ import {
 } from "./icons.jsx";
 import { MemberRow } from "./MemberList.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
+import Avatar from "./Avatar.jsx";
 
 // Tamanhos disponiveis pro tile de webcam - "size" vira uma classe CSS (.camera-tile-<size>,
 // ver global.css). Comeca em "md" (tamanho de antes), dá pra aumentar/diminuir pelos botoes
@@ -25,6 +27,63 @@ const CAMERA_SIZES = ["sm", "md", "lg", "xl"];
 // so' controla a resolucao do "preenchimento" (ver mic-meter-segments em VoiceChannel).
 const MIC_SEGMENT_COUNT = 40;
 const MIC_SEGMENTS = Array.from({ length: MIC_SEGMENT_COUNT }, (_, i) => i);
+
+/** true so' quando ESSE elemento especifico (nao qualquer um) esta em tela cheia agora -
+ *  varios tiles podem entrar em tela cheia em momentos diferentes, cada um com seu proprio
+ *  botao (ver ScreenShareTile) - por isso escuta fullscreenchange e compara com o proprio ref,
+ *  em vez de um estado global unico. */
+function useIsThisElementFullscreen(elRef) {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    function handleChange() {
+      setIsFullscreen(document.fullscreenElement === elRef.current);
+    }
+    document.addEventListener("fullscreenchange", handleChange);
+    return () => document.removeEventListener("fullscreenchange", handleChange);
+  }, [elRef]);
+  return isFullscreen;
+}
+
+/**
+ * "Facepile" flutuante que aparece POR CIMA de uma tela compartilhada em tela cheia - igual o
+ * Discord: cada pessoa na call vira um circulo (a propria camera, se estiver ligada, senao o
+ * avatar), com um anel verde quando esta falando. Escondida por padrao mesmo em tela cheia -
+ * um botao (UsersIcon) no canto liga/desliga ela na hora, sem sair da tela cheia.
+ */
+function FullscreenParticipantStrip({ participants, cameraTracks, speakingIds }) {
+  const cameraByIdentity = new Map(cameraTracks.map((c) => [c.identity, c]));
+  return (
+    <div className="fullscreen-participant-strip">
+      {participants.map((p) => {
+        const camera = cameraByIdentity.get(p.identity);
+        const speaking = speakingIds.has(p.identity);
+        return (
+          <div key={p.identity} className={"fullscreen-participant-item" + (speaking ? " speaking" : "")}>
+            {camera?.track ? (
+              <FullscreenParticipantCamera track={camera.track} isLocal={p.isLocal} />
+            ) : (
+              <Avatar name={p.name} url={p.avatarUrl} className="fullscreen-participant-avatar" />
+            )}
+            <span className="fullscreen-participant-name">{p.name}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Camera de alguem dentro do facepile - tile pequeno e redondo em vez do retangulo normal
+ *  (ver CameraTile), so' pra caber no anel junto com os avatares de quem nao tem camera. */
+function FullscreenParticipantCamera({ track, isLocal }) {
+  const videoRef = useRef(null);
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !track) return;
+    track.attach(el);
+    return () => track.detach(el);
+  }, [track]);
+  return <video ref={videoRef} autoPlay playsInline muted={isLocal} className="fullscreen-participant-avatar" />;
+}
 
 /** Cabecalho do canal de voz - nome, subtitulo "Canal de voz · Servidor", badge de "TEMPO
  *  REAL" enquanto conectado. Sem "facepile" de iniciais aqui (pedido do usuario pra tirar) -
@@ -99,9 +158,15 @@ function CameraTile({ track, name, isLocal, size }) {
  * VoiceChannel) - sem zoom manual, so' esses dois estados. Botao direito (so' em transmissao de
  * outra pessoa que voce esta assistindo) abre o controle de volume do audio dela - mesmo padrao
  * do botao direito num participante na sidebar (ver onVolumeMenu/VolumeSlider em VoiceChannel).
+ * Em tela cheia, ganha o facepile flutuante da call (ver FullscreenParticipantStrip) - por
+ * isso "tela cheia" aqui fulscreena o CONTAINER (essa div toda), nao so' o <video> sozinho:
+ * um <video> em tela cheia so' pode mostrar o proprio video, nada por cima dele.
  */
-function ScreenShareTile({ share, theaterMode, onToggleWatch, onToggleTheater, onVolumeMenu }) {
+function ScreenShareTile({ share, theaterMode, onToggleWatch, onToggleTheater, onVolumeMenu, participants, cameraTracks, speakingIds }) {
   const videoRef = useRef(null);
+  const containerRef = useRef(null);
+  const isFullscreen = useIsThisElementFullscreen(containerRef);
+  const [overlayVisible, setOverlayVisible] = useState(false);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -111,7 +176,7 @@ function ScreenShareTile({ share, theaterMode, onToggleWatch, onToggleTheater, o
   }, [share.track]);
 
   function handleMaximize() {
-    const el = videoRef.current;
+    const el = containerRef.current;
     const request = el?.requestFullscreen || el?.webkitRequestFullscreen;
     request?.call(el);
   }
@@ -133,7 +198,8 @@ function ScreenShareTile({ share, theaterMode, onToggleWatch, onToggleTheater, o
 
   return (
     <div
-      className={"camera-tile " + (theaterMode ? "screenshare-tile-theater" : "screenshare-tile-default")}
+      ref={containerRef}
+      className={"camera-tile " + (theaterMode ? "screenshare-tile-theater" : "screenshare-tile-default") + (isFullscreen ? " is-fullscreen" : "")}
       onContextMenu={
         share.isLocal
           ? undefined
@@ -144,27 +210,50 @@ function ScreenShareTile({ share, theaterMode, onToggleWatch, onToggleTheater, o
       }
     >
       <video ref={videoRef} autoPlay playsInline muted={share.isLocal} onDoubleClick={handleMaximize} />
-      <span className="camera-tile-name">{share.name}</span>
-      <button
-        type="button"
-        className={"screenshare-tile-theater-btn" + (theaterMode ? " active" : "")}
-        onClick={onToggleTheater}
-        title={theaterMode ? "Voltar ao tamanho normal" : "Modo teatro (bem maior, so' essa tela)"}
-      >
-        <WidenIcon size={13} />
-      </button>
-      <button type="button" className="camera-tile-maximize" onClick={handleMaximize} title="Tela cheia">
-        <MaximizeIcon size={13} />
-      </button>
-      {!share.isLocal && (
-        <button
-          type="button"
-          className="screenshare-tile-stop"
-          onClick={() => onToggleWatch(share.sid)}
-          title="Parar de assistir (economiza dados - você continua na call de voz normalmente)"
-        >
-          <EyeOffIcon size={13} />
-        </button>
+      {!isFullscreen && (
+        <>
+          <span className="camera-tile-name">{share.name}</span>
+          <button
+            type="button"
+            className={"screenshare-tile-theater-btn" + (theaterMode ? " active" : "")}
+            onClick={onToggleTheater}
+            title={theaterMode ? "Voltar ao tamanho normal" : "Modo teatro (bem maior, so' essa tela)"}
+          >
+            <WidenIcon size={13} />
+          </button>
+          {!share.isLocal && (
+            <button
+              type="button"
+              className="screenshare-tile-stop"
+              onClick={() => onToggleWatch(share.sid)}
+              title="Parar de assistir (economiza dados - você continua na call de voz normalmente)"
+            >
+              <EyeOffIcon size={13} />
+            </button>
+          )}
+          <button type="button" className="camera-tile-maximize" onClick={handleMaximize} title="Tela cheia">
+            <MaximizeIcon size={13} />
+          </button>
+        </>
+      )}
+
+      {isFullscreen && (
+        <>
+          {/* Igual o Discord: botao pra ligar/desligar o facepile por cima do video, sem sair
+              da tela cheia - escondido por padrao mesmo em tela cheia (pedido explicito do
+              usuario: "clicou, aparece a sobreposição; clicou de novo, some"). */}
+          <button
+            type="button"
+            className={"fullscreen-overlay-toggle" + (overlayVisible ? " active" : "")}
+            onClick={() => setOverlayVisible((v) => !v)}
+            title={overlayVisible ? "Esconder quem está na call" : "Mostrar quem está na call"}
+          >
+            <UsersIcon size={16} />
+          </button>
+          {overlayVisible && (
+            <FullscreenParticipantStrip participants={participants} cameraTracks={cameraTracks} speakingIds={speakingIds} />
+          )}
+        </>
       )}
     </div>
   );
@@ -185,6 +274,7 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
     screenShares,
     cameraTracks,
     participants,
+    speakingIds,
     toggleScreenShare,
     toggleWatchScreenShare,
     streamVolumes,
@@ -395,6 +485,9 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
                   onToggleTheater={() => toggleTheater(s.sid)}
                   onToggleWatch={toggleWatchScreenShare}
                   onVolumeMenu={openVolumeMenu}
+                  participants={participants}
+                  cameraTracks={cameraTracks}
+                  speakingIds={speakingIds}
                 />
               ))}
             </div>

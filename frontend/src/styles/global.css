@@ -1508,6 +1508,83 @@ img.chat-header-avatar { object-fit: cover; }
   .screenshare-tile-theater-btn { opacity: 1; }
 }
 
+/* Tela cheia de uma transmissao (ver ScreenShareTile.handleMaximize, fullscreena o container
+   INTEIRO, nao so' o <video> - senao nada consegue aparecer por cima dele). Video ganha
+   object-fit:contain so' nesse estado (senao "cover" cortaria as bordas em telas com proporcao
+   diferente da do monitor de quem assiste). */
+.camera-tile:fullscreen { background: #000; }
+.camera-tile:fullscreen video { object-fit: contain; }
+/* Botao "quem esta na call" - so' existe/aparece quando em tela cheia (ver isFullscreen em
+   ScreenShareTile). Canto oposto de onde o botao de tela cheia normal fica, pra nao competir
+   com o controle nativo de sair da tela cheia do proprio navegador (geralmente canto superior). */
+.fullscreen-overlay-toggle {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 3;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(4, 5, 8, 0.65);
+  color: #fff;
+}
+.fullscreen-overlay-toggle:hover { background: rgba(4, 5, 8, 0.85); }
+.fullscreen-overlay-toggle.active { background: var(--accent); }
+
+/* Facepile flutuante por cima do video em tela cheia (ver FullscreenParticipantStrip) - igual
+   o Discord: uma fileira de circulos (camera de quem tiver ligada, senao avatar), com anel
+   verde em quem esta falando agora. Rola na horizontal se nao couber todo mundo. */
+.fullscreen-participant-strip {
+  position: absolute;
+  left: 16px;
+  right: 72px;
+  bottom: 16px;
+  z-index: 2;
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 4px 2px;
+}
+.fullscreen-participant-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  width: 64px;
+}
+.fullscreen-participant-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: linear-gradient(135deg, var(--accent), var(--intel));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  border: 3px solid transparent;
+  transition: border-color 0.12s ease;
+}
+.fullscreen-participant-item.speaking .fullscreen-participant-avatar { border-color: var(--success); }
+.fullscreen-participant-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Webcams - ao contrario da tela compartilhada (um "palco" so' de cada vez), varias podem
    ficar ligadas ao mesmo tempo, entao aparecem lado a lado em tiles pequenos. O tamanho de
    cada tile vem da classe .camera-tile-<size> (ver CAMERA_SIZES/botoes +/- em
