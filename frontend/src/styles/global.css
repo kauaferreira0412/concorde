@@ -1122,6 +1122,24 @@ h3.chat-heading {
   border-radius: var(--radius-sm);
 }
 .mention-option:hover, .mention-option.active { background: var(--bg-hover); }
+
+/* Autocomplete de "/" (ver getSlashMenuState em ChatWindow.jsx) - mesmo cartao do @mencao,
+   so' com um rotulo (ex: "/roll" ou "d20") + descricao ao lado em vez de avatar+nome. */
+.slash-option { justify-content: flex-start; gap: 10px; }
+.slash-option-command {
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-weight: 700;
+  color: var(--accent-text);
+  flex-shrink: 0;
+}
+.slash-option-description { color: var(--text-muted); font-size: 12.5px; }
+.slash-menu-hint {
+  margin: 4px 2px 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 11px;
+  color: var(--text-muted);
+}
 .chat-status {
   padding: 8px 20px;
   font-size: 12.5px;

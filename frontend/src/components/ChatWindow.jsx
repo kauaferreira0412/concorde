@@ -19,6 +19,47 @@ import { CheckIcon, MegaphoneIcon, PencilIcon, PlusIcon, ReplyIcon, TrashIcon, X
 const ROLL_COMMAND_RE = /^\/(?:roll|r)\s+(.+)$/i;
 const ROLL_NOTATION_RE = /^(\d{0,2})d(\d{1,3})\s*([+-]\s*\d{1,3})?$/i;
 
+// Autocomplete de "/" (ver getSlashMenuState) - so' o /roll existe por enquanto, mas ja fica
+// numa lista pra dar pra adicionar outros comandos depois sem mexer no resto do mecanismo.
+const SLASH_COMMANDS = [{ name: "roll", description: "Rolar dados de RPG (ex: 2d20+5)" }];
+const DICE_SIDES = [4, 6, 8, 10, 12, 20, 100];
+
+/**
+ * Autocomplete de comando "/" - so' faz sentido no COMECO da mensagem (igual Discord), por
+ * isso olha o draft inteiro, nao o caret como a mencao (@) faz. Dois estagios:
+ *  1. Ainda escolhendo o comando ("/", "/r", "/ro"...) - sugere os nomes de comando.
+ *  2. Ja' escolheu "/roll " (ou "/r ") - sugere os tipos de dado (d4..d100), respeitando
+ *     qualquer numero de dados ja' digitado antes (ex: "/roll 2" sugere "2d4", "2d6"...).
+ */
+function getSlashMenuState(draft) {
+  if (!draft.startsWith("/")) return null;
+
+  const commandMatch = /^\/(\w*)$/.exec(draft);
+  if (commandMatch) {
+    const q = commandMatch[1].toLowerCase();
+    const items = SLASH_COMMANDS.filter((c) => c.name.startsWith(q)).map((c) => ({
+      key: c.name,
+      insert: `/${c.name} `,
+      display: `/${c.name}`,
+      description: c.description,
+    }));
+    return items.length > 0 ? { kind: "command", items } : null;
+  }
+
+  const rollMatch = /^(\/(?:roll|r)\s+)(\S*)$/i.exec(draft);
+  if (rollMatch) {
+    const prefix = rollMatch[1];
+    const partial = rollMatch[2];
+    const countPrefix = /^(\d{0,2})/.exec(partial)[1];
+    const items = DICE_SIDES.map((sides) => `${countPrefix}d${sides}`)
+      .filter((label) => label.toLowerCase().startsWith(partial.toLowerCase()))
+      .map((label) => ({ key: label, insert: prefix + label, display: label, description: null }));
+    return items.length > 0 ? { kind: "dice", items } : null;
+  }
+
+  return null;
+}
+
 /** Renderiza o conteudo da mensagem com markdown "estilo Discord" (negrito/italico/sublinhado/
  *  tachado/codigo/citacao/listas/titulos/links, ver utils/markdown.jsx) + @mencoes clicaveis
  *  (mesmo pipeline - so' reconhece quem e' de verdade membro do servidor). */
@@ -95,6 +136,8 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
   const [replyingTo, setReplyingTo] = useState(null);
   const [mentionQuery, setMentionQuery] = useState(null); // string | null - null = autocomplete fechado
   const [mentionIndex, setMentionIndex] = useState(0);
+  const [slashIndex, setSlashIndex] = useState(0);
+  const [slashDismissed, setSlashDismissed] = useState(false); // true = usuario fechou com Esc
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
   const draftInputRef = useRef(null);
@@ -104,6 +147,12 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     if (mentionQuery === null) return [];
     return members.filter((m) => m.username.toLowerCase().startsWith(mentionQuery.toLowerCase())).slice(0, 6);
   }, [mentionQuery, members]);
+
+  // "/roll" so' faz sentido no comeco da mensagem - nunca junto com o autocomplete de @mencao.
+  const slashMenu = useMemo(
+    () => (mentionQuery === null && !slashDismissed ? getSlashMenuState(draft) : null),
+    [draft, mentionQuery, slashDismissed]
+  );
 
   useEffect(() => {
     if (!channel) return;
@@ -187,6 +236,8 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     const query = getMentionQuery(value, caret);
     setMentionQuery(query);
     setMentionIndex(0);
+    setSlashIndex(0);
+    setSlashDismissed(false);
   }
 
   function pickMention(username) {
@@ -201,7 +252,43 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     });
   }
 
+  /** Clique ou Tab/Enter numa sugestao do "/" - so' troca o draft (nunca envia sozinho, o
+   *  usuario ainda pode continuar digitando/editando antes de mandar de verdade). */
+  function pickSlashItem(item) {
+    setDraft(item.insert);
+    setSlashIndex(0);
+    requestAnimationFrame(() => {
+      const input = draftInputRef.current;
+      input?.focus();
+      input?.setSelectionRange(item.insert.length, item.insert.length);
+    });
+  }
+
   function handleDraftKeyDown(e) {
+    if (slashMenu && slashMenu.items.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSlashIndex((i) => (i + 1) % slashMenu.items.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSlashIndex((i) => (i - 1 + slashMenu.items.length) % slashMenu.items.length);
+        return;
+      }
+      if (e.key === "Tab" || (e.key === "Enter" && slashMenu.kind === "command")) {
+        // Enter so' auto-completa no estagio "escolhendo o comando" - no estagio da notacao do
+        // dado (ex: "/roll d2_"), Enter continua ENVIANDO de verdade (ja' e' uma notacao valida
+        // sozinha, tipo "d20"), so' Tab completa com a sugestao ali.
+        e.preventDefault();
+        pickSlashItem(slashMenu.items[slashIndex]);
+        return;
+      }
+      if (e.key === "Escape") {
+        setSlashDismissed(true);
+        return;
+      }
+    }
     if (mentionQuery !== null && mentionMatches.length > 0) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -501,6 +588,25 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
             <PlusIcon />
           </button>
           <div className="chat-input-field">
+            {slashMenu && (
+              <div className="mention-menu slash-menu">
+                {slashMenu.items.map((item, i) => (
+                  <button
+                    type="button"
+                    key={item.key}
+                    className={"mention-option slash-option" + (i === slashIndex ? " active" : "")}
+                    onMouseDown={(e) => {
+                      e.preventDefault(); // nao deixa o input perder foco antes do clique registrar
+                      pickSlashItem(item);
+                    }}
+                  >
+                    <span className="slash-option-command">{item.display}</span>
+                    {item.description && <span className="slash-option-description">{item.description}</span>}
+                  </button>
+                ))}
+                <p className="slash-menu-hint">Tab pra completar · ↑↓ pra navegar</p>
+              </div>
+            )}
             {mentionQuery !== null && mentionMatches.length > 0 && (
               <div className="mention-menu">
                 {mentionMatches.map((m, i) => (
