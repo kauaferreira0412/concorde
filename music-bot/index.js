@@ -75,7 +75,7 @@ async function connectSession(channelId) {
   options.source = TrackSource.SOURCE_MICROPHONE;
   await room.localParticipant.publishTrack(track, options);
 
-  const session = { room, source, track, ytdlp: null, ffmpeg: null, idleTimer: null };
+  const session = { room, source, track, ytdlp: null, ffmpeg: null, idleTimer: null, forceMuted: false };
   sessions.set(channelId, session);
   console.log(`[${channelId}] bot entrou em ${roomName}`);
   notifyBackendPresence(channelId, true);
@@ -228,7 +228,12 @@ async function pumpAudio(channelId, session, ffmpeg) {
       const usableLength = data.length - (data.length % 2);
       leftover = Buffer.from(data.subarray(usableLength));
       if (usableLength === 0) continue;
-      const int16 = new Int16Array(data.buffer, data.byteOffset, usableLength / 2);
+      // Forcado a mudo por um moderador (ver VoiceModerationController/POST /mute) - manda
+      // SILENCIO em vez de pular o frame, pra manter o pacing (queuedDuration abaixo) e a
+      // musica continuar avancando escondida, pronta pra voltar do ponto certo quando desmutar.
+      const int16 = session.forceMuted
+        ? new Int16Array(usableLength / 2)
+        : new Int16Array(data.buffer, data.byteOffset, usableLength / 2);
       const frame = new AudioFrame(int16, SAMPLE_RATE, CHANNELS, int16.length);
       try {
         await session.source.captureFrame(frame);
@@ -267,6 +272,17 @@ app.post("/stop", async (req, res) => {
   const { channelId } = req.body || {};
   if (!channelId) return res.status(400).json({ error: "channelId é obrigatório" });
   await disconnectSession(String(channelId));
+  res.json({ ok: true });
+});
+
+/** Chamado pelo VoiceModerationController quando um moderador força mute/desmute NO BOT (o
+ *  alvo do force-mute e' o userId sintetico do bot, ver VoicePresenceService.joinBot) - so'
+ *  silencia os PROXIMOS frames (ver pumpAudio), nao mexe no processo/sessao em si. */
+app.post("/mute", (req, res) => {
+  const { channelId, muted } = req.body || {};
+  if (!channelId) return res.status(400).json({ error: "channelId é obrigatório" });
+  const session = sessions.get(String(channelId));
+  if (session) session.forceMuted = Boolean(muted);
   res.json({ ok: true });
 });
 
