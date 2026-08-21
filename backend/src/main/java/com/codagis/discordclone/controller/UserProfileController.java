@@ -32,6 +32,6 @@ public class UserProfileController {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario nao encontrado"));
         return new PublicProfileResponse(user.getId(), user.getUsername(), user.getNickname(), user.getAvatarUrl(),
-                user.getBio(), presenceService.effectiveStatus(user.getId()), user.getCreatedAt());
+                user.getBio(), presenceService.effectiveStatus(user.getId()), user.getCreatedAt(), user.getRole());
     }
 }

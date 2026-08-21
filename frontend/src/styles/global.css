@@ -2271,26 +2271,70 @@ h3.chat-heading {
 }
 
 /* ============================================================
-   Cartao de perfil (ProfileModal)
+   Cartao de perfil (ProfileModal.jsx) - banner colorido com o avatar "flutuando" por cima
+   (estilo Discord), depois secoes bem separadas (Sobre mim / Informacoes) em vez de tudo
+   solto num paragrafo so' (pedido explicito do usuario: "bem organizada, bem dividida").
    ============================================================ */
-.profile-modal { width: 380px; }
-.profile-header { display: flex; align-items: center; gap: 14px; }
+.profile-modal { width: 380px; padding: 0; gap: 0; overflow: hidden; }
+.profile-banner {
+  height: 72px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), #c77dff 60%, var(--intel));
+}
+.profile-header { display: flex; padding: 0 20px; margin-top: -34px; }
 .profile-avatar-wrap { flex-shrink: 0; }
 .profile-avatar {
-  width: 64px; height: 64px; border-radius: 50%;
+  width: 76px; height: 76px; border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), var(--intel));
   color: #fff; display: flex; align-items: center; justify-content: center;
-  font-size: 22px; font-weight: 700;
+  font-size: 24px; font-weight: 700;
+  border: 4px solid var(--bg-panel);
+  box-shadow: var(--shadow-md);
 }
-.profile-avatar-wrap .status-dot { width: 14px; height: 14px; border-width: 3px; }
-.profile-heading { min-width: 0; }
+.profile-avatar-wrap .status-dot { width: 16px; height: 16px; border-width: 3px; right: 2px; bottom: 2px; }
+.profile-body { padding: 10px 20px 4px; display: flex; flex-direction: column; gap: 4px; }
+.profile-heading { min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .profile-heading h2 { margin: 0; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.profile-username { margin: 2px 0 0; color: var(--text-muted); font-size: 13px; }
+.profile-admin-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--accent-text); background: var(--accent-soft);
+  border: 1px solid rgba(47, 107, 255, 0.35);
+  padding: 2px 8px; border-radius: 999px;
+  flex-shrink: 0;
+}
+.profile-username { margin: 0 0 8px; color: var(--text-muted); font-size: 13px; }
+.profile-status-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  align-self: flex-start;
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  background: var(--bg-panel-2); border: 1px solid var(--border-soft);
+  padding: 4px 10px 4px 8px; border-radius: 999px;
+  margin-bottom: 14px;
+}
+.profile-status-pill .status-dot { position: static; width: 8px; height: 8px; border: none; }
+.profile-section { padding: 12px 0; border-top: 1px solid var(--border-soft); }
+.profile-section:first-of-type { border-top: none; padding-top: 0; }
+.profile-section-title {
+  margin: 0 0 8px;
+  font-size: 11.5px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
 .profile-bio {
   margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text-secondary);
   background: var(--bg-panel-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md);
   padding: 10px 12px; white-space: pre-wrap; word-break: break-word;
 }
+.profile-bio-empty { color: var(--text-muted); font-style: italic; }
+.profile-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.profile-info-item {
+  display: flex; flex-direction: column; gap: 3px;
+  background: var(--bg-panel-2); border: 1px solid var(--border-soft); border-radius: var(--radius-md);
+  padding: 9px 11px;
+}
+.profile-info-label { font-size: 10.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.profile-info-value { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.profile-modal .settings-actions { padding: 14px 20px 20px; }
 .profile-modal textarea {
   background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm);
   color: var(--text-primary); padding: 10px 13px; font-size: 14px; font-family: inherit; resize: vertical;
