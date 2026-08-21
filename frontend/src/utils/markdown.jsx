@@ -82,10 +82,10 @@ export function parseMarkdownBlocks(content) {
   return blocks;
 }
 
-// Uma unica regex com alternativas (grupos nomeados) pra achar o PROXIMO token inline, da
-// esquerda pra direita - ordem importa (code antes de bold, etc) pra nao um "engolir" o outro.
-const INLINE_RE =
-  /`(?<code>[^`\n]+)`|\*\*(?<bold>[^*\n]+)\*\*|__(?<underline>[^_\n]+)__|~~(?<strike>[^~\n]+)~~|\*(?<italic1>[^*\n]+)\*|_(?<italic2>[^_\n]+)_|\[(?<linktext>[^\]\n]+)\]\((?<linkurl>https?:\/\/[^\s)]+)\)|(?<autolink>https?:\/\/[^\s<]+)|@(?<mention>\w+)/g;
+// Fonte da regex de tokens inline (SEM o "g" aqui) - so' vira RegExp de verdade dentro de
+// renderInline, uma instancia NOVA a cada chamada (ver comentario la' embaixo pro motivo).
+const INLINE_SOURCE =
+  "`(?<code>[^`\\n]+)`|\\*\\*(?<bold>[^*\\n]+)\\*\\*|__(?<underline>[^_\\n]+)__|~~(?<strike>[^~\\n]+)~~|\\*(?<italic1>[^*\\n]+)\\*|_(?<italic2>[^_\\n]+)_|\\[(?<linktext>[^\\]\\n]+)\\]\\((?<linkurl>https?:\\/\\/[^\\s)]+)\\)|(?<autolink>https?:\\/\\/[^\\s<]+)|@(?<mention>\\w+)";
 
 /**
  * Formatacao inline (dentro de um paragrafo/item de lista/citacao) - negrito, italico,
@@ -103,8 +103,14 @@ export function renderInline(text, { memberUsernames = [], myUsername, members =
     let lastIndex = 0;
     let match;
     let tokenIdx = 0;
-    INLINE_RE.lastIndex = 0;
-    while ((match = INLINE_RE.exec(line))) {
+    // Regex com flag "g" e' STATEFUL (lastIndex) - uma instancia compartilhada quebrava aqui
+    // porque renderInline chama a SI MESMA (pra formatacao dentro de **negrito**, __sublinhado__
+    // etc): a chamada recursiva reusava o mesmo objeto de regex e bagunçava o lastIndex da
+    // chamada de FORA no meio da propria iteracao dela, as vezes travando num loop que nunca
+    // avancava - trava a aba inteira (bug reportado: app trava 100% ao mandar markdown).
+    // Instancia NOVA a cada chamada = cada nivel de recursao tem seu proprio estado, isolado.
+    const re = new RegExp(INLINE_SOURCE, "g");
+    while ((match = re.exec(line))) {
       if (match.index > lastIndex) out.push(line.slice(lastIndex, match.index));
       const key = `${keyPrefix}-${lineIdx}-${tokenIdx++}`;
       const g = match.groups;
@@ -145,6 +151,10 @@ export function renderInline(text, { memberUsernames = [], myUsername, members =
         }
       }
       lastIndex = match.index + match[0].length;
+      // Reforco: nenhuma das alternativas hoje pode casar string vazia, mas se um dia alguem
+      // mexer na regex e introduzir uma, isso evita o mesmo tipo de loop infinito de novo -
+      // forca o ponteiro a andar pelo menos 1 caractere sempre.
+      if (match[0].length === 0) re.lastIndex++;
     }
     if (lastIndex < line.length) out.push(line.slice(lastIndex));
   });
