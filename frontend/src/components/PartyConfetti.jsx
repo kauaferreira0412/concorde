@@ -23,7 +23,7 @@ function makePieces(count) {
  * Dispara uma leva ao montar e depois de tempos em tempos (intervalMs) - nao fica caindo
  * confete o tempo todo, so' um "toque" ocasional.
  */
-export default function PartyConfetti({ intervalMs = 180000, burstMs = 6000, pieceCount = 36 }) {
+export default function PartyConfetti({ intervalMs = 600000, burstMs = 6000, pieceCount = 36 }) {
   const [pieces, setPieces] = useState(null);
 
   useEffect(() => {

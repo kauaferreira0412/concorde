@@ -4,10 +4,12 @@ import { XIcon } from "./icons.jsx";
 const DISMISS_KEY = "potatoMafiaBannerDismissed";
 
 /**
- * Cantinho comemorativo fixo - esse projeto inteiro e' um presente de aniversario pro grupo
+ * Cantinho comemorativo - esse projeto inteiro e' um presente de aniversario pro grupo
  * "Potato Mafia" (pedido explicito do usuario), entao so' aparece quando o servidor selecionado
- * se chama isso (ver ServerPage.jsx). So' CSS (nenhuma imagem/gif pesado, ver global.css) -
- * flutua e balança suavemente, nada de JS rodando por frame.
+ * se chama isso (ver ServerPage.jsx). Vive DENTRO da lista de membros (ver MemberList.jsx,
+ * pedido explicito do usuario - antes ficava flutuando fixo no canto da tela). So' CSS
+ * (nenhuma imagem/gif pesado, ver global.css) - flutua e balança suavemente, nada de JS
+ * rodando por frame.
  */
 export default function PotatoMafiaBanner() {
   const [dismissed, setDismissed] = useState(() => sessionStorage.getItem(DISMISS_KEY) === "true");

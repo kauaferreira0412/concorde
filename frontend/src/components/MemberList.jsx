@@ -6,6 +6,7 @@ import { useAlert } from "../context/AlertContext.jsx";
 import { ChevronsLeftIcon, ChevronsRightIcon, PencilIcon, TrashIcon, UsersIcon } from "./icons.jsx";
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
+import PotatoMafiaBanner from "./PotatoMafiaBanner.jsx";
 
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", OFFLINE: "Offline" };
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
@@ -16,7 +17,7 @@ const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: 
  * perturbe/Offline - ver PresenceStatus no backend). "Invisível" (escolha do proprio
  * usuario em Configuracoes) sempre aparece como Offline pra todo mundo, de propositio.
  */
-export default function MemberList({ serverId, stompClient, stompConnected }) {
+export default function MemberList({ serverId, stompClient, stompConnected, showPotatoBanner }) {
   const members = useServerMembers(serverId, stompClient, stompConnected);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("memberListCollapsed") === "true");
   // MANAGE_MEMBERS - controla se "Remover do servidor"/"Editar apelido" aparecem no clique
@@ -72,6 +73,7 @@ export default function MemberList({ serverId, stompClient, stompConnected }) {
 
       {!collapsed && (
         <div className="member-list-body">
+          {showPotatoBanner && <PotatoMafiaBanner />}
           {online.length > 0 && (
             <>
               <p className="channel-group-title member-list-group">ONLINE — {online.length}</p>

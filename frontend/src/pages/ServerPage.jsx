@@ -14,7 +14,6 @@ import EditServerModal from "../components/EditServerModal.jsx";
 import ServerRolesModal from "../components/ServerRolesModal.jsx";
 import SettingsModal from "../components/SettingsModal.jsx";
 import PartyConfetti from "../components/PartyConfetti.jsx";
-import PotatoMafiaBanner from "../components/PotatoMafiaBanner.jsx";
 import { VoiceCallProvider } from "../context/VoiceCallContext.jsx";
 
 export default function ServerPage() {
@@ -137,12 +136,9 @@ export default function ServerPage() {
 
   return (
     <VoiceCallProvider stompClient={stompClient} stompConnected={stompConnected}>
-      {isPotatoMafiaServer && (
-        <>
-          <PartyConfetti />
-          <PotatoMafiaBanner />
-        </>
-      )}
+      {/* Confete a cada 10min (600000ms) - o "Parabéns" em si mora dentro da lista de membros
+          agora (ver MemberList.jsx), nao mais flutuando fixo na tela (pedido do usuario). */}
+      {isPotatoMafiaServer && <PartyConfetti intervalMs={600000} />}
       <div className="app-shell">
         <ServerSidebar
           servers={servers}
@@ -182,7 +178,12 @@ export default function ServerPage() {
           />
         )}
 
-        <MemberList serverId={selectedServerId} stompClient={stompClient} stompConnected={stompConnected} />
+        <MemberList
+          serverId={selectedServerId}
+          stompClient={stompClient}
+          stompConnected={stompConnected}
+          showPotatoBanner={isPotatoMafiaServer}
+        />
 
         {showCreateServer && (
           <CreateServerModal onClose={() => setShowCreateServer(false)} onCreate={handleCreateServer} />
