@@ -18,6 +18,14 @@ services:
     environment:
       LIVEKIT_KEYS: "devkey: devsecret1234567890devsecret1234567890"
 
+  # Gera "PO Tokens" (prova de origem) pro yt-dlp usar - resolve o "Sign in to confirm you're
+  # not a bot" sem precisar de cookie/login nenhum (ver plugin instalado em music-bot/Dockerfile
+  # e YTDLP_EXTRA_ARGS em music-bot/index.js). So' precisa ser alcancavel PELO music-bot, nao
+  # expoe porta nenhuma pro host.
+  pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    restart: unless-stopped
+
   # Bot de musica (/play) - opcional em dev, so' sobe se voce quiser testar isso localmente.
   # O backend (fora do Docker em dev, ver README) precisa apontar MUSIC_BOT_URL pra
   # http://localhost:4001 (a porta abaixo) - troque no application.yml ou como variavel de
@@ -37,10 +45,13 @@ services:
       # container. So' usado pra avisar "entrei/saí da call" (ver MusicBotInternalController) -
       # se o backend nao estiver rodando nesse instante isso so' falha silenciosamente.
       BACKEND_URL: http://host.docker.internal:8080
-    # cookies.txt (OPCIONAL, nunca commitado) do SEU login do YouTube - contorna o "Sign in to
-    # confirm you're not a bot" (mais comum em VPS que na sua maquina, mas pode acontecer aqui
-    # tambem). Sem o arquivo, o bot continua funcionando do jeito de sempre.
+      # "pot-provider" resolve pro service acima na rede interna do compose.
+      POT_PROVIDER_URL: http://pot-provider:4416
+    # cookies.txt (OPCIONAL, nunca commitado) do SEU login do YouTube - reforca o PO Token
+    # acima em alguns casos, mas nao e' mais o principal. Sem o arquivo, o bot continua
+    # funcionando do jeito de sempre.
     volumes:
       - ./music-bot/data:/app/data
     depends_on:
       - livekit
+      - pot-provider

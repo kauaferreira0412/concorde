@@ -72,6 +72,15 @@ services:
       - livekit
       - music-bot
 
+  # Gera "PO Tokens" (prova de origem) pro yt-dlp usar - resolve o "Sign in to confirm you're
+  # not a bot" (comum em IP de VPS/datacenter) sem precisar de cookie/login nenhum, diferente
+  # do cookies.txt (que expira/precisa reexportar de vez em quando). Ver plugin instalado em
+  # music-bot/Dockerfile e YTDLP_EXTRA_ARGS em music-bot/index.js. So' precisa ser alcancavel
+  # PELO music-bot, nao expoe porta nenhuma pra internet.
+  pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    restart: unless-stopped
+
   # Bot de musica (/play, ver MusicController.java/music-bot/index.js) - entra na call como
   # participante de verdade e publica o audio. Servico Node.js separado do backend (Spring) de
   # proposito - ver comentario no topo do music-bot/index.js.
@@ -86,10 +95,11 @@ services:
       # avisar "entrei/saí da call" (ver MusicBotInternalController), pra ele aparecer na lista
       # de presenca de voz igual qualquer outro participante.
       BACKEND_URL: http://backend:8080
+      # "pot-provider" e' o service acima - resolve sozinho na rede interna do Docker.
+      POT_PROVIDER_URL: http://pot-provider:4416
     # cookies.txt (OPCIONAL, nunca commitado - ver .gitignore) exportado do SEU proprio login
-    # do YouTube, pra contornar o "Sign in to confirm you're not a bot" que o YouTube costuma
-    # jogar em IP de VPS/datacenter (ver DEPLOY.md pra como gerar esse arquivo). Sem ele, o bot
-    # continua funcionando do jeito de sempre - so' fica mais sujeito a esse bloqueio.
+    # do YouTube - reforca o PO Token acima em alguns casos, mas nao e' mais o principal desde
+    # que o pot-provider existe. Sem o arquivo, o bot continua funcionando do jeito de sempre.
     volumes:
       - ./music-bot/data:/app/data
     dns:
@@ -100,6 +110,7 @@ services:
     # no bot e' melhor esforco (ver music-bot/index.js), nao trava nada se o backend subir depois.
     depends_on:
       - livekit
+      - pot-provider
 
   gateway:
     build: ./frontend

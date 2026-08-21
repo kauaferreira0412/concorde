@@ -215,19 +215,32 @@ async function disconnectSession(channelId) {
 }
 
 // O YouTube costuma bloquear IPs de datacenter/VPS (diferente do seu PC, que tem IP
-// residencial) com "Sign in to confirm you're not a bot" - o proprio yt-dlp recomenda passar
-// cookies de uma sessao logada de verdade pra contornar isso (forcar outro "client" tipo
-// android/ios/tv NAO resolve - eles ate' passam por essa checagem, mas o YouTube bloqueia o
-// download do audio em si nesses clientes agora, formato "PO Token"/SABR, testado e piorou).
-// Cookies sao OPCIONAIS: se o arquivo nao existir, o bot funciona do jeito antigo (pode falhar
-// em VPS flagada, mas nao quebra nada) - ver COOKIES_PATH/veja o DEPLOY.md pra como gerar o
-// arquivo a partir do SEU proprio login do YouTube (nunca commitado, fica so' na VPS).
+// residencial) com "Sign in to confirm you're not a bot". Duas defesas, que se somam:
+//
+// 1. PO Token (principal) - o servico "pot-provider" (ver docker-compose*.yml, imagem
+//    brainicism/bgutil-ytdlp-pot-provider) gera uma "prova de origem" por conta propria a cada
+//    pedido, sem precisar de cookie/login nenhum. O plugin que fala com ele fica instalado
+//    dentro da propria imagem (ver music-bot/Dockerfile) - o yt-dlp carrega ele sozinho, so'
+//    precisamos apontar pro endereco do servico via --extractor-args.
+// 2. cookies.txt (reforco OPCIONAL) - sessao de uma conta do YouTube de verdade, exportada na
+//    mao (ver DEPLOY.md). Nao e' mais a defesa principal (o PO Token cobre a maioria dos
+//    casos sozinho), mas ainda ajuda em alguns videos/situacoes especificas.
+//
+// (Testado e DESCARTADO: forcar outro "client" tipo android/ios/tv no yt-dlp - eles ate'
+// passam da checagem de bot, mas o YouTube bloqueia o download do audio em si nesses clientes
+// agora, formato SABR.)
 const COOKIES_PATH = "/app/data/cookies.txt";
-const YTDLP_EXTRA_ARGS = existsSync(COOKIES_PATH) ? ["--cookies", COOKIES_PATH] : [];
-if (YTDLP_EXTRA_ARGS.length) {
-  console.log("cookies.txt encontrado - yt-dlp vai usar a sessão logada pra extrair áudio.");
+const POT_PROVIDER_URL = process.env.POT_PROVIDER_URL || "http://pot-provider:4416";
+const YTDLP_EXTRA_ARGS = [
+  "--extractor-args",
+  `youtubepot-bgutilhttp:base_url=${POT_PROVIDER_URL}`,
+  ...(existsSync(COOKIES_PATH) ? ["--cookies", COOKIES_PATH] : []),
+];
+console.log(`PO Token provider: ${POT_PROVIDER_URL}`);
+if (existsSync(COOKIES_PATH)) {
+  console.log("cookies.txt encontrado - yt-dlp tambem vai usar a sessão logada como reforço.");
 } else {
-  console.log("Sem cookies.txt (ver DEPLOY.md) - se o YouTube bloquear com 'confirm you're not a bot', é isso.");
+  console.log("Sem cookies.txt (opcional, ver DEPLOY.md) - o PO Token sozinho já deve bastar na maioria dos casos.");
 }
 
 /** Titulo + duracao, sem baixar audio nenhum - pra devolver/mostrar algo bonito na fila (ver

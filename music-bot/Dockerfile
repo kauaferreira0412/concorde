@@ -16,10 +16,21 @@ FROM node:20-bookworm-slim
 # Deno: o yt-dlp mais recente precisa de um runtime JavaScript pra resolver o desafio de
 # assinatura que o YouTube coloca nos links de audio (sem isso: "Signature solving failed" ->
 # "The page needs to be reloaded", mesmo com cookies validos - reportado/reproduzido na VPS).
+#
+# Plugin bgutil-ytdlp-pot-provider: gera um "PO Token" (prova de origem) por conta propria a
+# cada pedido, SEM depender de cookie/login nenhum - resolve o "Sign in to confirm you're not
+# a bot" de um jeito que nao expira/nao precisa reexportar toda hora (diferente do cookies.txt,
+# que e' so' um paliativo). O plugin em si e' so' um .zip largado na pasta de plugins do yt-dlp
+# (nao precisa de pip/Python instalado - o proprio yt-dlp standalone carrega ele sozinho); quem
+# faz o trabalho pesado (gerar o token) e' o servico separado "pot-provider" no compose, que
+# esse plugin so' consulta via HTTP (ver YTDLP_EXTRA_ARGS em index.js).
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl unzip ca-certificates \
     && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o /usr/local/bin/yt-dlp \
     && chmod a+rx /usr/local/bin/yt-dlp \
     && curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh \
+    && mkdir -p /root/.config/yt-dlp/plugins \
+    && curl -L https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/latest/download/bgutil-ytdlp-pot-provider.zip \
+       -o /root/.config/yt-dlp/plugins/bgutil-ytdlp-pot-provider.zip \
     && apt-get purge -y curl unzip && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
