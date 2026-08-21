@@ -1556,26 +1556,28 @@ img.chat-header-avatar { object-fit: cover; }
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  width: 64px;
+  width: 120px;
 }
+/* Quadrado, igual o tile de camera ligada (nao mais redondo) - e' bem maior tambem, pra dar
+   pra reconhecer o rosto/nome numa tela grande, nao so' um circulozinho minusculo. */
 .fullscreen-participant-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
+  width: 120px;
+  height: 120px;
+  border-radius: var(--radius-md);
   object-fit: cover;
   background: linear-gradient(135deg, var(--accent), var(--intel));
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 26px;
   font-weight: 700;
   border: 3px solid transparent;
   transition: border-color 0.12s ease;
 }
 .fullscreen-participant-item.speaking .fullscreen-participant-avatar { border-color: var(--success); }
 .fullscreen-participant-name {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 600;
   color: #fff;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
