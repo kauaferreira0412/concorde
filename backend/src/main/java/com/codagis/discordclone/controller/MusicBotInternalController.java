@@ -1,5 +1,7 @@
 package com.codagis.discordclone.controller;
 
+import com.codagis.discordclone.domain.MusicBotSettings;
+import com.codagis.discordclone.service.MusicBotSettingsService;
 import com.codagis.discordclone.ws.VoicePresenceService;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
@@ -21,11 +23,14 @@ import java.util.Map;
 public class MusicBotInternalController {
 
     private final VoicePresenceService voicePresenceService;
+    private final MusicBotSettingsService musicBotSettingsService;
     private final SimpMessagingTemplate messagingTemplate;
 
     public MusicBotInternalController(VoicePresenceService voicePresenceService,
+                                       MusicBotSettingsService musicBotSettingsService,
                                        SimpMessagingTemplate messagingTemplate) {
         this.voicePresenceService = voicePresenceService;
+        this.musicBotSettingsService = musicBotSettingsService;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -34,7 +39,11 @@ public class MusicBotInternalController {
     @PostMapping("/{channelId}/presence")
     public void presence(@PathVariable Long channelId, @RequestBody PresenceRequest req) {
         if (req.joined()) {
-            voicePresenceService.joinBot(channelId);
+            // Nome fixo ("Melodion") + foto configurada pelo admin (ver MusicBotSettingsController) -
+            // lido AQUI (nao guardado em VoicePresenceService, que e' so' presenca efemera) pra
+            // trocar a foto valer na proxima vez que o bot entrar em QUALQUER call, sem reiniciar nada.
+            MusicBotSettings settings = musicBotSettingsService.get();
+            voicePresenceService.joinBot(channelId, "Melodion", settings.getAvatarUrl());
         } else {
             voicePresenceService.leaveBot(channelId);
         }

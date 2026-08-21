@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -29,11 +29,39 @@ export default function AdminPage() {
   const [grantServerId, setGrantServerId] = useState("");
   const [grantMsg, setGrantMsg] = useState("");
 
+  // Foto de perfil do bot de musica ("Melodion", ver MusicController/music-bot/index.js) -
+  // afeta como ele aparece em QUALQUER call de qualquer servidor, por isso fica so' aqui no
+  // painel do admin (nao e' uma configuracao "por servidor").
+  const [botAvatarUrl, setBotAvatarUrl] = useState(null);
+  const [botAvatarUploading, setBotAvatarUploading] = useState(false);
+  const [botAvatarError, setBotAvatarError] = useState("");
+  const botAvatarInputRef = useRef(null);
+
   useEffect(() => {
     if (!isAdmin) return;
     reloadUsers();
     api.get("/api/servers").then(({ data }) => setServers(data));
+    api.get("/api/music-bot/settings").then(({ data }) => setBotAvatarUrl(data.avatarUrl));
   }, [isAdmin]);
+
+  async function handleBotAvatarChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setBotAvatarError("");
+    setBotAvatarUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await api.post("/api/music-bot/avatar", formData);
+      setBotAvatarUrl(data.avatarUrl);
+    } catch (err) {
+      setBotAvatarError(err.response?.data?.error || "Falha ao enviar a foto");
+    } finally {
+      setBotAvatarUploading(false);
+    }
+  }
 
   function reloadUsers() {
     api.get("/api/admin/users").then(({ data }) => setUsers(data));
@@ -115,6 +143,30 @@ export default function AdminPage() {
           {createOk && <p className="admin-success">{createOk}</p>}
           <button type="submit">Criar usuário</button>
         </form>
+
+        <div className="admin-card">
+          <h2>Bot de música (Melodion)</h2>
+          <p className="admin-hint">Foto de perfil dele em qualquer call, de qualquer servidor.</p>
+          <div className="avatar-picker">
+            <Avatar name="Melodion" url={botAvatarUrl} className="avatar-picker-preview" />
+            <div>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                ref={botAvatarInputRef}
+                onChange={handleBotAvatarChange}
+                hidden
+              />
+              <button type="button" onClick={() => botAvatarInputRef.current?.click()} disabled={botAvatarUploading}>
+                {botAvatarUploading ? "Enviando..." : "Trocar foto"}
+              </button>
+              <p className="admin-hint" style={{ margin: "6px 0 0" }}>
+                PNG, JPG, GIF ou WEBP, até 8MB.
+              </p>
+            </div>
+          </div>
+          {botAvatarError && <p className="auth-error">{botAvatarError}</p>}
+        </div>
 
         <form className="admin-card" onSubmit={handleGrantAccess}>
           <h2>Liberar acesso a um servidor</h2>

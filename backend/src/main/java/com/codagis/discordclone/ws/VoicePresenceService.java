@@ -164,9 +164,9 @@ public class VoicePresenceService {
      * acontece sozinho (ex: desconexao por inatividade) - por isso nao da pra disparar isso so'
      * a partir do /play e /stop do MusicController, so' o bot sabe com certeza quando entrou/saiu.
      */
-    public void joinBot(Long channelId) {
+    public void joinBot(Long channelId, String name, String avatarUrl) {
         byChannel.computeIfAbsent(channelId, k -> new ConcurrentHashMap<>())
-                .put(botUserId(channelId), new VoiceParticipantInfo(botUserId(channelId), "🎵 Music Bot", null,
+                .put(botUserId(channelId), new VoiceParticipantInfo(botUserId(channelId), name, avatarUrl,
                         true, false, false, false));
         broadcast(channelId);
     }

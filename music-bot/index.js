@@ -2,7 +2,7 @@
 // audio como um participante de verdade na sala do LiveKit exige o SDK nativo
 // "@livekit/rtc-node" (a mesma engine usada nos outros SDKs "de verdade" do LiveKit), que so'
 // existe pra Node/Python/Go - nao ha equivalente maduro pra Java. Em vez de forcar isso dentro
-// do Spring Boot, esse processo pequeno cuida so' disso: entra na call como "🎵 Music Bot" e
+// do Spring Boot, esse processo pequeno cuida so' disso: entra na call como "Melodion" e
 // toca o que o /play (ver ChatWindow.jsx/MusicController.java) mandar.
 //
 // Pipeline por musica: yt-dlp (extrai o audio do link/busca) -> ffmpeg (decodifica pra PCM cru)
@@ -46,13 +46,13 @@ if (!LIVEKIT_WS_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
 // channelId (string) -> sessao ativa (uma call de voz em que o bot esta conectado agora)
 const sessions = new Map();
 
-/** Entra numa sala do LiveKit como "🎵 Music Bot" e publica um track de audio vazio, pronto
+/** Entra numa sala do LiveKit como "Melodion" e publica um track de audio vazio, pronto
  *  pra receber frames - usado tanto pra entrar pela primeira vez (connectSession) quanto pra
  *  mover de canal (moveSession, que entra na sala NOVA antes de sair da antiga). */
 async function connectToRoom(channelId) {
   const roomName = `channel-${channelId}`;
   const identity = `musicbot-${channelId}`;
-  const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity, name: "🎵 Music Bot" });
+  const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity, name: "Melodion" });
   at.addGrant({
     room: roomName,
     roomJoin: true,
