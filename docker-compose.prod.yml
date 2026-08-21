@@ -86,6 +86,12 @@ services:
       # avisar "entrei/saí da call" (ver MusicBotInternalController), pra ele aparecer na lista
       # de presenca de voz igual qualquer outro participante.
       BACKEND_URL: http://backend:8080
+    # cookies.txt (OPCIONAL, nunca commitado - ver .gitignore) exportado do SEU proprio login
+    # do YouTube, pra contornar o "Sign in to confirm you're not a bot" que o YouTube costuma
+    # jogar em IP de VPS/datacenter (ver DEPLOY.md pra como gerar esse arquivo). Sem ele, o bot
+    # continua funcionando do jeito de sempre - so' fica mais sujeito a esse bloqueio.
+    volumes:
+      - ./music-bot/data:/app/data:ro
     dns:
       - 8.8.8.8
       - 1.1.1.1

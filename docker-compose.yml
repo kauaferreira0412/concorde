@@ -37,5 +37,10 @@ services:
       # container. So' usado pra avisar "entrei/saí da call" (ver MusicBotInternalController) -
       # se o backend nao estiver rodando nesse instante isso so' falha silenciosamente.
       BACKEND_URL: http://host.docker.internal:8080
+    # cookies.txt (OPCIONAL, nunca commitado) do SEU login do YouTube - contorna o "Sign in to
+    # confirm you're not a bot" (mais comum em VPS que na sua maquina, mas pode acontecer aqui
+    # tambem). Sem o arquivo, o bot continua funcionando do jeito de sempre.
+    volumes:
+      - ./music-bot/data:/app/data:ro
     depends_on:
       - livekit

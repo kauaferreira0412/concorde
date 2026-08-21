@@ -20,6 +20,9 @@ frontend/public/downloads/
 
 # Bot de musica (Node.js separado, ver music-bot/)
 music-bot/node_modules/
+# cookies.txt do YouTube (ver DEPLOY.md) - credencial de sessao de verdade, NUNCA versionar.
+music-bot/data/*
+!music-bot/data/.gitkeep
 
 # Deploy (producao)
 .env.prod

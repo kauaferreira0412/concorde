@@ -11,6 +11,7 @@
 import express from "express";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { AccessToken, TrackSource as GrantTrackSource } from "livekit-server-sdk";
 import {
   AudioFrame,
@@ -213,12 +214,29 @@ async function disconnectSession(channelId) {
   broadcastQueue(session); // avisa o card no chat que esvaziou (bot saiu = fila acabou tambem)
 }
 
+// O YouTube costuma bloquear IPs de datacenter/VPS (diferente do seu PC, que tem IP
+// residencial) com "Sign in to confirm you're not a bot" - o proprio yt-dlp recomenda passar
+// cookies de uma sessao logada de verdade pra contornar isso (forcar outro "client" tipo
+// android/ios/tv NAO resolve - eles ate' passam por essa checagem, mas o YouTube bloqueia o
+// download do audio em si nesses clientes agora, formato "PO Token"/SABR, testado e piorou).
+// Cookies sao OPCIONAIS: se o arquivo nao existir, o bot funciona do jeito antigo (pode falhar
+// em VPS flagada, mas nao quebra nada) - ver COOKIES_PATH/veja o DEPLOY.md pra como gerar o
+// arquivo a partir do SEU proprio login do YouTube (nunca commitado, fica so' na VPS).
+const COOKIES_PATH = "/app/data/cookies.txt";
+const YTDLP_EXTRA_ARGS = existsSync(COOKIES_PATH) ? ["--cookies", COOKIES_PATH] : [];
+if (YTDLP_EXTRA_ARGS.length) {
+  console.log("cookies.txt encontrado - yt-dlp vai usar a sessão logada pra extrair áudio.");
+} else {
+  console.log("Sem cookies.txt (ver DEPLOY.md) - se o YouTube bloquear com 'confirm you're not a bot', é isso.");
+}
+
 /** Titulo + duracao, sem baixar audio nenhum - pra devolver/mostrar algo bonito na fila (ver
  *  MusicQueueCard.jsx) sem precisar rodar o pipeline inteiro so' pra descobrir isso. */
 function fetchMetadata(channelId, query) {
   return new Promise((resolve) => {
     const p = spawn("yt-dlp", [
       "--no-playlist",
+      ...YTDLP_EXTRA_ARGS,
       "--print",
       "%(title)s",
       "--print",
@@ -297,7 +315,16 @@ async function startPlayback(session, item) {
   session.nowPlaying = item;
   broadcastQueue(session);
 
-  const ytdlp = spawn("yt-dlp", ["--no-playlist", "-f", "bestaudio", "-o", "-", "--quiet", item.resolvedQuery]);
+  const ytdlp = spawn("yt-dlp", [
+    "--no-playlist",
+    ...YTDLP_EXTRA_ARGS,
+    "-f",
+    "bestaudio",
+    "-o",
+    "-",
+    "--quiet",
+    item.resolvedQuery,
+  ]);
   const ffmpeg = spawn("ffmpeg", [
     "-loglevel",
     "error",

@@ -1,3 +1,4 @@
+
 # Deploy na VPS (Docker)
 
 Passo a passo pra rodar o Concorde inteiro (Postgres + backend + LiveKit + frontend) numa
@@ -154,3 +155,38 @@ navegador (ver `frontend/electron/main.cjs`, `preload.cjs` e `src/components/Scr
 - `50000-50100/udp` e `7881/tcp` (LiveKit, direto, sem passar pelo Caddy): a *mídia* de
   áudio/vídeo em si. É por isso que essas portas precisam estar abertas separadamente — diferente
   do que acontecia com o ngrok, aqui dá pra abrir UDP de verdade porque é sua própria VPS.
+
+## Bot de música (Melodion) sendo bloqueado pelo YouTube ("Sign in to confirm you're not a bot")
+
+VPS/datacenter costuma ter o IP "marcado" pelo YouTube, diferente do seu PC (IP residencial) -
+o sintoma é o bot entrar na call mas não tocar nada, e o título da música aparecer como o link
+cru no chat em vez do nome de verdade. Dá pra ver a confirmação nos logs:
+
+```bash
+docker compose -f docker-compose.prod.yml logs --tail 40 music-bot
+```
+
+Se aparecer `ERROR: [youtube] ...: Sign in to confirm you're not a bot`, o jeito confiável de
+resolver é dar pro `yt-dlp` os cookies de uma sessão sua de verdade, já logada no YouTube (forçar
+outro "client" tipo android/ios/tv **não resolve** - eles até passam dessa checagem, mas o
+YouTube bloqueia o download do áudio em si nesses clientes agora - já testamos).
+
+1. No seu navegador (Chrome/Firefox), **logado no YouTube**, instale uma extensão que exporta
+   cookies no formato Netscape - ex: "Get cookies.txt LOCALLY" (Chrome) ou "cookies.txt" (Firefox).
+2. Abra `youtube.com`, exporte os cookies com a extensão, salve como `cookies.txt`.
+3. Envie esse arquivo pra VPS, na pasta `music-bot/data/` (criada vazia no repo, ignorada pelo
+   git - o arquivo nunca é commitado, fica só na VPS):
+   ```bash
+   scp cookies.txt root@187.127.37.101:~/concorde/music-bot/data/cookies.txt
+   ```
+4. Reinicie só o bot pra ele pegar o arquivo (não precisa rebuildar nada, é só um volume montado):
+   ```bash
+   ssh root@187.127.37.101 "cd ~/concorde && docker compose -f docker-compose.prod.yml restart music-bot"
+   ```
+5. Confira no log (`docker compose ... logs --tail 5 music-bot`) se apareceu a linha
+   `cookies.txt encontrado - yt-dlp vai usar a sessão logada pra extrair áudio.`
+
+Esses cookies expiram/o YouTube pode invalidar de vez em quando (não tem uma validade fixa) -
+se o bloqueio voltar depois de um tempo, é só repetir os passos 1-3 com cookies novos. **Nunca
+compartilhe esse arquivo** (ele equivale à sua sessão logada) nem cole o conteúdo dele no chat -
+mande só via `scp` direto pra VPS.
