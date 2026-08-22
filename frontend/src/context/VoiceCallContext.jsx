@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { Room, RoomEvent, Track } from "livekit-client";
+import { Room, RoomEvent, ScreenSharePresets, Track } from "livekit-client";
 import api from "../api/client";
 import { useAuth } from "./AuthContext.jsx";
 import { useAlert } from "./AlertContext.jsx";
@@ -644,6 +644,17 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         audioCaptureDefaults: {
           ...(savedInput ? { deviceId: savedInput } : {}),
           noiseSuppression: false,
+        },
+        // O PADRAO do proprio livekit-client pra transmissao de tela e' baixo de proposito
+        // (h1080fps15 = so' 15fps e 2.5Mbps, pensado pra economizar banda no caso comum) - na
+        // pratica isso faz QUALQUER transmissao de tela parecer "travando" (15fps e' bem
+        // perceptivel, principalmente em jogos/video) mesmo com internet de sobra (reportado:
+        // "as vezes fica boa, as vezes trava"). h1080fps30 sobe pra 30fps/5Mbps - continua
+        // sendo so' um TETO (o proprio WebRTC reduz sozinho se a internet de quem esta
+        // transmitindo realmente nao aguentar, isso nao muda), mas para de limitar
+        // artificialmente quem TEM banda de sobra pra transmitir liso.
+        publishDefaults: {
+          screenShareEncoding: ScreenSharePresets.h1080fps30.encoding,
         },
       });
 
