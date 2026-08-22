@@ -500,11 +500,18 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     // e chamar syncScreenShares quando a mudanca for confirmada.
   }, []);
 
-  /** identity e' sempre "user-<id>" (ver VoiceController no backend) - extrai o id pra
-   *  gravar/ler a preferencia de volume por PESSOA (localStorage), nao por sessao de call. */
+  /** identity e' "user-<id>" pra gente (ver VoiceController no backend) ou "musicbot-<channelId>"
+   *  pro bot de musica (ver music-bot/index.js) - devolve a CHAVE de persistencia certa pra
+   *  gravar/ler o volume no localStorage, nao por sessao de call. Pro bot, usa a propria
+   *  identity (unica por canal) como chave - sem isso, o volume ajustado pra ele nunca batia
+   *  no "if (userId)" abaixo (regex so' aceitava "user-N"), entao ficava preso so' no Map em
+   *  memoria e resetava pro padrao toda vez que a pessoa saia e entrava de novo na call
+   *  (reportado - pra outras PESSOAS ja' persistia normal). */
   function userIdFromIdentity(identity) {
     const match = /^user-(\d+)$/.exec(identity || "");
-    return match ? match[1] : null;
+    if (match) return match[1];
+    if (/^musicbot-\d+$/.test(identity || "")) return identity;
+    return null;
   }
 
   /**
