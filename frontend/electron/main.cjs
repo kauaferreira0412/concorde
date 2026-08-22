@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol, ipcMain, desktopCapturer, net, shell, globalShortcut } = require("electron");
+const { app, BrowserWindow, protocol, ipcMain, desktopCapturer, net, shell, globalShortcut, Menu } = require("electron");
 const path = require("path");
 const { pathToFileURL } = require("url");
 const { spawn } = require("child_process");
@@ -39,11 +39,29 @@ protocol.registerSchemesAsPrivileged([
 
 let mainWindow;
 
+// Altura da barra de titulo customizada, em pixels - PRECISA bater com ".desktop-titlebar"
+// e "html[data-desktop-titlebar] #root" em global.css (o React reserva esse espaco no topo
+// da pagina pro conteudo nao ficar escondido atras da barra).
+const TITLEBAR_HEIGHT = 38;
+
 function createWindow(deepLinkUrl) {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     title: "Concorde",
+    backgroundColor: "#050816", // mesmo tom do --bg-app (ver global.css) - evita um "flash" branco
+    // Remove a barra de titulo/menu PADRAO do Windows (aquela feia, com File/Edit/View/Window/
+    // Help e os botoes brancos quadrados) - o conteudo web passa a ocupar a janela inteira, e a
+    // gente desenha nossa PROPRIA barra em cima (ver DesktopTitleBar.jsx). "titleBarOverlay"
+    // mantem os botoes de minimizar/maximizar/fechar sendo desenhados pelo proprio WINDOWS (nao
+    // por nos) so' que com as cores do nosso tema - continuam com o comportamento nativo de
+    // verdade (inclusive o menu de "snap layouts" ao passar o mouse no maximizar, do Windows 11).
+    titleBarStyle: "hidden",
+    titleBarOverlay: {
+      color: "#070b1a", // --bg-rail (ver global.css)
+      symbolColor: "#f4f6fd", // --text-primary
+      height: TITLEBAR_HEIGHT,
+    },
     webPreferences: {
       // getUserMedia/getDisplayMedia (mic, camera, compartilhar tela) funcionam
       // normalmente aqui, igual em um Chrome comum.
@@ -240,6 +258,11 @@ if (!gotLock) {
   });
 
   app.whenReady().then(() => {
+    // Some de vez o menu padrao do Electron (File/Edit/View/Window/Help) - com titleBarStyle
+    // "hidden" acima ele ja nao aparece na barra, mas isso tambem desativa os atalhos de
+    // teclado que vinham junto com ele por padrao (Ctrl+R recarregar, Ctrl+Shift+I devtools
+    // etc), que a gente nao quer expostos num app final pro usuario comum.
+    Menu.setApplicationMenu(null);
     registerAppProtocol();
     const deepLink = process.argv.find((arg) => arg.startsWith(`${APP_PROTOCOL}://`));
     createWindow(deepLink);

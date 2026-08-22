@@ -6,6 +6,7 @@ import LoginPage from "./pages/LoginPage.jsx";
 import ServerPage from "./pages/ServerPage.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
 import UpdateRequiredGate from "./components/UpdateRequiredGate.jsx";
+import DesktopTitleBar from "./components/DesktopTitleBar.jsx";
 
 function PrivateRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -18,6 +19,10 @@ export default function App() {
     // a tela de login, ver UpdateRequiredGate.jsx. So' bloqueia dentro do app desktop
     // (Electron); no navegador sempre libera na hora.
     <UpdateRequiredGate>
+      {/* window.concordeDesktop so' existe dentro do app instalado (ver preload.cjs) - no
+          navegador normal isso e' undefined e a pagina usa a barra de titulo de verdade do
+          proprio navegador, sem nenhuma mudanca. */}
+      {window.concordeDesktop && <DesktopTitleBar />}
       <AlertProvider>
         <ProfileProvider>
           <Routes>

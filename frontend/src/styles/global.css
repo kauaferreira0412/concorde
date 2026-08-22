@@ -61,6 +61,46 @@
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
+
+/* ============================================================
+   Barra de titulo customizada (so' app DESKTOP/Electron - ver DesktopTitleBar.jsx/main.cjs).
+   Os botoes de minimizar/maximizar/fechar sao desenhados pelo proprio WINDOWS por cima
+   (titleBarOverlay, ver main.cjs) - aqui so' cuida do resto: icone + nome do app a esquerda,
+   fundo no estilo do app, e arrastar a janela pelo clique-e-segura (-webkit-app-region: drag,
+   propriedade especifica do Chromium/Electron pra isso). Precisa ficar ACIMA de qualquer modal
+   (z-index bem alto) - um titulo de janela de verdade nunca fica escondido atras de um dialogo.
+   ============================================================ */
+.desktop-titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 150px 0 14px; /* padding-right reserva o espaco dos botoes nativos do Windows */
+  background: var(--bg-rail);
+  border-bottom: 1px solid var(--border-soft);
+  -webkit-app-region: drag;
+  z-index: 100000;
+  user-select: none;
+}
+.desktop-titlebar-icon { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; }
+.desktop-titlebar-title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Empurra TODO o conteudo da pagina pra baixo do espaco que a barra de titulo ocupa - com
+   "* { box-sizing: border-box }" acima, o padding entra DENTRO da altura de 100% do #root
+   (nao soma por cima), entao o resto do app (.app-shell etc) continua enchendo certinho o
+   que sobrou da tela, sem precisar mexer em nenhum layout existente. */
+html[data-desktop-titlebar="true"] #root {
+  padding-top: 38px;
+}
 body {
   font-family: var(--font);
   background: var(--bg-app-grad);
