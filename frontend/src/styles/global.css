@@ -1979,6 +1979,14 @@ h3.chat-heading {
   position: fixed; inset: 0; background: rgba(4, 5, 8, 0.72);
   backdrop-filter: blur(2px);
   display: flex; align-items: center; justify-content: center;
+  /* Sem z-index explicito, o backdrop ficava sujeito a ordem do DOM - qualquer elemento
+     posicionado (fixed/absolute) declarado DEPOIS dele na arvore (ex: avatares de quem esta
+     conectado na call, na sidebar) empatava e vencia por ordem, aparecendo por cima do modal
+     (reportado: "Sair da conta" ficando atras dos avatares). Um numero bem alto garante que
+     todo modal (ConfirmModal, SettingsModal, etc) sempre fica acima de qualquer outra coisa
+     da tela, independente de onde ele e' renderizado no JSX.
+  */
+  z-index: 10000;
 }
 .modal {
   background: var(--bg-panel);
