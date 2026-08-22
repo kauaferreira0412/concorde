@@ -45,6 +45,11 @@ services:
       # .../rtc/rtc e .../rtc/validate vira .../rtc/rtc/validate, que o LiveKit nao reconhece
       # (404). O Caddyfile do gateway ja trata o path /rtc* e manda pro livekit:7880.
       LIVEKIT_PUBLIC_WS_URL: wss://${DOMAIN}
+      # "livekit" e' o service abaixo - resolve sozinho na rede interna do Docker. So' pra
+      # chamadas ADMINISTRATIVAS server-a-server (ver LiveKitService.disconnectParticipant) -
+      # o Caddy (gateway) so' encaminha /rtc* pro LiveKit, entao a rota /twirp/* (admin) nao
+      # daria pra alcancar pelo dominio publico (LIVEKIT_PUBLIC_WS_URL acima).
+      LIVEKIT_INTERNAL_URL: http://livekit:7880
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
       PUBLIC_ORIGIN: https://${DOMAIN}

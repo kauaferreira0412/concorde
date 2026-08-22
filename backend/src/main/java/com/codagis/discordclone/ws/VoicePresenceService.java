@@ -1,5 +1,6 @@
 package com.codagis.discordclone.ws;
 
+import com.codagis.discordclone.service.LiveKitService;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class VoicePresenceService {
 
     private final SimpMessagingTemplate messagingTemplate;
+    private final LiveKitService liveKitService;
 
     // channelId -> (userId -> info)
     private final Map<Long, Map<Long, VoiceParticipantInfo>> byChannel = new ConcurrentHashMap<>();
@@ -32,8 +34,9 @@ public class VoicePresenceService {
     // (ver comentario la' embaixo pro bug que isso resolve).
     private final Map<Long, Map<Long, String>> currentSession = new ConcurrentHashMap<>();
 
-    public VoicePresenceService(SimpMessagingTemplate messagingTemplate) {
+    public VoicePresenceService(SimpMessagingTemplate messagingTemplate, LiveKitService liveKitService) {
         this.messagingTemplate = messagingTemplate;
+        this.liveKitService = liveKitService;
     }
 
     /**
@@ -87,6 +90,14 @@ public class VoicePresenceService {
             }
         }
         broadcast(channelId);
+        // O WebSocket do chat (aqui) e a conexao de audio (LiveKit/WebRTC) sao dois sistemas
+        // SEPARADOS - se o app da pessoa caiu sem avisar (internet cortada, fechou a força), a
+        // gente ja percebeu e tirou ela da lista acima, mas o microfone dela pode continuar
+        // "vivo" na call por um tempo, sem aparecer pra ninguem (reportado pelo usuario -
+        // ouviu a voz de alguem que nao constava mais como conectado). Forca a desconexao de
+        // verdade tambem, em vez de confiar que o proprio cliente (que acabou de sumir) vai
+        // fazer essa limpeza sozinho.
+        liveKitService.disconnectParticipant("channel-" + channelId, "user-" + userId);
     }
 
     public void setMicEnabled(String sessionId, boolean micEnabled) {

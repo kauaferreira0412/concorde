@@ -5,6 +5,7 @@ import com.codagis.discordclone.domain.Membership;
 import com.codagis.discordclone.domain.ServerPermission;
 import com.codagis.discordclone.repository.ChannelRepository;
 import com.codagis.discordclone.repository.MembershipRepository;
+import com.codagis.discordclone.service.LiveKitService;
 import com.codagis.discordclone.service.PermissionService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -41,18 +42,20 @@ public class VoiceModerationController {
     private final PermissionService permissionService;
     private final VoicePresenceService presenceService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final LiveKitService liveKitService;
     private final String musicBotUrl;
     private final RestTemplate restTemplate = new RestTemplate();
 
     public VoiceModerationController(ChannelRepository channelRepository, MembershipRepository membershipRepository,
                                       PermissionService permissionService, VoicePresenceService presenceService,
-                                      SimpMessagingTemplate messagingTemplate,
+                                      SimpMessagingTemplate messagingTemplate, LiveKitService liveKitService,
                                       @Value("${app.music-bot.url}") String musicBotUrl) {
         this.channelRepository = channelRepository;
         this.membershipRepository = membershipRepository;
         this.permissionService = permissionService;
         this.presenceService = presenceService;
         this.messagingTemplate = messagingTemplate;
+        this.liveKitService = liveKitService;
         this.musicBotUrl = musicBotUrl;
     }
 
@@ -116,6 +119,12 @@ public class VoiceModerationController {
             return;
         }
         broadcast(channelId, new VoiceControlEvent("KICK", payload.targetUserId(), null, null, null, null));
+        // O broadcast acima so' funciona se o cliente-alvo estiver vivo pra reagir sozinho -
+        // se o app dele ja tiver travado/perdido conexao (mesmo bug da "conexao fantasma", ver
+        // VoicePresenceService.leaveBySession), o kick pareceria funcionar (some da lista) mas
+        // o audio continuaria saindo. Forca a desconexao de verdade no LiveKit tambem, garante
+        // o kick mesmo contra um cliente que nao vai reagir a nada.
+        liveKitService.disconnectParticipant("channel-" + channelId, "user-" + payload.targetUserId());
     }
 
     /** Punicao GRAVADA (Membership) - continua valendo mesmo se a pessoa sair e entrar de
