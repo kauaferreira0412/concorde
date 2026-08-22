@@ -43,6 +43,13 @@ public class ServerController {
         return serverService.updateServer(currentUser.id(), serverId, req);
     }
 
+    /** Apaga o servidor inteiro (canais, mensagens, membros e perfis) - so' o ADMIN global,
+     *  mesmo criterio de criar/editar (ver ServerService.deleteServer). */
+    @DeleteMapping("/{serverId}")
+    public void delete(@PathVariable Long serverId) {
+        serverService.deleteServer(currentUser.id(), serverId);
+    }
+
     /** Troca o icone do servidor. Salva em potato/servers/{serverId}/... no GCS. */
     @PostMapping(value = "/{serverId}/icon", consumes = "multipart/form-data")
     public ServerResponse uploadIcon(@PathVariable Long serverId, @RequestParam("file") MultipartFile file) {

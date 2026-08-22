@@ -11,4 +11,7 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
     List<Membership> findByServerId(Long serverId);
     Optional<Membership> findByServerIdAndUserId(Long serverId, Long userId);
     boolean existsByServerIdAndUserId(Long serverId, Long userId);
+
+    /** Usado ao apagar um servidor inteiro (ver ServerService.deleteServer). */
+    void deleteByServerId(Long serverId);
 }

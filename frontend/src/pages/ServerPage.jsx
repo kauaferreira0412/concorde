@@ -110,6 +110,19 @@ export default function ServerPage() {
     setServers((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
   }
 
+  /** Depois de excluir um servidor inteiro (EditServerModal, so' ADMIN) - tira da lista e, se
+   *  era o servidor que estava aberto, pula pra outro que tenha sobrado (ou pra tela vazia de
+   *  "nenhum servidor" se essa era o ultimo - mesmo estado que um admin ve antes de criar o
+   *  primeiro servidor). O redirecionamento automatico pro primeiro servidor (useEffect logo
+   *  acima) so roda uma vez na entrada do app, entao precisa disso aqui na mao. */
+  function handleDeleteServer(deletedId) {
+    const remaining = servers.filter((s) => s.id !== deletedId);
+    setServers(remaining);
+    if (selectedServerId === deletedId) {
+      navigate(remaining.length > 0 ? `/servers/${remaining[0].id}` : "/servers", { replace: true });
+    }
+  }
+
   function openCreateChannel(type) {
     if (!selectedServerId) return;
     setCreateChannelType(type);
@@ -196,7 +209,12 @@ export default function ServerPage() {
           />
         )}
         {editingServer && (
-          <EditServerModal server={editingServer} onClose={() => setEditingServer(null)} onUpdate={handleUpdateServer} />
+          <EditServerModal
+            server={editingServer}
+            onClose={() => setEditingServer(null)}
+            onUpdate={handleUpdateServer}
+            onDelete={handleDeleteServer}
+          />
         )}
         {rolesServer && (
           <ServerRolesModal

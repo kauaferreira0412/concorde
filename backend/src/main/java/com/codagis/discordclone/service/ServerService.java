@@ -136,6 +136,25 @@ public class ServerService {
         return toResponse(serverRepository.save(server));
     }
 
+    /** Apaga o servidor inteiro - canais, mensagens, membros e perfis dele. Mesmo criterio de
+     *  quem pode criar/editar servidor (ADMIN global). Nao tem como desfazer, o frontend
+     *  confirma antes (ver EditServerModal.jsx). Nao forca desconexao de quem estiver numa call
+     *  de voz desse servidor nesse momento - mesma limitacao que ja existia em deleteChannel,
+     *  a call so' termina quando a pessoa sair sozinha. */
+    @Transactional
+    public void deleteServer(Long requesterId, Long serverId) {
+        adminGuard.assertAdmin(requesterId);
+        if (!serverRepository.existsById(serverId)) {
+            throw new IllegalArgumentException("Servidor nao encontrado");
+        }
+        channelRepository.findByServerIdOrderByIdAsc(serverId)
+                .forEach(channel -> messageRepository.deleteByChannelId(channel.getId()));
+        channelRepository.deleteByServerId(serverId);
+        serverRoleRepository.deleteByServerId(serverId);
+        membershipRepository.deleteByServerId(serverId);
+        serverRepository.deleteById(serverId);
+    }
+
     @Transactional
     public ServerResponse updateServerIcon(Long requesterId, Long serverId, String iconUrl) {
         adminGuard.assertAdmin(requesterId);

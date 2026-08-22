@@ -1,6 +1,8 @@
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import api from "../api/client";
+import { useAlert } from "../context/AlertContext.jsx";
 import Avatar from "./Avatar.jsx";
+import ConfirmModal from "./ConfirmModal.jsx";
 
 /**
  * Editar um servidor existente (so' ADMIN ve o botao que abre isso, ver ChannelSidebar.jsx -
@@ -8,7 +10,7 @@ import Avatar from "./Avatar.jsx";
  * hora ao escolher o arquivo (igual a foto de perfil do usuario); nome/descricao ficam
  * pendentes ate' clicar em Salvar.
  */
-export default function EditServerModal({ server, onClose, onUpdate }) {
+export default function EditServerModal({ server, onClose, onUpdate, onDelete }) {
   const [name, setName] = useState(server.name || "");
   const [description, setDescription] = useState(server.description || "");
   const [iconUrl, setIconUrl] = useState(server.iconUrl || "");
@@ -16,7 +18,23 @@ export default function EditServerModal({ server, onClose, onUpdate }) {
   const [iconError, setIconError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const iconInputRef = useRef(null);
+  const { showAlert } = useAlert();
+
+  // ConfirmModal fecha sozinho assim que onConfirm() e' chamado (nao espera ele terminar, ver
+  // ConfirmModal.jsx) - por isso o erro, se der, aparece num alerta em vez de dentro do modal
+  // (que ja' nao esta mais na tela quando o "await" resolve). Mesmo padrao de
+  // ChannelSidebar.handleConfirmDeleteChannel.
+  async function handleConfirmDeleteServer() {
+    try {
+      await api.delete(`/api/servers/${server.id}`);
+      onDelete(server.id);
+      onClose();
+    } catch (err) {
+      showAlert(err.response?.data?.error || "Não foi possível excluir esse servidor");
+    }
+  }
 
   async function handleIconChange(e) {
     const file = e.target.files?.[0];
@@ -58,6 +76,7 @@ export default function EditServerModal({ server, onClose, onUpdate }) {
   }
 
   return (
+    <Fragment>
     <div className="modal-backdrop" onClick={onClose}>
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
         <h2>Editar servidor</h2>
@@ -102,6 +121,19 @@ export default function EditServerModal({ server, onClose, onUpdate }) {
 
         {saveError && <p className="auth-error">{saveError}</p>}
 
+        <div className="settings-divider" />
+
+        <div className="settings-field">
+          <label className="settings-label">Zona de perigo</label>
+          <p className="admin-hint" style={{ margin: "0 0 10px" }}>
+            Excluir o servidor apaga todos os canais, mensagens e membros dele. Não dá pra
+            desfazer.
+          </p>
+          <button type="button" className="danger" onClick={() => setConfirmingDelete(true)} disabled={saving}>
+            Excluir servidor
+          </button>
+        </div>
+
         <div className="settings-actions">
           <button type="button" className="link-btn" onClick={onClose} disabled={saving}>
             Cancelar
@@ -112,5 +144,21 @@ export default function EditServerModal({ server, onClose, onUpdate }) {
         </div>
       </form>
     </div>
+
+    {/* Fora do modal-backdrop de cima de proposito - senao os dois "modal-backdrop" ficariam
+        aninhados, e um clique no fundo escuro do ConfirmModal borbulharia pro onClick={onClose}
+        do backdrop de fora tambem, fechando os dois modais de uma vez em vez de so' o de
+        confirmacao. */}
+    {confirmingDelete && (
+      <ConfirmModal
+        title="Excluir servidor"
+        message={`Tem certeza que quer excluir "${server.name}"? Todos os canais, mensagens e membros desse servidor serão apagados junto - não dá pra desfazer.`}
+        confirmLabel="Excluir"
+        danger
+        onClose={() => setConfirmingDelete(false)}
+        onConfirm={handleConfirmDeleteServer}
+      />
+    )}
+    </Fragment>
   );
 }

@@ -7,4 +7,7 @@ import java.util.List;
 
 public interface ServerRoleRepository extends JpaRepository<ServerRole, Long> {
     List<ServerRole> findByServerId(Long serverId);
+
+    /** Usado ao apagar um servidor inteiro (ver ServerService.deleteServer). */
+    void deleteByServerId(Long serverId);
 }
