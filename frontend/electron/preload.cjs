@@ -32,4 +32,20 @@ contextBridge.exposeInMainWorld("concordeDesktop", {
   openExternal: (url) => ipcRenderer.invoke("concorde:open-external", url),
   /** Dispara o desinstalador do Windows e fecha o app. {ok:boolean, error?:string} */
   uninstall: () => ipcRenderer.invoke("concorde:uninstall"),
+
+  /**
+   * Atalhos GLOBAIS de mutar/ensurdecer - registrados no SISTEMA OPERACIONAL (globalShortcut,
+   * ver main.cjs), continuam funcionando mesmo com o Concorde em segundo plano (diferente de um
+   * "keydown" comum, que so' dispara com a janela em foco - era exatamente o bug relatado).
+   * Chamado na entrada do app e toda vez que o usuario muda o atalho em Configuracoes (ver
+   * VoiceCallContext.jsx/SettingsModal.jsx). Formato "ctrl+shift+m" (ver keyboardShortcuts.js).
+   */
+  registerGlobalShortcuts: (muteCombo, deafenCombo) =>
+    ipcRenderer.invoke("concorde:register-shortcuts", { muteCombo, deafenCombo }),
+  /** cb("mute" | "deafen") toda vez que o atalho global correspondente e' disparado. */
+  onGlobalShortcut: (cb) => {
+    const listener = (_event, action) => cb(action);
+    ipcRenderer.on("concorde:global-shortcut", listener);
+    return () => ipcRenderer.removeListener("concorde:global-shortcut", listener);
+  },
 });

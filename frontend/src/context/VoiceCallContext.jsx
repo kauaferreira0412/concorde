@@ -23,7 +23,7 @@ import {
   playScreenShareStopSound,
   playUnmuteSound,
 } from "../utils/soundEffects";
-import { getDeafenShortcut, getMuteShortcut, shortcutFromEvent } from "../utils/keyboardShortcuts";
+import { getDeafenShortcut, getMuteShortcut, shortcutFromEvent, syncGlobalShortcuts } from "../utils/keyboardShortcuts";
 import {
   publishVoiceDeafenState,
   publishVoiceForceDeafen,
@@ -352,9 +352,32 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [activeChannel]);
 
-  // Atalhos globais de mutar/ensurdecer (configuraveis em Configuracoes) - lidos direto do
-  // localStorage a cada tecla, entao uma mudanca em Configuracoes vale na hora, sem re-render.
+  // Atalhos de mutar/ensurdecer (configuraveis em Configuracoes) - lidos direto do localStorage
+  // a cada disparo, entao uma mudanca em Configuracoes vale na hora, sem re-render.
+  //
+  // No navegador normal, so da pra ouvir "keydown" - e isso so' dispara com a janela do
+  // Concorde em FOCO (limitacao de seguranca do proprio navegador, impossivel de contornar
+  // fora de um app nativo). No app desktop (Electron), window.concordeDesktop existe e a gente
+  // usa atalho GLOBAL de verdade (registrado no SO, ver electron/main.cjs/preload.cjs) -
+  // continua funcionando com o Concorde em segundo plano (era exatamente o bug relatado: "so
+  // funciona com o Concorde em tela principal"). Por isso o listener de "keydown" abaixo so'
+  // roda fora do Electron - deixar os dois ativos ao mesmo tempo faria o atalho disparar
+  // DUAS vezes (uma pelo SO, outra pelo navegador) sempre que o Concorde estivesse em foco,
+  // desmutando/mutando de volta na hora.
   useEffect(() => {
+    if (window.concordeDesktop) {
+      // Registra na entrada do app (e de novo toda vez que o usuario salva um atalho novo em
+      // Configuracoes, ver keyboardShortcuts.js) - assim funciona mesmo sem abrir Configuracoes
+      // nessa sessao.
+      syncGlobalShortcuts();
+      const unsubscribe = window.concordeDesktop.onGlobalShortcut((action) => {
+        if (!roomRef.current) return;
+        if (action === "mute") toggleMic();
+        else if (action === "deafen") toggleDeafen();
+      });
+      return unsubscribe;
+    }
+
     function handleKeyDown(e) {
       if (!roomRef.current) return;
       const combo = shortcutFromEvent(e);

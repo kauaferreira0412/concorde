@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol, ipcMain, desktopCapturer, net, shell } = require("electron");
+const { app, BrowserWindow, protocol, ipcMain, desktopCapturer, net, shell, globalShortcut } = require("electron");
 const path = require("path");
 const { pathToFileURL } = require("url");
 const { spawn } = require("child_process");
@@ -128,6 +128,50 @@ ipcMain.handle("concorde:stop-window-audio", () => {
   if (audioCapture) audioCapture.stopCapture();
 });
 
+// Atalhos GLOBAIS (mutar/ensurdecer) - ao contrario de um listener de "keydown" comum no
+// renderer (so' dispara com a janela do Concorde em foco), globalShortcut e' registrado no
+// SISTEMA OPERACIONAL: continua funcionando mesmo com outra janela em primeiro plano (jogo,
+// navegador, etc), que era exatamente o bug relatado. Formato interno do app e'
+// "ctrl+shift+m" (ver keyboardShortcuts.js) - o Electron exige "Control+Shift+M".
+function comboToAccelerator(combo) {
+  if (!combo) return null;
+  return combo
+    .split("+")
+    .map((part) => {
+      if (part === "ctrl") return "Control";
+      if (part === "shift") return "Shift";
+      if (part === "alt") return "Alt";
+      if (part === "meta") return "Super";
+      if (part === "space") return "Space";
+      return part.length === 1 ? part.toUpperCase() : part[0].toUpperCase() + part.slice(1);
+    })
+    .join("+");
+}
+
+// Re-registrado do zero toda vez que e' chamado (na entrada do app E toda vez que o usuario
+// muda o atalho em Configuracoes, ver VoiceCallContext.jsx/SettingsModal.jsx) - mais simples
+// do que tentar diffar qual mudou. "Melhor esforco": se o combo ja estiver ocupado por outro
+// programa no SO, globalShortcut.register() so' retorna false, sem travar nada.
+ipcMain.handle("concorde:register-shortcuts", (_event, { muteCombo, deafenCombo } = {}) => {
+  globalShortcut.unregisterAll();
+  const register = (combo, action) => {
+    const accelerator = comboToAccelerator(combo);
+    if (!accelerator) return;
+    try {
+      globalShortcut.register(accelerator, () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("concorde:global-shortcut", action);
+        }
+      });
+    } catch (err) {
+      console.warn(`Nao foi possivel registrar o atalho global "${accelerator}":`, err.message);
+    }
+  };
+  register(muteCombo, "mute");
+  register(deafenCombo, "deafen");
+  return { ok: true };
+});
+
 // Abre o link de download (site) no navegador PADRAO do usuario, nao numa janela do proprio
 // Concorde - faz mais sentido baixar um instalador novo por fora do app que esta desatualizado
 // (e que a pessoa esta prestes a desinstalar).
@@ -204,4 +248,10 @@ if (!gotLock) {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+// Libera os atalhos globais do SO ao fechar - senao eles ficam "presos" ate' o processo do
+// Electron morrer de vez, mesmo com a janela ja fechada.
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
 });
