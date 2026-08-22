@@ -48,4 +48,14 @@ contextBridge.exposeInMainWorld("concordeDesktop", {
     ipcRenderer.on("concorde:global-shortcut", listener);
     return () => ipcRenderer.removeListener("concorde:global-shortcut", listener);
   },
+
+  /**
+   * Zoom da pagina (Ctrl +/-/0, Ctrl+scroll) - sem o menu padrao do Electron (removido de
+   * proposito, ver main.cjs/DesktopTitleBar.jsx) esses atalhos pararam de funcionar sozinhos.
+   * Quem escuta teclado/scroll e' o React (DesktopTitleBar.jsx); quem aplica de verdade e' o
+   * processo principal (webContents.setZoomLevel, ver main.cjs).
+   */
+  zoomIn: () => ipcRenderer.invoke("concorde:zoom-in"),
+  zoomOut: () => ipcRenderer.invoke("concorde:zoom-out"),
+  zoomReset: () => ipcRenderer.invoke("concorde:zoom-reset"),
 });

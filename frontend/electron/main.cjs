@@ -190,6 +190,30 @@ ipcMain.handle("concorde:register-shortcuts", (_event, { muteCombo, deafenCombo 
   return { ok: true };
 });
 
+// Zoom da pagina (Ctrl +/-/0, Ctrl+scroll) - o Electron so' vem com esses atalhos "de graca"
+// atraves do MENU padrao (role "zoomIn"/"zoomOut"/"resetZoom"), que a gente removeu de
+// proposito (ver Menu.setApplicationMenu(null) acima, junto com a barra de titulo customizada -
+// DesktopTitleBar.jsx) - reimplementados aqui na mao. O renderer (DesktopTitleBar.jsx) escuta
+// o teclado/scroll e so' chama esses 3 IPCs; quem de fato aplica o zoom e' o processo principal
+// (webContents.setZoomLevel), que e' onde esse controle realmente vive no Electron. Passo de
+// 0.5 "nivel" (~10% maior/menor por vez, escala do proprio Chromium), limitado entre -4 (bem
+// pequeno) e 5 (bem grande) pra nunca sair de uma proporcao usavel.
+const ZOOM_STEP = 0.5;
+const ZOOM_MIN = -4;
+const ZOOM_MAX = 5;
+
+ipcMain.handle("concorde:zoom-in", () => {
+  if (!mainWindow) return;
+  mainWindow.webContents.setZoomLevel(Math.min(ZOOM_MAX, mainWindow.webContents.getZoomLevel() + ZOOM_STEP));
+});
+ipcMain.handle("concorde:zoom-out", () => {
+  if (!mainWindow) return;
+  mainWindow.webContents.setZoomLevel(Math.max(ZOOM_MIN, mainWindow.webContents.getZoomLevel() - ZOOM_STEP));
+});
+ipcMain.handle("concorde:zoom-reset", () => {
+  mainWindow?.webContents.setZoomLevel(0);
+});
+
 // Abre o link de download (site) no navegador PADRAO do usuario, nao numa janela do proprio
 // Concorde - faz mais sentido baixar um instalador novo por fora do app que esta desatualizado
 // (e que a pessoa esta prestes a desinstalar).
