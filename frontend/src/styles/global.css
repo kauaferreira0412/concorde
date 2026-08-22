@@ -2094,7 +2094,18 @@ h3.chat-heading {
 .screen-picker-name {
   display: flex; align-items: center; gap: 6px;
   font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  /* "overflow/text-overflow/white-space" precisam estar no SPAN DE TEXTO em si (ver
+     .screen-picker-name-text abaixo), nao aqui - nesse container flex (que tambem tem o icone
+     como filho) eles nao cortam o texto direito, so' deixa o nome vazando pra fora do card
+     (reportado - nome de aba/janela grande "estourando" o espaco do popup). */
+  min-width: 0;
+}
+.screen-picker-name-text {
+  /* "display:block" e' necessario pra "text-overflow:ellipsis" funcionar de verdade num filho
+     de flexbox - um <span> normal (inline) nao respeita "overflow:hidden" direito. */
+  display: block;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0;
 }
 .screen-picker-icon { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
 .invite-link-row { display: flex; gap: 8px; margin: 14px 0; }

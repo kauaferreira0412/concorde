@@ -91,7 +91,7 @@ export default function ScreenSharePicker({ onSelect, onClose }) {
                 </span>
                 <span className="screen-picker-name">
                   {s.iconDataUrl && <img className="screen-picker-icon" src={s.iconDataUrl} alt="" />}
-                  {s.name || (tab === "screen" ? "Tela" : "Janela")}
+                  <span className="screen-picker-name-text">{s.name || (tab === "screen" ? "Tela" : "Janela")}</span>
                 </span>
               </button>
             ))}
