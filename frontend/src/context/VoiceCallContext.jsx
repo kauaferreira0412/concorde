@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { Room, RoomEvent, ScreenSharePresets, Track } from "livekit-client";
+import { Room, RoomEvent, Track } from "livekit-client";
 import api from "../api/client";
 import { useAuth } from "./AuthContext.jsx";
 import { useAlert } from "./AlertContext.jsx";
@@ -649,12 +649,15 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         // (h1080fps15 = so' 15fps e 2.5Mbps, pensado pra economizar banda no caso comum) - na
         // pratica isso faz QUALQUER transmissao de tela parecer "travando" (15fps e' bem
         // perceptivel, principalmente em jogos/video) mesmo com internet de sobra (reportado:
-        // "as vezes fica boa, as vezes trava"). h1080fps30 sobe pra 30fps/5Mbps - continua
-        // sendo so' um TETO (o proprio WebRTC reduz sozinho se a internet de quem esta
-        // transmitindo realmente nao aguentar, isso nao muda), mas para de limitar
-        // artificialmente quem TEM banda de sobra pra transmitir liso.
+        // "as vezes fica boa, as vezes trava"). 1080p 60fps/8Mbps - pedido explicito do usuario
+        // (30fps ja tinha resolvido o "travando", mas ele queria 60 mesmo); nao existe preset
+        // pronto de 60fps na lib (ScreenSharePresets so' vai ate' h1080fps30), entao e' um
+        // objeto literal em vez de ScreenSharePresets.*. Continua sendo so' um TETO (o proprio
+        // WebRTC reduz sozinho se a internet de quem esta transmitindo realmente nao aguentar,
+        // isso nao muda), mas para de limitar artificialmente quem TEM banda de sobra pra
+        // transmitir liso.
         publishDefaults: {
-          screenShareEncoding: ScreenSharePresets.h1080fps30.encoding,
+          screenShareEncoding: { maxBitrate: 8_000_000, maxFramerate: 60, priority: "high" },
         },
       });
 
@@ -1250,7 +1253,13 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       //   Concorde (geraria um espelho infinito, video dentro de video).
       // - echoCancellation/noiseSuppression: reduz ainda mais qualquer resquicio de eco.
       await room.localParticipant.setScreenShareEnabled(true, {
-        video: { displaySurface: "browser" }, // sugere ABA como opcao padrao (audio mais limpo)
+        video: {
+          displaySurface: "browser", // sugere ABA como opcao padrao (audio mais limpo)
+          // Sem isso o navegador captura numa taxa propria (nem sempre 60) - o TETO de
+          // encoding (60fps, ver publishDefaults.screenShareEncoding acima na criacao da Room)
+          // so' ajuda de verdade se a CAPTURA em si tambem entregar 60 quadros por segundo.
+          frameRate: { ideal: 60, max: 60 },
+        },
         audio: { echoCancellation: true, noiseSuppression: true },
         systemAudio: "exclude",
         selfBrowserSurface: "exclude",
@@ -1302,7 +1311,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
             chromeMediaSourceId: source.id,
             maxWidth: 1920,
             maxHeight: 1080,
-            maxFrameRate: 30,
+            // Bate com o TETO de encoding (60fps, ver publishDefaults.screenShareEncoding na
+            // criacao da Room) - sem isso a captura em si ja vinha limitada a 30, e o teto de
+            // encoding mais alto nao adiantava nada (nao tem quadro extra pra codificar).
+            maxFrameRate: 60,
           },
         },
       });
