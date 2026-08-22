@@ -202,16 +202,33 @@ const ZOOM_STEP = 0.5;
 const ZOOM_MIN = -4;
 const ZOOM_MAX = 5;
 
+// webContents.setZoomLevel() reescala TODO o conteudo web, inclusive a nossa barra de titulo
+// customizada (ela e' HTML normal, ver DesktopTitleBar.jsx/global.css) - mas os botoes de
+// minimizar/maximizar/fechar NAO sao HTML nenhum, sao desenhados pelo proprio WINDOWS por cima
+// (titleBarOverlay, ver createWindow acima), numa altura FIXA que o zoom nao alcanca sozinho.
+// Sem isso, dar zoom deixava nossa barra menor/maior enquanto os botoes do Windows ficavam
+// sempre do mesmo tamanho - iam desalinhando (reportado, com print). setTitleBarOverlay()
+// deixa reajustar essa altura na hora, entao chamamos ela toda vez que o zoom muda, escalando
+// pelo MESMO fator (getZoomFactor(), o multiplicador de verdade - 1 = 100%, 1.5 = 150% etc).
+function applyZoomLevel(level) {
+  if (!mainWindow) return;
+  mainWindow.webContents.setZoomLevel(level);
+  if (process.platform === "win32") {
+    const factor = mainWindow.webContents.getZoomFactor();
+    mainWindow.setTitleBarOverlay({ height: Math.round(TITLEBAR_HEIGHT * factor) });
+  }
+}
+
 ipcMain.handle("concorde:zoom-in", () => {
   if (!mainWindow) return;
-  mainWindow.webContents.setZoomLevel(Math.min(ZOOM_MAX, mainWindow.webContents.getZoomLevel() + ZOOM_STEP));
+  applyZoomLevel(Math.min(ZOOM_MAX, mainWindow.webContents.getZoomLevel() + ZOOM_STEP));
 });
 ipcMain.handle("concorde:zoom-out", () => {
   if (!mainWindow) return;
-  mainWindow.webContents.setZoomLevel(Math.max(ZOOM_MIN, mainWindow.webContents.getZoomLevel() - ZOOM_STEP));
+  applyZoomLevel(Math.max(ZOOM_MIN, mainWindow.webContents.getZoomLevel() - ZOOM_STEP));
 });
 ipcMain.handle("concorde:zoom-reset", () => {
-  mainWindow?.webContents.setZoomLevel(0);
+  applyZoomLevel(0);
 });
 
 // Abre o link de download (site) no navegador PADRAO do usuario, nao numa janela do proprio
