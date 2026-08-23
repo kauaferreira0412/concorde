@@ -26,6 +26,7 @@ import {
 } from "../utils/keyboardShortcuts";
 import { playJoinSound } from "../utils/soundEffects";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import api from "../api/client";
 import Avatar from "./Avatar.jsx";
 import StatusDropdown from "./StatusDropdown.jsx";
@@ -85,6 +86,7 @@ function ShortcutRecorder({ value, onChange }) {
  */
 export default function SettingsModal({ onClose }) {
   const { user, updateUser, isAdmin } = useAuth();
+  const { activeChannel, deafened, toggleDeafen } = useVoiceCall();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("perfil");
   const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
@@ -152,6 +154,10 @@ export default function SettingsModal({ onClose }) {
   // so' a call de verdade (LiveKit) usava a supressao, ver VoiceCallContext.jsx.
   const testAudioContextRef = useRef(null);
   const testProcessorRef = useRef(null);
+  // true = foi ESSE teste que ligou o ensurdecido (ver startTest/stopTest abaixo) - so' desfaz
+  // ao parar se foi a gente quem mudou, senao ia desensurdecer alguem que ja' estava assim por
+  // opcao propria (ex: abriu Configuracoes pra testar o mic enquanto ja' tava ensurdecido).
+  const testDeafenedForTestRef = useRef(false);
 
   useEffect(() => {
     // O navegador so mostra os nomes dos dispositivos depois de uma permissao de microfone
@@ -217,7 +223,12 @@ export default function SettingsModal({ onClose }) {
     }
   }
 
-  async function startTest() {
+  /** So' a parte de captura/tocar de volta o microfone - sem mexer em ensurdecer (ver
+   *  startTest/stopTest abaixo, que envolvem essa aqui). Reaproveitada tambem pra reiniciar
+   *  o teste ao trocar o modo de supressao de ruido no meio (ver useEffect mais abaixo) - nesse
+   *  caso o teste inteiro continua rodando, entao NAO faz sentido desensurdecer/ensurdecer nesse
+   *  meio-tempo (so' no inicio/fim de verdade do teste). */
+  async function startLocalTest() {
     setPermissionError("");
     try {
       // MESMAS constraints que a call de verdade usa (ver audioCaptureDefaults em
@@ -271,12 +282,14 @@ export default function SettingsModal({ onClose }) {
 
       startMeter(audibleTrack);
       setTesting(true);
+      return true;
     } catch (err) {
       setPermissionError("Não consegui abrir o microfone selecionado: " + err.message);
+      return false;
     }
   }
 
-  function stopTest() {
+  function stopLocalTest() {
     stopMeter();
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
@@ -294,12 +307,49 @@ export default function SettingsModal({ onClose }) {
     setTesting(false);
   }
 
-  // Troca o modo de supressao COM o teste ja' rodando (bater na mesa comparando) - reinicia o
-  // teste sozinho pra aplicar o novo modo na hora, sem precisar clicar em "Parar"/"Testar" nele.
+  /** Comeca a testar de verdade - ver startLocalTest acima pra so' a parte de captura/audio. */
+  async function startTest() {
+    // Se estiver numa call agora, ensurdece antes de comecar a testar - ensurdecer TAMBEM muta
+    // o microfone sozinho (ver toggleDeafen em VoiceCallContext.jsx, mesmo comportamento do
+    // botao de ensurdecer normal) - pedido explicito: sem isso, quem esta testando ouviria a
+    // propria voz duas vezes (o teste local + ela voltando pela call) e todo mundo mais ouviria
+    // o "testando, 1, 2, 3" ao vivo.
+    if (activeChannel && !deafened) {
+      await toggleDeafen();
+      testDeafenedForTestRef.current = true;
+    }
+    const started = await startLocalTest();
+    // Deu errado antes de comecar o teste de verdade (ex: permissao negada) - desfaz o
+    // ensurdecer que a gente acabou de ligar acima, senao a pessoa ficava ensurdecida a
+    // toa, sem nenhum teste rodando.
+    if (!started && testDeafenedForTestRef.current) {
+      testDeafenedForTestRef.current = false;
+      await toggleDeafen();
+    }
+  }
+
+  /** Para de testar de verdade - ver stopLocalTest acima pra so' a parte de captura/audio. */
+  async function stopTest() {
+    stopLocalTest();
+    // Desfaz o ensurdecer que o INICIO do teste ligou (ver startTest acima) - que tambem
+    // desmuta o microfone sozinho ao desligar (mesmo comportamento do botao de ensurdecer
+    // normal, ver toggleDeafen em VoiceCallContext.jsx). So' roda se foi ESSE teste quem
+    // ensurdeceu - se a pessoa ja' estava ensurdecida por opcao propria antes de testar, isso
+    // fica do jeito que estava.
+    if (testDeafenedForTestRef.current) {
+      testDeafenedForTestRef.current = false;
+      await toggleDeafen();
+    }
+  }
+
+  // Troca o modo de supressao COM o teste ja' rodando (bater na mesa comparando) - reinicia
+  // so' a captura/audio (nao ensurdecer/desensurdecer de novo - o teste inteiro continua "de
+  // pe" o tempo todo, so' o filtro de ruido troca no meio) pra aplicar o novo modo na hora, sem
+  // precisar clicar em "Parar"/"Testar" nele.
   useEffect(() => {
     if (!testing) return;
-    stopTest();
-    startTest();
+    stopLocalTest();
+    startLocalTest();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noiseSuppressionMode]);
 
