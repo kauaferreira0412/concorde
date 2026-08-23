@@ -45,6 +45,7 @@ public class VoicePresenceController {
 
     public record MicStatePayload(boolean micEnabled) {}
     public record DeafenStatePayload(boolean deafened) {}
+    public record WatchingPayload(java.util.List<Long> watchingUserIds) {}
 
     @MessageMapping("/channel.{channelId}.voice.join")
     public void join(@DestinationVariable Long channelId, @Header("simpSessionId") String sessionId, Principal principal) {
@@ -99,6 +100,15 @@ public class VoicePresenceController {
             return;
         }
         presenceService.setDeafened(sessionId, payload.deafened());
+    }
+
+    /** Cliente avisa a lista INTEIRA e atualizada de quem ele esta assistindo agora (pode
+     *  assistir mais de uma transmissao ao mesmo tempo) - so' repassado pra todo mundo do canal
+     *  (ver VoicePresenceService.setWatching), sem regra de permissao nenhuma (assistir uma
+     *  transmissao ja' e' livre pra qualquer membro da call). */
+    @MessageMapping("/channel.{channelId}.voice.watching")
+    public void watching(@DestinationVariable Long channelId, WatchingPayload payload, @Header("simpSessionId") String sessionId) {
+        presenceService.setWatching(sessionId, payload.watchingUserIds());
     }
 
     private Long userIdOf(Principal principal) {

@@ -30,6 +30,7 @@ import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import api from "../api/client";
 import Avatar from "./Avatar.jsx";
 import StatusDropdown from "./StatusDropdown.jsx";
+import VolumeSlider from "./VolumeSlider.jsx";
 import { BellIcon, KeyboardIcon, MicIcon, ShieldIcon, UserIcon, XIcon } from "./icons.jsx";
 
 /** Abas da tela de configuracoes - cada uma so' renderiza o seu pedaco (ver SettingsModal). */
@@ -86,7 +87,7 @@ function ShortcutRecorder({ value, onChange }) {
  */
 export default function SettingsModal({ onClose }) {
   const { user, updateUser, isAdmin } = useAuth();
-  const { activeChannel, deafened, toggleDeafen } = useVoiceCall();
+  const { activeChannel, deafened, toggleDeafen, micGain, setMicGainPercent, masterVolume, setMasterVolumePercent } = useVoiceCall();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("perfil");
   const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
@@ -598,6 +599,15 @@ export default function SettingsModal({ onClose }) {
                 </div>
 
                 <div className="settings-field">
+                  <label className="settings-label">Volume do seu microfone</label>
+                  <VolumeSlider value={micGain} onChange={setMicGainPercent} max={200} label="Volume do seu microfone" />
+                  <p className="admin-hint" style={{ margin: 0 }}>
+                    O quão alto a SUA voz sai pros outros na call - 100% é o normal. Vale na hora, mesmo no meio de
+                    uma call.
+                  </p>
+                </div>
+
+                <div className="settings-field">
                   <label className="settings-label">Alto-falante / fone (saída)</label>
                   <select value={selectedOutput} onChange={(e) => setSelectedOutput(e.target.value)} disabled={!outputSupported}>
                     <option value="">Padrão do sistema</option>
@@ -613,6 +623,15 @@ export default function SettingsModal({ onClose }) {
                       sempre o dispositivo padrão do sistema.
                     </p>
                   )}
+                </div>
+
+                <div className="settings-field">
+                  <label className="settings-label">Volume geral (alto-falante)</label>
+                  <VolumeSlider value={masterVolume} onChange={setMasterVolumePercent} label="Volume geral" />
+                  <p className="admin-hint" style={{ margin: 0 }}>
+                    Multiplica por cima do volume individual de cada pessoa/transmissão - abaixa (ou reforça) tudo
+                    de uma vez, sem perder as preferências que você já ajustou pra cada um.
+                  </p>
                 </div>
 
                 <div className="settings-field">

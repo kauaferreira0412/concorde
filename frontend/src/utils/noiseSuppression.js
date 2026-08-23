@@ -62,13 +62,21 @@ function ensureWorkletModule(audioContext, key, path) {
   return byKey.get(key);
 }
 
-/** Base comum: MediaStreamSource -> WorkletNode -> MediaStreamDestination. So' muda como o
- *  WorkletNode e' criado (RNNoise vs GTCRN) - ver subclasses abaixo. */
+/** Base comum: MediaStreamSource -> WorkletNode -> GainNode -> MediaStreamDestination. So'
+ *  muda como o WorkletNode e' criado (RNNoise vs GTCRN) - ver subclasses abaixo. O GainNode
+ *  aplica o volume do PROPRIO microfone (ver "gain" abaixo/createNoiseSuppressionProcessor) -
+ *  fica DEPOIS do filtro de ruido de proposito (amplificar ANTES prejudicaria a rede neural
+ *  detectando ruido, que espera o nivel "cru" do microfone). */
 class BaseWasmNoiseSuppressionProcessor {
   name = "concorde-noise-suppression";
+  // Setado ANTES de "track.setProcessor(processor)" chamar init() por baixo dos panos (ver
+  // createNoiseSuppressionProcessor abaixo) - o LiveKit so' repassa {kind,track,audioContext,
+  // localTrack} pro init(), sem espaco pra opcoes extras nossas passarem por ali.
+  gain = 1;
   processedTrack;
   sourceNode;
   workletNode;
+  gainNode;
   destinationNode;
 
   async init(opts) {
@@ -76,8 +84,10 @@ class BaseWasmNoiseSuppressionProcessor {
     this.audioContext = audioContext;
     this.workletNode = await this.createWorkletNode(audioContext);
     this.sourceNode = audioContext.createMediaStreamSource(new MediaStream([track]));
+    this.gainNode = audioContext.createGain();
+    this.gainNode.gain.value = this.gain;
     this.destinationNode = audioContext.createMediaStreamDestination();
-    this.sourceNode.connect(this.workletNode).connect(this.destinationNode);
+    this.sourceNode.connect(this.workletNode).connect(this.gainNode).connect(this.destinationNode);
     this.processedTrack = this.destinationNode.stream.getAudioTracks()[0];
   }
 
@@ -91,9 +101,48 @@ class BaseWasmNoiseSuppressionProcessor {
       this.sourceNode?.disconnect();
       this.workletNode?.disconnect();
       this.workletNode?.destroy?.();
+      this.gainNode?.disconnect();
       this.destinationNode?.disconnect();
     } catch {
       // AudioContext ja' pode ter sido fechado (call encerrada) - nao ha' o que limpar
+    }
+  }
+}
+
+/** So' o volume do microfone, sem supressao de ruido nenhuma (modo "off") - usado quando o
+ *  volume do microfone NAO esta em 100% mas a supressao de ruido esta desligada, senao o
+ *  ganho nao teria como ser aplicado (sem processador nenhum, o track cru vai direto). */
+class GainOnlyProcessor {
+  name = "concorde-mic-gain";
+  gain = 1;
+  processedTrack;
+  sourceNode;
+  gainNode;
+  destinationNode;
+
+  async init(opts) {
+    const { track, audioContext } = opts;
+    this.audioContext = audioContext;
+    this.sourceNode = audioContext.createMediaStreamSource(new MediaStream([track]));
+    this.gainNode = audioContext.createGain();
+    this.gainNode.gain.value = this.gain;
+    this.destinationNode = audioContext.createMediaStreamDestination();
+    this.sourceNode.connect(this.gainNode).connect(this.destinationNode);
+    this.processedTrack = this.destinationNode.stream.getAudioTracks()[0];
+  }
+
+  async restart(opts) {
+    await this.destroy();
+    await this.init(opts);
+  }
+
+  async destroy() {
+    try {
+      this.sourceNode?.disconnect();
+      this.gainNode?.disconnect();
+      this.destinationNode?.disconnect();
+    } catch {
+      // idem
     }
   }
 }
@@ -116,9 +165,19 @@ class GtcrnProcessor extends BaseWasmNoiseSuppressionProcessor {
   }
 }
 
-/** null pro modo "off" - quem chama deve usar track.stopProcessor() nesse caso. */
-export function createNoiseSuppressionProcessor(mode) {
-  if (mode === "rnnoise") return new RnnoiseProcessor();
-  if (mode === "gtcrn") return new GtcrnProcessor();
-  return null;
+/**
+ * null quando NAO precisa de processador nenhum (modo "off" E volume do microfone em 100%) -
+ * quem chama deve usar track.stopProcessor() nesse caso, o track cru vai direto. "gainPercent"
+ * (0-200, ver getMicGain em utils/audioSettings.js) sempre entra no processador quando ele
+ * existe - se so' o volume mudou (supressao "off"), cai no GainOnlyProcessor (so' o ganho, sem
+ * filtro de ruido nenhum).
+ */
+export function createNoiseSuppressionProcessor(mode, gainPercent = 100) {
+  const gain = Math.max(0, gainPercent) / 100;
+  let processor = null;
+  if (mode === "rnnoise") processor = new RnnoiseProcessor();
+  else if (mode === "gtcrn") processor = new GtcrnProcessor();
+  else if (gain !== 1) processor = new GainOnlyProcessor();
+  if (processor) processor.gain = gain;
+  return processor;
 }

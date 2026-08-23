@@ -3,6 +3,7 @@ import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useServerMembers } from "../utils/useServerMembers";
 import {
   ExternalLinkIcon,
+  EyeIcon,
   EyeOffIcon,
   MaximizeIcon,
   MenuIcon,
@@ -18,6 +19,7 @@ import {
 import { MemberRow } from "./MemberList.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
 import Avatar from "./Avatar.jsx";
+import { useTrackFps } from "../utils/useTrackFps";
 import CameraPipWindow from "./CameraPipWindow.jsx";
 
 // Tamanhos disponiveis pro tile de webcam - "size" vira uma classe CSS (.camera-tile-<size>,
@@ -164,11 +166,24 @@ function CameraTile({ track, name, isLocal, size }) {
  * isso "tela cheia" aqui fulscreena o CONTAINER (essa div toda), nao so' o <video> sozinho:
  * um <video> em tela cheia so' pode mostrar o proprio video, nada por cima dele.
  */
-function ScreenShareTile({ share, theaterMode, onToggleWatch, onToggleTheater, onVolumeMenu, participants, cameraTracks, speakingIds }) {
+function ScreenShareTile({
+  share,
+  theaterMode,
+  onToggleWatch,
+  onToggleTheater,
+  onVolumeMenu,
+  participants,
+  cameraTracks,
+  speakingIds,
+  watchers,
+}) {
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   const isFullscreen = useIsThisElementFullscreen(containerRef);
   const [overlayVisible, setOverlayVisible] = useState(false);
+  const [watchersOpen, setWatchersOpen] = useState(false);
+  const watchersRef = useRef(null);
+  const fps = useTrackFps(share.track);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -176,6 +191,17 @@ function ScreenShareTile({ share, theaterMode, onToggleWatch, onToggleTheater, o
     share.track.attach(el);
     return () => share.track.detach(el);
   }, [share.track]);
+
+  // Fecha o popover de "quem esta vendo" ao clicar em qualquer lugar fora dele - mesmo padrao
+  // do menu de canal (ver ChannelSidebar.jsx).
+  useEffect(() => {
+    if (!watchersOpen) return;
+    function handlePointerDown(e) {
+      if (watchersRef.current && !watchersRef.current.contains(e.target)) setWatchersOpen(false);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [watchersOpen]);
 
   function handleMaximize() {
     const el = containerRef.current;
@@ -215,6 +241,38 @@ function ScreenShareTile({ share, theaterMode, onToggleWatch, onToggleTheater, o
       {!isFullscreen && (
         <>
           <span className="camera-tile-name">{share.name}</span>
+          {fps != null && <span className="screenshare-fps-badge">{fps} fps</span>}
+          <div className="screenshare-watchers-wrap" ref={watchersRef}>
+            <button
+              type="button"
+              className={"screenshare-watchers-btn" + (watchersOpen ? " active" : "")}
+              onClick={(e) => {
+                e.stopPropagation();
+                setWatchersOpen((v) => !v);
+              }}
+              title="Quem está vendo essa transmissão agora"
+            >
+              <EyeIcon size={13} />
+              <span>{watchers.length}</span>
+            </button>
+            {watchersOpen && (
+              <div className="screenshare-watchers-popover">
+                <p className="screenshare-watchers-title">Assistindo agora</p>
+                {watchers.length === 0 ? (
+                  <p className="admin-hint" style={{ margin: 0 }}>
+                    Ninguém está assistindo ainda.
+                  </p>
+                ) : (
+                  watchers.map((w) => (
+                    <div key={w.userId} className="screenshare-watchers-row">
+                      <Avatar name={w.name} url={w.avatarUrl} className="voice-avatar small" />
+                      <span>{w.name}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
           <button
             type="button"
             className={"screenshare-tile-theater-btn" + (theaterMode ? " active" : "")}
@@ -279,6 +337,7 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
     speakingIds,
     toggleScreenShare,
     toggleWatchScreenShare,
+    screenShareWatchers,
     streamVolumes,
     setStreamVolume,
     joinChannel,
@@ -527,6 +586,7 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
                   participants={participants}
                   cameraTracks={cameraTracks}
                   speakingIds={speakingIds}
+                  watchers={screenShareWatchers[s.participantIdentity] || []}
                 />
               ))}
             </div>

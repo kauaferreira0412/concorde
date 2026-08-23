@@ -5,12 +5,16 @@ import { useAuth } from "./AuthContext.jsx";
 import { useAlert } from "./AlertContext.jsx";
 import { useMicLevel } from "../utils/useMicLevel";
 import {
+  getMasterVolume,
+  getMicGain,
   getNoiseSuppressionMode,
   getSavedAudioInput,
   getSavedAudioOutput,
   getSavedParticipantVolume,
   getSavedStreamVolume,
   getSavedVideoInput,
+  setMasterVolume as persistMasterVolume,
+  setMicGain as persistMicGain,
   setSavedParticipantVolume,
   setSavedStreamVolume,
 } from "../utils/audioSettings";
@@ -33,6 +37,7 @@ import {
   publishVoiceLeave,
   publishVoiceMicState,
   publishVoiceMove,
+  publishVoiceWatching,
   subscribeToVoiceControl,
   subscribeToVoicePresence,
 } from "../ws/chatSocket";
@@ -66,6 +71,22 @@ function loadActiveChannel() {
   }
 }
 
+/** Reorganiza o snapshot de presenca de voz (lista de VoiceParticipantInfo, ver
+ *  VoicePresenceService.java no backend) por quem esta sendo ASSISTIDO - "user-<id>" (a
+ *  identity de quem compartilha, mesmo formato usado pelo LiveKit) -> lista de quem esta
+ *  vendo agora. Usado tanto pelo push via WebSocket quanto pelo poll de reforco via REST (ver
+ *  os dois useEffect mais abaixo que chamam isso). */
+function watchersByIdentity(list) {
+  const map = {};
+  (list || []).forEach((p) => {
+    (p.watchingUserIds || []).forEach((sharerId) => {
+      const key = "user-" + sharerId;
+      (map[key] || (map[key] = [])).push({ userId: p.userId, name: p.username, avatarUrl: p.avatarUrl });
+    });
+  });
+  return map;
+}
+
 /**
  * Estado global da call de voz (fora do componente de canal), para os icones de
  * mutar/ensurdecer na barra inferior funcionarem de qualquer tela, e para a call
@@ -96,8 +117,13 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   // navegador e no app desktop, e' so' getUserMedia comum via LiveKit (setCameraEnabled),
   // sem nenhuma parte nativa envolvida. Ver toggleCamera/CameraTile em VoiceChannel.jsx.
   const [cameraTracks, setCameraTracks] = useState([]); // [{ identity, name, isLocal, track }]
-  const [participantVolumes, setParticipantVolumesState] = useState({}); // identity -> 0..200 (voz)
-  const [streamVolumes, setStreamVolumesState] = useState({}); // identity -> 0..200 (audio da transmissao de tela dessa pessoa)
+  const [participantVolumes, setParticipantVolumesState] = useState({}); // identity -> 0..300 (voz)
+  const [streamVolumes, setStreamVolumesState] = useState({}); // identity -> 0..300 (audio da transmissao de tela dessa pessoa)
+  // Volume do SEU microfone (o que sai pra fora) e volume MESTRE (alto-falante, multiplica por
+  // cima de todo volume individual) - ver utils/audioSettings.js. Estado (nao so' ref) pra
+  // alimentar os sliders em Configuracoes.
+  const [micGain, setMicGainState] = useState(getMicGain());
+  const [masterVolume, setMasterVolumeState] = useState(getMasterVolume());
   // So' usado no app desktop (Electron) - true enquanto o seletor customizado de tela/janela
   // esta aberto, esperando o usuario escolher o que compartilhar (ver ScreenSharePicker.jsx).
   const [screenPickerOpen, setScreenPickerOpen] = useState(false);
@@ -131,8 +157,18 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const cameraEnabledRef = useRef(false);
   const micAudioTracksRef = useRef(new Map()); // identity -> RemoteAudioTrack (voz, pro controle de volume)
   const screenAudioTracksRef = useRef(new Map()); // identity -> RemoteAudioTrack (audio da transmissao de tela dessa pessoa)
-  const participantVolumesRef = useRef(new Map()); // identity -> 0..200, fonte da verdade sincrona
+  const participantVolumesRef = useRef(new Map()); // identity -> 0..300, fonte da verdade sincrona
   const streamVolumesRef = useRef(new Map());
+  // O SEU proprio track de microfone publicado agora (LocalAudioTrack, ver
+  // RoomEvent.LocalTrackPublished) - guardado pra dar pra reaplicar o volume do microfone NA
+  // HORA se voce mudar isso em Configuracoes no meio de uma call (ver setMicGainPercent),
+  // sem precisar desmutar/mutar pra fazer efeito.
+  const localMicTrackRef = useRef(null);
+  // Volume MESTRE (alto-falante) - multiplica por cima de todo volume individual (ver
+  // resolveParticipantVolume/resolveStreamVolume abaixo e setMasterVolumePercent). Ref (nao so'
+  // estado) porque precisa ser lido de forma sincrona dentro de closures antigas do LiveKit
+  // (RoomEvent handlers registrados uma unica vez ao entrar na call).
+  const masterVolumeRef = useRef(getMasterVolume());
   // So' preenchido no app desktop (Electron), quando o compartilhamento foi iniciado pelo
   // ScreenSharePicker (video/audio capturados "na mao" via chromeMediaSourceId, nao pelo
   // setScreenShareEnabled padrao do LiveKit) - precisa pra saber COMO parar depois.
@@ -143,6 +179,12 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   // presenca (mesmo canal que alimenta "Conectados agora"), pra mostrar um icone diferente
   // de quem so mutou o microfone.
   const presenceDeafenedRef = useRef(new Map()); // userId (string) -> deafened
+  // De quem esta assistindo a transmissao de tela de CADA UM agora - "user-<id do dono>" ->
+  // [{userId, name, avatarUrl}] de quem esta vendo. Vem da MESMA presenca de voz que alimenta
+  // presenceDeafenedRef acima (ver watchersByIdentity/publishVoiceWatching) - precisa ser
+  // ESTADO (nao ref) porque alimenta o icone de "quem esta vendo" no quadrado de transmissao
+  // (VoiceChannel.jsx), que precisa re-renderizar quando isso muda.
+  const [screenShareWatchers, setScreenShareWatchers] = useState({});
   const presenceSubRef = useRef(null);
   const controlSubRef = useRef(null); // ver subscribeToVoiceControl - comandos de moderacao endereçados a mim
   const myPermissionsRef = useRef(new Set());
@@ -203,21 +245,25 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   }
 
   /**
-   * Aplica (ou remove) a supressao de ruido por IA escolhida em Configuracoes no track do
-   * microfone que acabou de ser publicado - ver utils/noiseSuppression.js pro porque disso
-   * existir (RNNoise/GTCRN em vez da constraint nativa fraca do navegador). Chamado sempre que
-   * o microfone e' (re)publicado (ver RoomEvent.LocalTrackPublished em joinChannel) - cobre
-   * entrar na call, desmutar, liberar um ensurdecido e trocar de dispositivo de entrada,
-   * automaticamente, sem precisar lembrar de chamar isso em cada lugar separado.
+   * Aplica (ou remove) a supressao de ruido por IA escolhida em Configuracoes E o volume do
+   * PROPRIO microfone (ver getMicGain/setMicGainPercent) no track do microfone que acabou de
+   * ser publicado - ver utils/noiseSuppression.js pro porque disso existir (RNNoise/GTCRN em
+   * vez da constraint nativa fraca do navegador, e o GainNode embutido no mesmo processador pro
+   * volume). Chamado sempre que o microfone e' (re)publicado (ver RoomEvent.LocalTrackPublished
+   * em joinChannel) - cobre entrar na call, desmutar, liberar um ensurdecido e trocar de
+   * dispositivo de entrada, automaticamente, sem precisar lembrar de chamar isso em cada lugar
+   * separado - E chamado de novo na hora se voce mudar o volume do microfone NO MEIO de uma
+   * call (ver setMicGainPercent), pra nao precisar desmutar/mutar pra fazer efeito.
    */
   async function applyNoiseSuppression(track) {
     const mode = getNoiseSuppressionMode();
+    const gainPercent = getMicGain();
     try {
-      if (mode === "off") {
+      const processor = createNoiseSuppressionProcessor(mode, gainPercent);
+      if (!processor) {
         if (track.getProcessor?.()) await track.stopProcessor();
         return;
       }
-      const processor = createNoiseSuppressionProcessor(mode);
       await track.setProcessor(processor);
     } catch (err) {
       console.warn(`Não foi possível aplicar a supressão de ruído (${mode}):`, err);
@@ -298,6 +344,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     publishVoiceJoin(stompClientRef.current, channelId);
     publishVoiceMicState(stompClientRef.current, channelId, micEnabledRef.current);
     publishVoiceDeafenState(stompClientRef.current, channelId, deafenedRef.current);
+    publishVoiceWatching(stompClientRef.current, channelId, currentWatchingUserIds());
     // A subscricao antiga morreu junto com a sessao STOMP anterior - refaz do zero.
     try {
       presenceSubRef.current?.unsubscribe();
@@ -306,6 +353,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     }
     presenceSubRef.current = subscribeToVoicePresence(stompClientRef.current, channelId, (list) => {
       presenceDeafenedRef.current = new Map(list.map((p) => [String(p.userId), p.deafened]));
+      setScreenShareWatchers(watchersByIdentity(list));
       if (roomRef.current) refreshParticipants(roomRef.current);
     });
     try {
@@ -332,6 +380,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         .get(`/api/channels/${channelId}/voice-presence`)
         .then(({ data }) => {
           presenceDeafenedRef.current = new Map((data || []).map((p) => [String(p.userId), p.deafened]));
+          setScreenShareWatchers(watchersByIdentity(data));
           if (roomRef.current) refreshParticipants(roomRef.current);
         })
         .catch(() => {});
@@ -478,6 +527,12 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     const nextWatching = !entry.track;
     if (nextWatching) watchedShareIdentitiesRef.current.add(entry.participantIdentity);
     else watchedShareIdentitiesRef.current.delete(entry.participantIdentity);
+    // Avisa quem esta compartilhando (e todo mundo mais no canal) quem voce esta assistindo
+    // agora - pra alimentar o icone de "quem esta vendo" no quadrado de transmissao (ver
+    // ScreenShareTile/screenShareWatchers, VoiceChannel.jsx/VoiceCallContext.jsx).
+    if (activeChannelRef.current && stompClientRef.current && stompConnectedRef.current) {
+      publishVoiceWatching(stompClientRef.current, activeChannelRef.current.id, currentWatchingUserIds());
+    }
     try {
       await entry.pub.setSubscribed(nextWatching);
     } catch (err) {
@@ -514,6 +569,19 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     return null;
   }
 
+  /** Lista NUMERICA (userId de verdade, o que o backend espera - ver
+   *  VoicePresenceService.setWatching) de quem voce esta assistindo AGORA, a partir de
+   *  watchedShareIdentitiesRef (identities "user-<id>") - filtra fora o bot de musica (nunca
+   *  compartilha tela, "musicbot-<x>" nao bate no formato numerico) e qualquer identity que
+   *  nao reconheca. Usada tanto pra publicar de novo ao (re)conectar quanto ao mudar quem voce
+   *  assiste (ver toggleWatchScreenShare). */
+  function currentWatchingUserIds() {
+    return [...watchedShareIdentitiesRef.current]
+      .map((identity) => userIdFromIdentity(identity))
+      .filter((id) => id && /^\d+$/.test(id))
+      .map(Number);
+  }
+
   /**
    * Le o volume de voz que deve valer AGORA pra essa pessoa - do Map em memoria se ja' foi
    * lido/ajustado nessa call, senao do localStorage (preferencia de uma call anterior), senao
@@ -540,6 +608,15 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     return value;
   }
 
+  /** Volume de 0-300% (participante/transmissao) JA multiplicado pelo volume MESTRE (0-300%,
+   *  ver masterVolumeRef/setMasterVolumePercent) - e' esse numero final que vai pro
+   *  track.setVolume() de verdade. Centralizado aqui pra nenhum dos varios lugares que chamam
+   *  setVolume() (attach inicial, reconectar, tirar do ensurdecido etc) esquecer de aplicar o
+   *  mestre junto. */
+  function effectiveVolume(rawPercent) {
+    return (rawPercent / 100) * (masterVolumeRef.current / 100);
+  }
+
   function setParticipantVolume(identity, percent) {
     const clamped = Math.max(0, Math.min(300, Math.round(percent)));
     participantVolumesRef.current.set(identity, clamped);
@@ -553,7 +630,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     // ouvindo alguem no momento; a preferencia fica salva e volta a valer depois (ver
     // toggleMic/clearDeafened), senao mexer no slider "furaria" o silencio sem querer.
     if (!deafenedRef.current) {
-      micAudioTracksRef.current.get(identity)?.setVolume(clamped / 100);
+      micAudioTracksRef.current.get(identity)?.setVolume(effectiveVolume(clamped));
     }
   }
 
@@ -564,8 +641,32 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     const userId = userIdFromIdentity(identity);
     if (userId) setSavedStreamVolume(userId, clamped);
     if (!deafenedRef.current) {
-      screenAudioTracksRef.current.get(identity)?.setVolume(clamped / 100);
+      screenAudioTracksRef.current.get(identity)?.setVolume(effectiveVolume(clamped));
     }
+  }
+
+  /** Volume MESTRE (alto-falante) - multiplica por cima de TODO volume individual (voz e
+   *  transmissao de tela de qualquer pessoa), sem mexer nas preferencias individuais salvas de
+   *  cada uma (ver effectiveVolume acima). Reaplica na hora em quem esta tocando agora mesmo -
+   *  senao so' valeria na proxima vez que cada track fosse reanexado. */
+  function setMasterVolumePercent(percent) {
+    const clamped = Math.max(0, Math.min(300, Math.round(percent)));
+    masterVolumeRef.current = clamped;
+    setMasterVolumeState(clamped);
+    persistMasterVolume(clamped);
+    if (deafenedRef.current) return; // ensurdecido ja' esta tudo a 0, nada pra reaplicar agora
+    micAudioTracksRef.current.forEach((track, identity) => track.setVolume(effectiveVolume(resolveParticipantVolume(identity))));
+    screenAudioTracksRef.current.forEach((track, identity) => track.setVolume(effectiveVolume(resolveStreamVolume(identity))));
+  }
+
+  /** Volume do SEU proprio microfone (0-200%, o que sai pra fora pros outros) - reaplica na
+   *  hora se voce estiver com o microfone publicado agora (ver localMicTrackRef), sem precisar
+   *  desmutar/mutar pra fazer efeito (ver applyNoiseSuppression). */
+  function setMicGainPercent(percent) {
+    const clamped = Math.max(0, Math.min(200, Math.round(percent)));
+    setMicGainState(clamped);
+    persistMicGain(clamped);
+    if (localMicTrackRef.current) applyNoiseSuppression(localMicTrackRef.current);
   }
 
   /** Desconecta e limpa tudo - usado tanto no "Sair da call" quanto ao trocar de canal. */
@@ -586,8 +687,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     clearActiveChannel();
     await roomRef.current?.disconnect();
     roomRef.current = null;
+    localMicTrackRef.current = null;
     videoTracksRef.current.clear();
     watchedShareIdentitiesRef.current = new Set();
+    setScreenShareWatchers({});
     micAudioTracksRef.current.clear();
     screenAudioTracksRef.current.clear();
     participantVolumesRef.current = new Map();
@@ -658,6 +761,16 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         // transmitir liso.
         publishDefaults: {
           screenShareEncoding: { maxBitrate: 8_000_000, maxFramerate: 60, priority: "high" },
+          // O PADRAO do proprio livekit-client pra transmissao de tela, quando falta banda, e'
+          // "maintain-resolution" (o WebRTC prefere derrubar o FRAMERATE pra manter a imagem
+          // nitida - bom pra compartilhar documento/planilha, pessimo pra jogo com movimento
+          // rapido: vira uma sequencia de fotos travadas em vez de continuar fluido so' com
+          // menos nitidez). "maintain-framerate" inverte essa prioridade - sob a MESMA pressao
+          // de rede, o WebRTC preferer perder um pouco de nitidez a perder fluidez (reportado:
+          // "trava, principalmente em jogos mais freneticos"). So' entra em jogo quando a
+          // internet de quem esta transmitindo realmente aperta - com banda de sobra (a maioria
+          // do tempo) nao muda nada, ja' roda no teto de 60fps/8Mbps acima.
+          degradationPreference: "maintain-framerate",
         },
       });
 
@@ -721,10 +834,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           if (deafenedRef.current) el.muted = true;
           if (pub.source === Track.Source.Microphone) {
             micAudioTracksRef.current.set(participant.identity, track);
-            track.setVolume(silenced ? 0 : resolveParticipantVolume(participant.identity) / 100);
+            track.setVolume(silenced ? 0 : effectiveVolume(resolveParticipantVolume(participant.identity)));
           } else if (pub.source === Track.Source.ScreenShareAudio) {
             screenAudioTracksRef.current.set(participant.identity, track);
-            track.setVolume(silenced ? 0 : resolveStreamVolume(participant.identity) / 100);
+            track.setVolume(silenced ? 0 : effectiveVolume(resolveStreamVolume(participant.identity)));
           }
           // O microfone so fica "inscrito" (chega aqui) depois que a pessoa efetivamente
           // publica o track - se a gente nao atualizar a lista agora, quem entrou na call
@@ -791,6 +904,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         // lugar so' pra isso em vez de espalhar em cada setMicrophoneEnabled(true) espalhado
         // pelo arquivo (join/toggleMic/toggleDeafen) - nenhum lugar (atual ou futuro) esquece.
         if (pub.source === Track.Source.Microphone && pub.track) {
+          localMicTrackRef.current = pub.track;
           applyNoiseSuppression(pub.track);
         }
         if (pub.source === Track.Source.ScreenShare && pub.track) {
@@ -895,6 +1009,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         publishVoiceJoin(stompClientRef.current, channel.id);
         presenceSubRef.current = subscribeToVoicePresence(stompClientRef.current, channel.id, (list) => {
           presenceDeafenedRef.current = new Map(list.map((p) => [String(p.userId), p.deafened]));
+          setScreenShareWatchers(watchersByIdentity(list));
           if (roomRef.current) refreshParticipants(roomRef.current);
         });
         controlSubRef.current = subscribeToVoiceControl(stompClientRef.current, channel.id, handleVoiceControlEvent);
@@ -944,10 +1059,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
    */
   function restoreListenVolumes(room) {
     micAudioTracksRef.current.forEach((track, identity) => {
-      track.setVolume(resolveParticipantVolume(identity) / 100);
+      track.setVolume(effectiveVolume(resolveParticipantVolume(identity)));
     });
     screenAudioTracksRef.current.forEach((track, identity) => {
-      track.setVolume(resolveStreamVolume(identity) / 100);
+      track.setVolume(effectiveVolume(resolveStreamVolume(identity)));
     });
     // Reforco pro caso raro de webAudioMix nao estar disponivel (cai pro elemento nativo).
     room.remoteParticipants.forEach((participant) => {
@@ -990,7 +1105,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           // Precisa estar anexado ANTES do setVolume() - ver comentario grande no
           // RoomEvent.TrackSubscribed acima pro bug do "0 e' falsy" que isso evita.
           if (pub.track.attachedElements.length === 0) pub.track.attach();
-          pub.track.setVolume(silenced ? 0 : resolveParticipantVolume(participant.identity) / 100);
+          pub.track.setVolume(silenced ? 0 : effectiveVolume(resolveParticipantVolume(participant.identity)));
           pub.track.attachedElements.forEach((el) => (el.muted = silenced));
         } else if (pub.source === Track.Source.ScreenShareAudio) {
           // Se a reconexao trouxe de volta o audio de uma transmissao que voce NAO escolheu
@@ -1002,7 +1117,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           }
           screenAudioTracksRef.current.set(participant.identity, pub.track);
           if (pub.track.attachedElements.length === 0) pub.track.attach();
-          pub.track.setVolume(silenced ? 0 : resolveStreamVolume(participant.identity) / 100);
+          pub.track.setVolume(silenced ? 0 : effectiveVolume(resolveStreamVolume(participant.identity)));
           pub.track.attachedElements.forEach((el) => (el.muted = silenced));
         }
       });
@@ -1413,10 +1528,15 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         pingMs,
         screenShares,
         toggleWatchScreenShare,
+        screenShareWatchers,
         participantVolumes,
         streamVolumes,
         setParticipantVolume,
         setStreamVolume,
+        micGain,
+        setMicGainPercent,
+        masterVolume,
+        setMasterVolumePercent,
         joinChannel,
         leaveChannel,
         toggleMic,

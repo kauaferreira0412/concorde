@@ -80,3 +80,36 @@ export function getSavedStreamVolume(userId) {
 export function setSavedStreamVolume(userId, percent) {
   localStorage.setItem(STREAM_VOLUME_PREFIX + userId, String(percent));
 }
+
+// Volume do SEU PROPRIO microfone (o que sai pra fora, pros outros - pedido explicito do
+// usuario: "quero baixar o volume do meu microfone, caso eu queira que ele saia mais baixo").
+// Diferente do volume individual acima (como VOCE ouve cada pessoa) - esse aqui afeta como
+// TODO MUNDO ouve VOCE. Ganho aplicado via GainNode (ver utils/noiseSuppression.js), nao e' so'
+// a constraint nativa do navegador - por isso da pra passar de 100% (ate' 200%, mesmo teto do
+// volume individual). Vale a partir da proxima vez que o microfone (re)publica (desmutar,
+// trocar de dispositivo, ver applyNoiseSuppression em VoiceCallContext.jsx).
+const MIC_GAIN_KEY = "micGainPercent";
+
+export function getMicGain() {
+  const raw = localStorage.getItem(MIC_GAIN_KEY);
+  return raw === null ? 100 : Number(raw);
+}
+export function setMicGain(percent) {
+  localStorage.setItem(MIC_GAIN_KEY, String(percent));
+}
+
+// Volume MESTRE (alto-falante) - multiplica por CIMA de todo volume individual (voz e
+// transmissao de tela de cada pessoa, ver participantVolumes/streamVolumes em
+// VoiceCallContext.jsx) - um "volume geral da call" independente do volume do Windows/app,
+// pedido explicito do usuario ("o mesmo e' o volume de alto-falante"). 100% = nao muda nada
+// (comportamento de sempre); baixar isso abafa todo mundo de uma vez, sem perder as
+// preferencias individuais de cada pessoa (elas continuam guardadas do jeito que estavam).
+const MASTER_VOLUME_KEY = "masterVolumePercent";
+
+export function getMasterVolume() {
+  const raw = localStorage.getItem(MASTER_VOLUME_KEY);
+  return raw === null ? 100 : Number(raw);
+}
+export function setMasterVolume(percent) {
+  localStorage.setItem(MASTER_VOLUME_KEY, String(percent));
+}

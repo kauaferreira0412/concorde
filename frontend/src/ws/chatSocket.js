@@ -87,6 +87,17 @@ export function publishVoiceDeafenState(client, channelId, deafened) {
   });
 }
 
+/** Lista INTEIRA e atualizada de quem (userIds) a pessoa esta assistindo agora (pode assistir
+ *  mais de uma transmissao ao mesmo tempo) - so' repassado pra todo mundo do canal (ver
+ *  VoicePresenceService.setWatching no backend), pra quem esta compartilhando saber quem esta
+ *  vendo (ver icone no cantinho do quadrado de transmissao, VoiceChannel.jsx). */
+export function publishVoiceWatching(client, channelId, watchingUserIds) {
+  client.publish({
+    destination: `/app/channel.${channelId}.voice.watching`,
+    body: JSON.stringify({ watchingUserIds }),
+  });
+}
+
 /**
  * Presenca GLOBAL (app aberto, nao so' na call de voz) - um usuario por vez, transmitido
  * pra todo mundo que tem esse topico assinado (ver OnlinePresenceService no backend).

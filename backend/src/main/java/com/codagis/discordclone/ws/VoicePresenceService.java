@@ -50,7 +50,7 @@ public class VoicePresenceService {
         boolean effectiveForceMuted = forceMuted || forceDeafened;
         byChannel.computeIfAbsent(channelId, k -> new ConcurrentHashMap<>())
                 .put(userId, new VoiceParticipantInfo(userId, username, avatarUrl, !effectiveForceMuted, forceDeafened,
-                        effectiveForceMuted, forceDeafened));
+                        effectiveForceMuted, forceDeafened, List.of()));
         sessionChannel.put(sessionId, channelId);
         sessionUser.put(sessionId, userId);
         currentSession.computeIfAbsent(channelId, k -> new ConcurrentHashMap<>()).put(userId, sessionId);
@@ -107,7 +107,7 @@ public class VoicePresenceService {
             return;
         }
         update(channelId, userId, current -> new VoiceParticipantInfo(userId, current.username(), current.avatarUrl(),
-                micEnabled, current.deafened(), current.forceMuted(), current.forceDeafened()));
+                micEnabled, current.deafened(), current.forceMuted(), current.forceDeafened(), current.watchingUserIds()));
     }
 
     /** Ensurdecer e' diferente de so mutar: a pessoa nem esta ouvindo ninguem, nao so calada. */
@@ -118,7 +118,23 @@ public class VoicePresenceService {
             return;
         }
         update(channelId, userId, current -> new VoiceParticipantInfo(userId, current.username(), current.avatarUrl(),
-                current.micEnabled(), deafened, current.forceMuted(), current.forceDeafened()));
+                current.micEnabled(), deafened, current.forceMuted(), current.forceDeafened(), current.watchingUserIds()));
+    }
+
+    /** De QUEM (pode ser mais de uma pessoa ao mesmo tempo) essa pessoa esta assistindo a
+     *  transmissao de tela agora - o cliente manda a lista INTEIRA atualizada toda vez que ela
+     *  muda (ver toggleWatchScreenShare no frontend), mais simples que ficar calculando um
+     *  diff aqui. Existe pra quem esta compartilhando a tela saber, na hora, quem esta vendo
+     *  (pedido explicito do usuario). */
+    public void setWatching(String sessionId, List<Long> watchingUserIds) {
+        Long channelId = sessionChannel.get(sessionId);
+        Long userId = sessionUser.get(sessionId);
+        if (channelId == null || userId == null) {
+            return;
+        }
+        List<Long> safeIds = watchingUserIds == null ? List.of() : watchingUserIds;
+        update(channelId, userId, current -> new VoiceParticipantInfo(userId, current.username(), current.avatarUrl(),
+                current.micEnabled(), current.deafened(), current.forceMuted(), current.forceDeafened(), safeIds));
     }
 
     /**
@@ -131,7 +147,7 @@ public class VoicePresenceService {
      */
     public void setForceMuted(Long channelId, Long targetUserId, boolean forceMuted) {
         update(channelId, targetUserId, current -> new VoiceParticipantInfo(targetUserId, current.username(),
-                current.avatarUrl(), !forceMuted, current.deafened(), forceMuted, current.forceDeafened()));
+                current.avatarUrl(), !forceMuted, current.deafened(), forceMuted, current.forceDeafened(), current.watchingUserIds()));
     }
 
     /**
@@ -144,7 +160,7 @@ public class VoicePresenceService {
      */
     public void setForceDeafened(Long channelId, Long targetUserId, boolean forceDeafened) {
         update(channelId, targetUserId, current -> new VoiceParticipantInfo(targetUserId, current.username(),
-                current.avatarUrl(), !forceDeafened, forceDeafened, forceDeafened, forceDeafened));
+                current.avatarUrl(), !forceDeafened, forceDeafened, forceDeafened, forceDeafened, current.watchingUserIds()));
     }
 
     public boolean isForceMuted(Long channelId, Long userId) {
@@ -178,7 +194,7 @@ public class VoicePresenceService {
     public void joinBot(Long channelId, String name, String avatarUrl) {
         byChannel.computeIfAbsent(channelId, k -> new ConcurrentHashMap<>())
                 .put(botUserId(channelId), new VoiceParticipantInfo(botUserId(channelId), name, avatarUrl,
-                        true, false, false, false));
+                        true, false, false, false, List.of()));
         broadcast(channelId);
     }
 
