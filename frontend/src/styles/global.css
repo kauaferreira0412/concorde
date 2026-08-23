@@ -246,6 +246,20 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .auth-field-toggle:hover { color: var(--text-primary); background: var(--bg-hover); }
 .auth-field:has(.auth-field-toggle) input { padding-right: 34px; }
 
+/* Checkbox "Lembrar acesso" (ver LoginPage.jsx) - fica entre os campos e o botao de entrar,
+   discreto (nao e' o foco principal da tela). */
+.auth-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  margin: -4px 0 0;
+}
+.auth-remember input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+
 .auth-card > button[type="submit"] {
   background: var(--accent);
   color: #fff;

@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -22,7 +23,7 @@ export default function LoginPage() {
     setError("");
     setSubmitting(true);
     try {
-      await login(usernameOrEmail, password);
+      await login(usernameOrEmail, password, rememberMe);
       navigate("/servers");
     } catch (err) {
       setError(err.response?.data?.error || "Falha ao entrar");
@@ -74,6 +75,11 @@ export default function LoginPage() {
           >
             {showPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
           </button>
+        </label>
+
+        <label className="auth-remember">
+          <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+          Lembrar acesso
         </label>
 
         {error && <p className="auth-error">{error}</p>}
