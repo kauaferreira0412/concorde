@@ -17,12 +17,17 @@ import { createPortal } from "react-dom";
  * "children" e' desenhado DENTRO da janela nova via createPortal - continua sendo React de
  * verdade (mesmos componentes, mesmo estado), so' o "onde na tela" que muda.
  */
-export default function CameraPipWindow({ onClose, children }) {
+export default function CameraPipWindow({ onClose, onError, children }) {
   const [pipWindow, setPipWindow] = useState(null);
 
   useEffect(() => {
     if (!("documentPictureInPicture" in window)) {
-      onClose(); // navegador nao suporta (Firefox/Safari) - nao trava nada, so' nao abre
+      // Navegador sem suporte (Firefox/Safari, ou Chromium antigo demais) - o botao ja' nem
+      // deveria aparecer nesse caso (ver cameraPipSupported em VoiceChannel.jsx), mas se
+      // chegar aqui mesmo assim, avisa com uma mensagem de verdade em vez de so' fechar
+      // silenciosamente (antes disso: "clico, pisca e nao abre", sem nenhuma pista do porque).
+      onError?.("Seu navegador não suporta abrir as câmeras numa janela separada.");
+      onClose();
       return;
     }
     let cancelled = false;
@@ -49,8 +54,12 @@ export default function CameraPipWindow({ onClose, children }) {
         w.addEventListener("pagehide", () => onClose(), { once: true });
         setPipWindow(w);
       })
-      .catch(() => {
-        onClose(); // usuario negou/cancelou o pedido do navegador - volta pro normal sozinho
+      .catch((err) => {
+        // O pedido em si falhou (ex: chamado fora de um clique de verdade - a API exige um
+        // "gesto do usuario" recente - ou o navegador/Electron nao tem o recurso ligado) -
+        // mostra o motivo de verdade em vez de so' fechar silenciosamente.
+        onError?.("Não foi possível abrir a janela das câmeras: " + (err?.message || err));
+        onClose();
       });
     return () => {
       cancelled = true;

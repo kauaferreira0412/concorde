@@ -4,6 +4,14 @@ const { pathToFileURL } = require("url");
 const { spawn } = require("child_process");
 const fs = require("fs");
 
+// A janela separada "so' com as cameras" (CameraPipWindow.jsx) usa a API Document
+// Picture-in-Picture do Chromium - estavel no Chrome de verdade desde a v116, mas o Electron
+// NAO garante vir ligada por padrao pra toda versao/canal (ao contrario do Chrome instalado no
+// Windows do usuario) - precisa desse switch ANTES do app ficar pronto (depois disso o
+// Chromium ja' terminou de ler os switches de linha de comando, nao adianta mais). Sem isso, o
+// pedido da janela falhava/rejeitava na hora (reportado: "clico, pisca e nao abre").
+app.commandLine.appendSwitch("enable-features", "DocumentPictureInPicture");
+
 const APP_PROTOCOL = "concorde"; // concorde://invite/<code> - deep link, registrado no SO
 const DEV_URL = "http://localhost:5173";
 

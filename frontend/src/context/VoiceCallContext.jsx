@@ -525,6 +525,18 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
 
   /** Cria ou atualiza a entrada de uma transmissao de tela (mescla com o que ja existia). */
   function upsertScreenShare(sid, patch) {
+    const identity = patch.participantIdentity ?? videoTracksRef.current.get(sid)?.participantIdentity;
+    // So' existe UM compartilhamento de tela ativo por pessoa de cada vez (LiveKit substitui
+    // a publicacao anterior sozinho ao chamar setScreenShareEnabled de novo) - se JA existe uma
+    // entrada de OUTRO sid pra essa mesma pessoa, e' resto de uma publicacao antiga que nunca
+    // foi limpa direito (ex: reconexao abrupta sem TrackUnpublished, ver
+    // RoomEvent.ParticipantDisconnected acima) - remove antes de adicionar a nova, senao a
+    // pessoa aparece compartilhando tela duas vezes ao mesmo tempo (reportado, com print).
+    if (identity) {
+      for (const [otherSid, entry] of [...videoTracksRef.current.entries()]) {
+        if (otherSid !== sid && entry.participantIdentity === identity) videoTracksRef.current.delete(otherSid);
+      }
+    }
     const merged = { ...(videoTracksRef.current.get(sid) || {}), ...patch };
     videoTracksRef.current.set(sid, merged);
     syncScreenShares();
@@ -993,9 +1005,23 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         refreshParticipants(newRoom);
         playJoinSound();
       });
-      newRoom.on(RoomEvent.ParticipantDisconnected, () => {
+      newRoom.on(RoomEvent.ParticipantDisconnected, (participant) => {
         refreshParticipants(newRoom);
         playLeaveSound();
+        // Rede varia (a mesma pressao de rede que causa o "trava" na transmissao, ver fix
+        // anterior) pode fazer um participante cair de um jeito ABRUPTO (timeout do servidor,
+        // sem handshake limpo de "parei de compartilhar") - nesse caso TrackUnpublished pode
+        // nunca disparar pra tela/camera dele, deixando uma entrada FANTASMA presa em
+        // videoTracksRef/cameraTracksRef pra sempre. Se ela reconectar e compartilhar nova
+        // tela, entra uma entrada NOVA (trackSid diferente) do lado da velha, que ninguem
+        // nunca removeu - reportado: "tem gente compartilhando tela duas vezes repetida".
+        // Reforco: ao desconectar de vez, garante que NENHUM resto dessa pessoa continua
+        // preso, independente de TrackUnpublished ter disparado ou nao.
+        for (const [sid, entry] of [...videoTracksRef.current.entries()]) {
+          if (entry.participantIdentity === participant.identity) videoTracksRef.current.delete(sid);
+        }
+        syncScreenShares();
+        if (cameraTracksRef.current.delete(participant.identity)) syncCameraTracks();
       });
       // O LiveKit calcula quem esta falando com base no nivel de audio - so quem esta
       // dentro da call (conectado ao LiveKit) recebe isso, ninguem de fora ve.

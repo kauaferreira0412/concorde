@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
+import { useAlert } from "../context/AlertContext.jsx";
 import { useServerMembers } from "../utils/useServerMembers";
 import {
   ExternalLinkIcon,
@@ -325,6 +326,7 @@ function ScreenShareTile({
  * Discord, que te mantem na call enquanto voce navega pelo servidor.
  */
 export default function VoiceChannel({ channel, serverName, stompClient, stompConnected }) {
+  const { showAlert } = useAlert();
   const {
     activeChannel,
     connected,
@@ -520,7 +522,7 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
             {cameraPipOpen ? (
               <>
                 <p className="voice-hint">As câmeras estão numa janela separada agora.</p>
-                <CameraPipWindow onClose={() => setCameraPipOpen(false)}>
+                <CameraPipWindow onClose={() => setCameraPipOpen(false)} onError={showAlert}>
                   <div className="camera-pip-grid">
                     {cameraTracks.map((c) => (
                       <CameraTile key={c.identity} track={c.track} name={c.name} isLocal={c.isLocal} size="xl" />
