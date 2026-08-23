@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { Room, RoomEvent, Track } from "livekit-client";
+import { DisconnectReason, Room, RoomEvent, Track } from "livekit-client";
 import api from "../api/client";
 import { useAuth } from "./AuthContext.jsx";
 import { useAlert } from "./AlertContext.jsx";
@@ -164,6 +164,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   // HORA se voce mudar isso em Configuracoes no meio de uma call (ver setMicGainPercent),
   // sem precisar desmutar/mutar pra fazer efeito.
   const localMicTrackRef = useRef(null);
+  // true bem no comecinho de QUALQUER desconexao que a GENTE pediu (sair da call, trocar de
+  // canal - ver disconnectInternal) - o handler de RoomEvent.Disconnected (ver joinChannel)
+  // confere isso pra saber se e' uma queda de VERDADE (ele NAO pediu) ou so' o eco da nossa
+  // propria saida, sem tratar a segunda como um problema.
+  const intentionalDisconnectRef = useRef(false);
   // Volume MESTRE (alto-falante) - multiplica por cima de todo volume individual (ver
   // resolveParticipantVolume/resolveStreamVolume abaixo e setMasterVolumePercent). Ref (nao so'
   // estado) porque precisa ser lido de forma sincrona dentro de closures antigas do LiveKit
@@ -382,6 +387,22 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           presenceDeafenedRef.current = new Map((data || []).map((p) => [String(p.userId), p.deafened]));
           setScreenShareWatchers(watchersByIdentity(data));
           if (roomRef.current) refreshParticipants(roomRef.current);
+          // "Usuario fantasma" NO SENTIDO INVERSO do bug acima: fala/ouve normal pelo LiveKit
+          // (a call de audio nunca caiu), mas sumiu da lista de presenca do lado do SERVIDOR -
+          // por exemplo, a mensagem STOMP de "entrei" se perdeu no meio do caminho sem nenhum
+          // disconnect/reconnect pra disparar o efeito que reanuncia isso (ver useEffect
+          // [stompConnected] acima). Reportado: "usuarios que falam e ouvem a gente na call mas
+          // nao mostram que estao na call". Se EU ainda estiver conectado ao LiveKit mas nao
+          // aparecer nessa lista, reanuncia sozinho - dentro de no maximo 12s isso se corrige
+          // sem precisar sair/entrar na call na mao.
+          const myUserId = userRef.current?.id;
+          const iAmPresent = (data || []).some((p) => String(p.userId) === String(myUserId));
+          if (roomRef.current && myUserId != null && !iAmPresent && stompClientRef.current && stompConnectedRef.current) {
+            console.warn("Presenca de voz sumiu do lado do servidor enquanto ainda conectado ao LiveKit - reanunciando.");
+            publishVoiceJoin(stompClientRef.current, channelId);
+            publishVoiceMicState(stompClientRef.current, channelId, micEnabledRef.current);
+            publishVoiceDeafenState(stompClientRef.current, channelId, deafenedRef.current);
+          }
         })
         .catch(() => {});
     }, 12000);
@@ -671,6 +692,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
 
   /** Desconecta e limpa tudo - usado tanto no "Sair da call" quanto ao trocar de canal. */
   async function disconnectInternal() {
+    intentionalDisconnectRef.current = true;
     const channelLeaving = activeChannelRef.current;
     if (channelLeaving && stompClientRef.current && stompConnectedRef.current) {
       publishVoiceLeave(stompClientRef.current, channelLeaving.id);
@@ -938,6 +960,34 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       // segundo plano - ver resyncFromRoom acima pra detalhe do que isso corrige.
       newRoom.on(RoomEvent.Reconnected, () => {
         resyncFromRoom(newRoom);
+      });
+      // Desconexao de VERDADE - o LiveKit ja tentou reconectar sozinho por baixo dos panos
+      // (RoomEvent.Reconnected acima) e desistiu, OU foi um kick/servidor caiu/etc. Sem esse
+      // handler, activeChannel/connected NUNCA mudavam sozinhos nesse caso - a tela ficava
+      // "presa" mostrando que voce ainda esta na call (o app achava que so' o LiveKit tinha
+      // ficado quieto por um instante), mesmo com o audio JA morto de verdade (nao fala nem
+      // ouve mais) - exatamente o bug relatado: "cai da call, mas continua aparecendo que
+      // esta". "intentionalDisconnectRef" distingue isso de um disconnect() que a GENTE pediu
+      // (sair/trocar de canal, ver disconnectInternal) - so' reage aqui na queda que NINGUEM
+      // pediu.
+      newRoom.on(RoomEvent.Disconnected, (reason) => {
+        if (intentionalDisconnectRef.current) {
+          intentionalDisconnectRef.current = false; // reseta pra proxima vez
+          return;
+        }
+        console.warn("Desconectado da call de voz sem pedir (motivo LiveKit):", reason);
+        let message =
+          "Você perdeu a conexão com a call de voz (internet instável?). Entre de novo se quiser continuar.";
+        if (reason === DisconnectReason.PARTICIPANT_REMOVED) {
+          message = "Você foi removido dessa call de voz por um moderador.";
+        } else if (reason === DisconnectReason.ROOM_DELETED || reason === DisconnectReason.SERVER_SHUTDOWN) {
+          message = "Essa call de voz foi encerrada.";
+        } else if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
+          message = "Você entrou nessa call em outro lugar (outra aba/dispositivo) - essa conexão foi encerrada.";
+        }
+        disconnectInternal();
+        playLeaveSound();
+        showAlert(message);
       });
       newRoom.on(RoomEvent.ParticipantConnected, () => {
         refreshParticipants(newRoom);
