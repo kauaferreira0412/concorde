@@ -46,6 +46,22 @@ export const NOISE_SUPPRESSION_MODES = [
   },
 ];
 
+/**
+ * Forca um node do Web Audio a trabalhar com UM canal so' (mono), fazendo o DOWNMIX de
+ * verdade se a entrada vier em estereo (soma os dois lados, "speakers" - nao descarta
+ * nenhum canal). Sem isso, alguns microfones (principalmente USB/headset que capturam em
+ * estereo mesmo tendo so' uma capsula de verdade) faziam o audio de quem estava com a
+ * supressao de ruido/volume do microfone ligados sair so' de UM LADO do fone pra quem
+ * escutava (reportado: "as vezes so ouve de um lado, desliga a supressao/sai e entra da call
+ * que volta ao normal") - os defaults do Web Audio (channelCountMode "max") deixavam passar
+ * 2 canais adiante em vez de combinar os dois num so'.
+ */
+function forceMonoDownmix(node) {
+  node.channelCount = 1;
+  node.channelCountMode = "explicit";
+  node.channelInterpretation = "speakers";
+}
+
 // audioWorklet.addModule() da erro se voce registrar o MESMO nome de processor duas vezes no
 // MESMO AudioContext - guarda a promise por contexto pra nunca tentar de novo (acontece se o
 // usuario trocar de dispositivo de microfone varias vezes na mesma call, ver restart() abaixo).
@@ -84,7 +100,9 @@ class BaseWasmNoiseSuppressionProcessor {
     this.audioContext = audioContext;
     this.workletNode = await this.createWorkletNode(audioContext);
     this.sourceNode = audioContext.createMediaStreamSource(new MediaStream([track]));
+    forceMonoDownmix(this.sourceNode);
     this.gainNode = audioContext.createGain();
+    forceMonoDownmix(this.gainNode);
     this.gainNode.gain.value = this.gain;
     this.destinationNode = audioContext.createMediaStreamDestination();
     this.sourceNode.connect(this.workletNode).connect(this.gainNode).connect(this.destinationNode);
@@ -124,7 +142,9 @@ class GainOnlyProcessor {
     const { track, audioContext } = opts;
     this.audioContext = audioContext;
     this.sourceNode = audioContext.createMediaStreamSource(new MediaStream([track]));
+    forceMonoDownmix(this.sourceNode);
     this.gainNode = audioContext.createGain();
+    forceMonoDownmix(this.gainNode);
     this.gainNode.gain.value = this.gain;
     this.destinationNode = audioContext.createMediaStreamDestination();
     this.sourceNode.connect(this.gainNode).connect(this.destinationNode);
