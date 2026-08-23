@@ -1978,6 +1978,30 @@ h3.chat-heading {
   .camera-tile-maximize { opacity: 1; }
 }
 
+/* Janela separada so' com as cameras (Document Picture-in-Picture, ver CameraPipWindow.jsx) -
+   ela clona essas MESMAS folhas de estilo pro proprio <head>, entao essas classes tambem valem
+   la' dentro. Comeca com um document vazio (sem "html,body,#root{height:100%}" do topo do
+   arquivo) - daqui pra baixo cuida da altura/fundo sozinho. */
+.camera-pip-body {
+  margin: 0;
+  height: 100vh;
+  background: var(--bg-app);
+  overflow: auto;
+}
+.camera-pip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+  padding: 10px;
+  box-sizing: border-box;
+  min-height: 100%;
+}
+/* Dentro do PiP as cameras devem preencher o quadradinho que o grid deu pra elas (maiores,
+   lado a lado) em vez do tamanho fixo em px de ".camera-tile-<size>" (pensado pro grid normal,
+   que flui/quebra linha - ver .camera-grid acima) - especificidade de 2 classes juntas ja'
+   ganha da de 1 classe so', nao precisa de !important. */
+.camera-pip-grid .camera-tile { width: 100%; height: 100%; aspect-ratio: 16 / 9; }
+
 /* ============================================================
    Lightbox (visualizador de imagem em tela cheia - ver ImageLightbox.jsx)
    ============================================================ */

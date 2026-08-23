@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useServerMembers } from "../utils/useServerMembers";
 import {
+  ExternalLinkIcon,
   EyeOffIcon,
   MaximizeIcon,
   MenuIcon,
@@ -17,6 +18,7 @@ import {
 import { MemberRow } from "./MemberList.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
 import Avatar from "./Avatar.jsx";
+import CameraPipWindow from "./CameraPipWindow.jsx";
 
 // Tamanhos disponiveis pro tile de webcam - "size" vira uma classe CSS (.camera-tile-<size>,
 // ver global.css). Comeca em "md" (tamanho de antes), dá pra aumentar/diminuir pelos botoes
@@ -317,6 +319,20 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
   // tiles de webcam de uma vez (ver botoes +/- no cabecalho da secao CÂMERAS).
   const [cameraSizeIdx, setCameraSizeIdx] = useState(1);
   const cameraSize = CAMERA_SIZES[cameraSizeIdx];
+  // Janela separada so' com as cameras (Document Picture-in-Picture, ver CameraPipWindow.jsx) -
+  // pedido explicito do usuario: ver as cameras maiores, lado a lado, numa janela a parte.
+  // "cameraPipSupported" esconde o botao em navegadores sem essa API (Firefox/Safari) em vez de
+  // deixar clicar e nao acontecer nada.
+  const [cameraPipOpen, setCameraPipOpen] = useState(false);
+  const cameraPipSupported = typeof window !== "undefined" && "documentPictureInPicture" in window;
+  // Sem camera nenhuma ligada, a secao inteira some (ver "cameraTracks.length > 0" abaixo),
+  // levando a janela do PiP junto (CameraPipWindow fecha sozinha ao desmontar) - mas sem isso
+  // aqui, se alguem ligasse a camera de novo depois, a secao voltaria tentando reabrir o PiP
+  // sozinha (sem clique nenhum da pessoa), e o navegador rejeita isso (documentPictureInPicture
+  // exige um gesto do usuario) - melhor so' resetar pra visualizacao normal nesse meio-tempo.
+  useEffect(() => {
+    if (cameraTracks.length === 0) setCameraPipOpen(false);
+  }, [cameraTracks.length]);
 
   // "Modo teatro" - POR TELA (um Set de sids), nao um botao global: ativar/desativar numa
   // transmissao nao deve mexer nas outras (bug relatado: parar de assistir uma tirava o modo
@@ -416,7 +432,7 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
                   type="button"
                   className="icon-btn"
                   onClick={() => setCameraSizeIdx((i) => Math.max(0, i - 1))}
-                  disabled={cameraSizeIdx === 0}
+                  disabled={cameraSizeIdx === 0 || cameraPipOpen}
                   title="Diminuir câmeras"
                 >
                   <ZoomOutIcon size={15} />
@@ -425,18 +441,41 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
                   type="button"
                   className="icon-btn"
                   onClick={() => setCameraSizeIdx((i) => Math.min(CAMERA_SIZES.length - 1, i + 1))}
-                  disabled={cameraSizeIdx === CAMERA_SIZES.length - 1}
+                  disabled={cameraSizeIdx === CAMERA_SIZES.length - 1 || cameraPipOpen}
                   title="Aumentar câmeras"
                 >
                   <ZoomInIcon size={15} />
                 </button>
+                {cameraPipSupported && (
+                  <button
+                    type="button"
+                    className={"icon-btn" + (cameraPipOpen ? " icon-btn-active" : "")}
+                    onClick={() => setCameraPipOpen((v) => !v)}
+                    title={cameraPipOpen ? "Voltar pro Concorde" : "Abrir câmeras em outra janela"}
+                  >
+                    <ExternalLinkIcon size={15} />
+                  </button>
+                )}
               </div>
             </div>
-            <div className="camera-grid">
-              {cameraTracks.map((c) => (
-                <CameraTile key={c.identity} track={c.track} name={c.name} isLocal={c.isLocal} size={cameraSize} />
-              ))}
-            </div>
+            {cameraPipOpen ? (
+              <>
+                <p className="voice-hint">As câmeras estão numa janela separada agora.</p>
+                <CameraPipWindow onClose={() => setCameraPipOpen(false)}>
+                  <div className="camera-pip-grid">
+                    {cameraTracks.map((c) => (
+                      <CameraTile key={c.identity} track={c.track} name={c.name} isLocal={c.isLocal} size="xl" />
+                    ))}
+                  </div>
+                </CameraPipWindow>
+              </>
+            ) : (
+              <div className="camera-grid">
+                {cameraTracks.map((c) => (
+                  <CameraTile key={c.identity} track={c.track} name={c.name} isLocal={c.isLocal} size={cameraSize} />
+                ))}
+              </div>
+            )}
           </section>
         )}
 
