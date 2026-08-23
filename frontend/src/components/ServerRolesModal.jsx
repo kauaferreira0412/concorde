@@ -14,6 +14,7 @@ const PERMISSIONS = [
   { value: "MANAGE_CHANNELS", label: "Gerenciar canais (criar/editar/apagar)" },
   { value: "MANAGE_MEMBERS", label: "Gerenciar membros (remover do servidor, editar apelido)" },
   { value: "MANAGE_ROLES", label: "Gerenciar perfis (criar/editar/atribuir)" },
+  { value: "MANAGE_SERVER", label: "Editar dados do servidor (nome, ícone, descrição)" },
 ];
 
 /** Formulario de criar/editar um Perfil - nome + quais permissoes ele carrega. */

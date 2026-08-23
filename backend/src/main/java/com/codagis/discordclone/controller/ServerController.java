@@ -37,14 +37,15 @@ public class ServerController {
         return serverService.createServer(currentUser.id(), req);
     }
 
-    /** So o ADMIN (mesmo criterio de quem pode criar servidor) pode editar nome/descricao. */
+    /** Dono/ADMIN global sempre podem, ou quem tiver MANAGE_SERVER nesse servidor especifico
+     *  (ver ServerService.updateServer). */
     @PutMapping("/{serverId}")
     public ServerResponse update(@PathVariable Long serverId, @Valid @RequestBody UpdateServerRequest req) {
         return serverService.updateServer(currentUser.id(), serverId, req);
     }
 
     /** Apaga o servidor inteiro (canais, mensagens, membros e perfis) - so' o ADMIN global,
-     *  mesmo criterio de criar/editar (ver ServerService.deleteServer). */
+     *  mais restrito que editar por ser irreversivel (ver ServerService.deleteServer). */
     @DeleteMapping("/{serverId}")
     public void delete(@PathVariable Long serverId) {
         serverService.deleteServer(currentUser.id(), serverId);

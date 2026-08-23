@@ -124,11 +124,13 @@ public class ServerService {
                 .toList();
     }
 
-    /** So o dono do servidor (ou o ADMIN) pode editar nome/descricao - mesmo criterio de
-     * quem pode criar servidor pra comecar (ver AdminGuard). */
+    /** Dono/ADMIN global sempre podem (ver PermissionService.isOwnerOrGlobalAdmin) - alem
+     * deles, quem tiver a permissao MANAGE_SERVER atribuida por um Perfil NESSE servidor
+     * (pedido explicito: liberacao por servidor, nao mais so' ADMIN global). */
     @Transactional
     public ServerResponse updateServer(Long requesterId, Long serverId, UpdateServerRequest req) {
-        adminGuard.assertAdmin(requesterId);
+        assertMember(serverId, requesterId);
+        permissionService.assertHas(serverId, requesterId, ServerPermission.MANAGE_SERVER);
         Server server = serverRepository.findById(serverId)
                 .orElseThrow(() -> new IllegalArgumentException("Servidor nao encontrado"));
         server.setName(req.name());
@@ -137,10 +139,11 @@ public class ServerService {
     }
 
     /** Apaga o servidor inteiro - canais, mensagens, membros e perfis dele. Mesmo criterio de
-     *  quem pode criar/editar servidor (ADMIN global). Nao tem como desfazer, o frontend
-     *  confirma antes (ver EditServerModal.jsx). Nao forca desconexao de quem estiver numa call
-     *  de voz desse servidor nesse momento - mesma limitacao que ja existia em deleteChannel,
-     *  a call so' termina quando a pessoa sair sozinha. */
+     *  quem pode CRIAR servidor (so' ADMIN global) - mais restrito que editar (updateServer
+     *  acima, que ja aceita MANAGE_SERVER), de proposito: e' irreversivel. Nao tem como desfazer,
+     *  o frontend confirma antes (ver EditServerModal.jsx). Nao forca desconexao de quem
+     *  estiver numa call de voz desse servidor nesse momento - mesma limitacao que ja existia
+     *  em deleteChannel, a call so' termina quando a pessoa sair sozinha. */
     @Transactional
     public void deleteServer(Long requesterId, Long serverId) {
         adminGuard.assertAdmin(requesterId);
@@ -157,7 +160,8 @@ public class ServerService {
 
     @Transactional
     public ServerResponse updateServerIcon(Long requesterId, Long serverId, String iconUrl) {
-        adminGuard.assertAdmin(requesterId);
+        assertMember(serverId, requesterId);
+        permissionService.assertHas(serverId, requesterId, ServerPermission.MANAGE_SERVER);
         Server server = serverRepository.findById(serverId)
                 .orElseThrow(() -> new IllegalArgumentException("Servidor nao encontrado"));
         server.setIconUrl(iconUrl);

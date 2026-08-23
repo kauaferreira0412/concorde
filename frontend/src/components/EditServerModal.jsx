@@ -1,16 +1,21 @@
 import { Fragment, useRef, useState } from "react";
 import api from "../api/client";
 import { useAlert } from "../context/AlertContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 
 /**
- * Editar um servidor existente (so' ADMIN ve o botao que abre isso, ver ChannelSidebar.jsx -
- * o backend tambem confere, ver ServerService.updateServer/updateServerIcon). Icone troca na
- * hora ao escolher o arquivo (igual a foto de perfil do usuario); nome/descricao ficam
- * pendentes ate' clicar em Salvar.
+ * Editar um servidor existente - dono do servidor, ADMIN global, ou quem tiver a permissao
+ * MANAGE_SERVER atribuida por um Perfil NESSE servidor ve o botao que abre isso (ver
+ * ChannelSidebar.jsx - o backend tambem confere, ver ServerService.updateServer/
+ * updateServerIcon). Icone troca na hora ao escolher o arquivo (igual a foto de perfil do
+ * usuario); nome/descricao ficam pendentes ate' clicar em Salvar. A "Zona de perigo" (excluir
+ * o servidor inteiro) e' mais restrita - continua so' ADMIN global (ver
+ * ServerService.deleteServer, deliberadamente separado por ser irreversivel).
  */
 export default function EditServerModal({ server, onClose, onUpdate, onDelete }) {
+  const { isAdmin } = useAuth();
   const [name, setName] = useState(server.name || "");
   const [description, setDescription] = useState(server.description || "");
   const [iconUrl, setIconUrl] = useState(server.iconUrl || "");
@@ -121,18 +126,24 @@ export default function EditServerModal({ server, onClose, onUpdate, onDelete })
 
         {saveError && <p className="auth-error">{saveError}</p>}
 
-        <div className="settings-divider" />
-
-        <div className="settings-field">
-          <label className="settings-label">Zona de perigo</label>
-          <p className="admin-hint" style={{ margin: "0 0 10px" }}>
-            Excluir o servidor apaga todos os canais, mensagens e membros dele. Não dá pra
-            desfazer.
-          </p>
-          <button type="button" className="danger" onClick={() => setConfirmingDelete(true)} disabled={saving}>
-            Excluir servidor
-          </button>
-        </div>
+        {/* So' ADMIN global ve isso - diferente do resto do modal (editar nome/icone), que
+            agora tambem libera pra quem tiver MANAGE_SERVER, excluir o servidor continua mais
+            restrito por ser irreversivel (ver ServerService.deleteServer). */}
+        {isAdmin && (
+          <>
+            <div className="settings-divider" />
+            <div className="settings-field">
+              <label className="settings-label">Zona de perigo</label>
+              <p className="admin-hint" style={{ margin: "0 0 10px" }}>
+                Excluir o servidor apaga todos os canais, mensagens e membros dele. Não dá pra
+                desfazer.
+              </p>
+              <button type="button" className="danger" onClick={() => setConfirmingDelete(true)} disabled={saving}>
+                Excluir servidor
+              </button>
+            </div>
+          </>
+        )}
 
         <div className="settings-actions">
           <button type="button" className="link-btn" onClick={onClose} disabled={saving}>

@@ -283,7 +283,7 @@ export default function ChannelSidebar({
               <ShieldIcon size={15} />
             </button>
           )}
-          {!collapsed && server && isAdmin && (
+          {!collapsed && server && (isAdmin || myServerPermissions.has("MANAGE_SERVER")) && (
             <button className="icon-btn" onClick={() => onEditServer(server)} title="Editar servidor">
               <PencilIcon size={15} />
             </button>

@@ -22,5 +22,9 @@ public enum ServerPermission {
     MANAGE_MEMBERS,
     /** Criar/editar/apagar Perfis (ServerRole) e atribui-los a membros - controla quem mais
      * pode conceder as outras permissoes daqui pra frente. */
-    MANAGE_ROLES
+    MANAGE_ROLES,
+    /** Editar nome/descricao/icone do SERVIDOR em si (ver EditServerModal.jsx) - NAO inclui
+     * excluir o servidor inteiro, isso continua so' do dono/ADMIN global (ver
+     * ServerService.deleteServer, deliberadamente mais restrito por ser irreversivel). */
+    MANAGE_SERVER
 }
