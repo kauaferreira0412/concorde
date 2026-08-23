@@ -11,8 +11,14 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  // sessionStorage (isolado por aba) - ver AuthContext.jsx pro motivo de nao ser localStorage.
-  const token = sessionStorage.getItem("token");
+  // sessionStorage por padrao (isolado por aba) - ver AuthContext.jsx pro motivo de nao ser
+  // localStorage. localStorage entra quando o login foi feito com "Lembrar acesso" marcado
+  // (ver AuthContext.jsx) - ESQUECER de checar aqui tambem foi um bug real: o token ia pro
+  // storage certo, mas toda chamada de API saia sem Authorization nenhum (essa leitura so'
+  // olhava sessionStorage), entao TUDO que depende de estar logado vinha vazio/401 em
+  // silencio (reportado: loga, aparece o nome, mas "nenhum servidor liberado" - o token
+  // simplesmente nunca ia junto na requisicao).
+  const token = localStorage.getItem("token") || sessionStorage.getItem("token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
