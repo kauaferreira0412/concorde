@@ -541,7 +541,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   }
 
   function setParticipantVolume(identity, percent) {
-    const clamped = Math.max(0, Math.min(200, Math.round(percent)));
+    const clamped = Math.max(0, Math.min(300, Math.round(percent)));
     participantVolumesRef.current.set(identity, clamped);
     setParticipantVolumesState(Object.fromEntries(participantVolumesRef.current));
     // Gravado por PESSOA (userId), sobrevive a ela sair/entrar de novo na call, voce sair/
@@ -558,7 +558,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   }
 
   function setStreamVolume(identity, percent) {
-    const clamped = Math.max(0, Math.min(200, Math.round(percent)));
+    const clamped = Math.max(0, Math.min(300, Math.round(percent)));
     streamVolumesRef.current.set(identity, clamped);
     setStreamVolumesState(Object.fromEntries(streamVolumesRef.current));
     const userId = userIdFromIdentity(identity);
@@ -634,7 +634,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         // Sem isso, o volume de cada participante/transmissao fica preso ao <audio>.volume
         // do navegador, que trava em 100% - com webAudioMix ligado, o LiveKit passa a
         // controlar o audio por um GainNode (Web Audio API), que aceita valores acima de 1
-        // (ate' 200% aqui - ver setParticipantVolume/setStreamVolume).
+        // (ate' 300% aqui - ver setParticipantVolume/setStreamVolume).
         webAudioMix: true,
         // noiseSuppression nativa do navegador DESLIGADA de proposito - a supressao de
         // verdade agora e' feita por IA (RNNoise/GTCRN, ver utils/noiseSuppression.js e o

@@ -1,6 +1,6 @@
 import { VolumeIcon } from "./icons.jsx";
 
-/** Slider de volume 0-200% (o Discord/navegador so vai ate 100% - aqui passa disso via
+/** Slider de volume 0-300% (o Discord/navegador so vai ate 100% - aqui passa disso via
     Web Audio, ver webAudioMix em VoiceCallContext.jsx). Reaproveitado pra voz individual
     (popover na sidebar) e pro audio da transmissão de tela (VoiceChannel.jsx). */
 export default function VolumeSlider({ value, onChange, label }) {
@@ -10,7 +10,7 @@ export default function VolumeSlider({ value, onChange, label }) {
       <input
         type="range"
         min={0}
-        max={200}
+        max={300}
         step={5}
         value={value}
         onClick={(e) => e.stopPropagation()}
