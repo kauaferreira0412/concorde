@@ -6,6 +6,7 @@ import com.codagis.discordclone.dto.ServerRoleDtos.*;
 import com.codagis.discordclone.security.CurrentUser;
 import com.codagis.discordclone.service.GcsService;
 import com.codagis.discordclone.service.ServerService;
+import com.codagis.discordclone.ws.VoiceParticipantInfo;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -80,6 +81,13 @@ public class ServerController {
     @GetMapping("/{serverId}/channels")
     public List<ChannelResponse> listChannels(@PathVariable Long serverId) {
         return serverService.listChannels(serverId, currentUser.id());
+    }
+
+    /** Quem esta numa call de voz agora, em qualquer canal desse servidor - usado no hover do
+     *  icone do servidor na sidebar (ver ServerSidebar.jsx), sem precisar abrir o servidor. */
+    @GetMapping("/{serverId}/voice-presence")
+    public List<VoiceParticipantInfo> getVoicePresence(@PathVariable Long serverId) {
+        return serverService.getVoicePresence(serverId, currentUser.id());
     }
 
     @PostMapping("/{serverId}/channels")

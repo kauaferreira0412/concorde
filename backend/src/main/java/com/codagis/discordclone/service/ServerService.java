@@ -7,6 +7,8 @@ import com.codagis.discordclone.repository.*;
 import com.codagis.discordclone.security.AdminGuard;
 import com.codagis.discordclone.ws.OnlinePresenceService;
 import com.codagis.discordclone.ws.PresenceStatus;
+import com.codagis.discordclone.ws.VoiceParticipantInfo;
+import com.codagis.discordclone.ws.VoicePresenceService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,12 +29,13 @@ public class ServerService {
     private final AdminGuard adminGuard;
     private final OnlinePresenceService presenceService;
     private final PermissionService permissionService;
+    private final VoicePresenceService voicePresenceService;
 
     public ServerService(ServerRepository serverRepository, ChannelRepository channelRepository,
                           MembershipRepository membershipRepository, UserRepository userRepository,
                           ServerRoleRepository serverRoleRepository, MessageRepository messageRepository,
                           AdminGuard adminGuard, OnlinePresenceService presenceService,
-                          PermissionService permissionService) {
+                          PermissionService permissionService, VoicePresenceService voicePresenceService) {
         this.serverRepository = serverRepository;
         this.channelRepository = channelRepository;
         this.membershipRepository = membershipRepository;
@@ -42,6 +45,21 @@ public class ServerService {
         this.adminGuard = adminGuard;
         this.presenceService = presenceService;
         this.permissionService = permissionService;
+        this.voicePresenceService = voicePresenceService;
+    }
+
+    /** Quem esta conectado numa call de voz agora, em QUALQUER canal de voz desse servidor -
+     *  usado no hover do icone do servidor na sidebar (ver ServerSidebar.jsx), pra mostrar os
+     *  avatares de quem esta na call sem precisar entrar no servidor primeiro (pedido
+     *  explicito do usuario). Junta a presenca (ver VoicePresenceService) de cada canal de voz
+     *  numa lista so' - normalmente uma pessoa so' esta numa call de cada vez, entao nao
+     *  precisa de nenhuma deduplicacao especial. */
+    public List<VoiceParticipantInfo> getVoicePresence(Long serverId, Long userId) {
+        assertMember(serverId, userId);
+        return channelRepository.findByServerIdOrderByIdAsc(serverId).stream()
+                .filter(c -> c.getType() == ChannelType.VOICE)
+                .flatMap(c -> voicePresenceService.snapshot(c.getId()).stream())
+                .toList();
     }
 
     /** So o ADMIN pode criar servidores. */
