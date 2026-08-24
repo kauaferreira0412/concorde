@@ -108,8 +108,24 @@ if (!installer) {
 
 mkdirSync(downloadsDir, { recursive: true });
 const destName = `Concorde-Setup${targetExt}`;
-copyFileSync(join(releaseDir, installer.f), join(downloadsDir, destName));
+const destPath = join(downloadsDir, destName);
+copyFileSync(join(releaseDir, installer.f), destPath);
 console.log(`\nInstalador copiado: public/downloads/${destName}`);
+
+// So' no Windows, e so' PALIATIVO: o instalador nao e' assinado digitalmente (sem certificado
+// de assinatura de codigo), entao navegadores/Windows Defender tratam ".exe" desconhecido como
+// suspeito por padrao (reportado: bloqueado no download, ou removido pelo Defender depois -
+// "Trojan:Win32/Wacatac.C!ml", um falso positivo bem comum nesse tipo de app sem assinatura).
+// Embrulhar num .zip evita a checagem de reputacao que o navegador faz ESPECIFICAMENTE em
+// download de .exe cru - NAO elimina o alerta do Defender ao extrair/rodar depois, so' destrava
+// o download em si. O jeito de verdade de resolver os dois e' assinar o instalador.
+if (platform === "win") {
+  const zipPath = join(downloadsDir, "Concorde-Setup.zip");
+  run(
+    `powershell -NoProfile -Command "Compress-Archive -Path '${destPath}' -DestinationPath '${zipPath}' -Force"`
+  );
+  console.log(`Zip paliativo gerado: public/downloads/Concorde-Setup.zip`);
+}
 
 // Build normal do SITE (sem VITE_API_URL/VITE_WS_URL) - continua usando "mesma origem",
 // igual sempre foi. So' entra aqui pra empacotar o instalador junto como arquivo estatico.

@@ -99,10 +99,19 @@ export default function LoginPage() {
             Instale o Concorde no Windows: notificações mesmo com a janela fechada, atalho no
             menu iniciar e compartilhamento de tela nativo, com áudio de janelas e programas.
           </p>
-          <a className="auth-download-btn" href="/downloads/Concorde-Setup.exe" download>
+          {/* .zip em vez do .exe cru de proposito - o instalador nao tem assinatura digital
+              (sem certificado de codigo), e' comum navegador/Windows Defender tratar um .exe
+              desconhecido como suspeito so' pelo download (reportado). Um .zip passa por essa
+              checagem especifica - so' extrai o instalador de dentro pra rodar. */}
+          <a className="auth-download-btn" href="/downloads/Concorde-Setup.zip" download>
             <DownloadIcon size={16} />
             Baixar para Windows
           </a>
+          <p className="admin-hint" style={{ margin: "6px 0 0" }}>
+            Baixa um .zip - extraia e rode o instalador de dentro. Como ainda não temos um
+            certificado de assinatura de código, o Windows pode avisar que não reconhece o
+            programa (comum em apps pequenos como este) - escolha "Executar assim mesmo".
+          </p>
         </div>
       )}
     </div>
