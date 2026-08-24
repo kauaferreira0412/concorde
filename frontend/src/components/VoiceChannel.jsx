@@ -14,6 +14,7 @@ import {
   UsersIcon,
   VolumeIcon,
   WidenIcon,
+  XIcon,
   ZoomInIcon,
   ZoomOutIcon,
 } from "./icons.jsx";
@@ -22,6 +23,18 @@ import VolumeSlider from "./VolumeSlider.jsx";
 import Avatar from "./Avatar.jsx";
 import { useTrackFps } from "../utils/useTrackFps";
 import CameraPipWindow from "./CameraPipWindow.jsx";
+import { createPortal } from "react-dom";
+
+// window.concordeDesktop so' existe dentro do app Electron (ver electron/preload.cjs). A janela
+// separada das cameras usa Document Picture-in-Picture (CameraPipWindow.jsx) NO NAVEGADOR - mas
+// essa API depende de integracao com a "casca" de navegador de verdade (abas, gerenciador de
+// janelas) que o Electron simplesmente NAO tem (ele empacota so' o motor Chromium, sem o Chrome
+// em si por cima) - o objeto ate' existe no "window" (nao da pra checar por feature-detection
+// comum), mas o pedido de janela nunca resolve nem rejeita, so' fica pendurado pra sempre
+// (reportado: "clico, pisca e nao aparece nada" - so' no app desktop, no navegador funciona).
+// Dentro do Electron a gente usa outro caminho pro MESMO resultado visual (cameras maiores,
+// numa visualizacao separada) - ver cameraPipSupported/CameraPipOverlay abaixo.
+const isElectronDesktop = typeof window !== "undefined" && !!window.concordeDesktop;
 
 // Tamanhos disponiveis pro tile de webcam - "size" vira uma classe CSS (.camera-tile-<size>,
 // ver global.css). Comeca em "md" (tamanho de antes), dá pra aumentar/diminuir pelos botoes
@@ -380,12 +393,14 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
   // tiles de webcam de uma vez (ver botoes +/- no cabecalho da secao CÂMERAS).
   const [cameraSizeIdx, setCameraSizeIdx] = useState(1);
   const cameraSize = CAMERA_SIZES[cameraSizeIdx];
-  // Janela separada so' com as cameras (Document Picture-in-Picture, ver CameraPipWindow.jsx) -
-  // pedido explicito do usuario: ver as cameras maiores, lado a lado, numa janela a parte.
-  // "cameraPipSupported" esconde o botao em navegadores sem essa API (Firefox/Safari) em vez de
-  // deixar clicar e nao acontecer nada.
+  // Janela separada so' com as cameras - pedido explicito do usuario: ver as cameras maiores,
+  // lado a lado, numa visualizacao separada. No navegador usa Document Picture-in-Picture de
+  // verdade (CameraPipWindow.jsx); no app desktop usa uma sobreposicao DENTRO da propria janela
+  // (CameraPipOverlay logo abaixo - ver o comentario grande em isElectronDesktop pro motivo).
+  // "cameraPipSupported" esconde o botao so' quando NENHUM dos dois caminhos funciona
+  // (navegador sem essa API, tipo Firefox/Safari) - no Electron sempre e' true.
   const [cameraPipOpen, setCameraPipOpen] = useState(false);
-  const cameraPipSupported = typeof window !== "undefined" && "documentPictureInPicture" in window;
+  const cameraPipSupported = isElectronDesktop || (typeof window !== "undefined" && "documentPictureInPicture" in window);
   // Sem camera nenhuma ligada, a secao inteira some (ver "cameraTracks.length > 0" abaixo),
   // levando a janela do PiP junto (CameraPipWindow fecha sozinha ao desmontar) - mas sem isso
   // aqui, se alguem ligasse a camera de novo depois, a secao voltaria tentando reabrir o PiP
@@ -512,14 +527,22 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
                     type="button"
                     className={"icon-btn" + (cameraPipOpen ? " icon-btn-active" : "")}
                     onClick={() => setCameraPipOpen((v) => !v)}
-                    title={cameraPipOpen ? "Voltar pro Concorde" : "Abrir câmeras em outra janela"}
+                    title={
+                      cameraPipOpen
+                        ? "Voltar pro Concorde"
+                        : isElectronDesktop
+                        ? "Ampliar câmeras"
+                        : "Abrir câmeras em outra janela"
+                    }
                   >
                     <ExternalLinkIcon size={15} />
                   </button>
                 )}
               </div>
             </div>
-            {cameraPipOpen ? (
+            {cameraPipOpen && isElectronDesktop ? (
+              <p className="voice-hint">As câmeras estão ampliadas na tela agora.</p>
+            ) : cameraPipOpen ? (
               <>
                 <p className="voice-hint">As câmeras estão numa janela separada agora.</p>
                 <CameraPipWindow onClose={() => setCameraPipOpen(false)} onError={showAlert}>
@@ -539,6 +562,30 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
             )}
           </section>
         )}
+
+        {/* App desktop (Electron): "janela separada" vira uma sobreposicao DENTRO da propria
+            janela do app (ver comentario grande em isElectronDesktop, no topo do arquivo, pro
+            motivo de Document Picture-in-Picture nao funcionar no Electron). Portal pro
+            document.body pra ficar por cima de TUDO (inclusive a barra de titulo customizada,
+            ver z-index em global.css), independente de onde essa secao esta' na arvore. */}
+        {cameraPipOpen &&
+          isElectronDesktop &&
+          createPortal(
+            <div className="camera-pip-overlay">
+              <div className="camera-pip-overlay-header">
+                <span>Câmeras</span>
+                <button type="button" className="icon-btn" onClick={() => setCameraPipOpen(false)} title="Voltar pro Concorde">
+                  <XIcon size={16} />
+                </button>
+              </div>
+              <div className="camera-pip-grid">
+                {cameraTracks.map((c) => (
+                  <CameraTile key={c.identity} track={c.track} name={c.name} isLocal={c.isLocal} size="xl" />
+                ))}
+              </div>
+            </div>,
+            document.body
+          )}
 
         <section className="voice-section">
           <div className="voice-section-header">
