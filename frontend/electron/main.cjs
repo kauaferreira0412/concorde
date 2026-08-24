@@ -83,6 +83,43 @@ function createWindow(deepLinkUrl) {
   }
 }
 
+// Janela SEPARADA de verdade das cameras (Document Picture-in-Picture nao funciona dentro do
+// Electron, ver CameraPipPage.jsx pro motivo completo) - so' uma de cada vez (clicar de novo
+// com uma ja aberta so' traz ela pra frente, em vez de empilhar varias).
+let cameraPipWindow = null;
+
+function createCameraPipWindow(channelId, appToken) {
+  if (cameraPipWindow && !cameraPipWindow.isDestroyed()) {
+    cameraPipWindow.focus();
+    return;
+  }
+  cameraPipWindow = new BrowserWindow({
+    width: 900,
+    height: 560,
+    title: "Concorde — Câmeras",
+    backgroundColor: "#050816",
+    // Mesmo tratamento de barra de titulo da janela principal (ver createWindow acima) -
+    // consistencia visual, e' a MESMA DesktopTitleBar.jsx que renderiza aqui dentro.
+    titleBarStyle: "hidden",
+    titleBarOverlay: { color: "#070b1a", symbolColor: "#f4f6fd", height: TITLEBAR_HEIGHT },
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, "preload.cjs"),
+    },
+  });
+  const hash = `#/camera-pip/${channelId}?token=${encodeURIComponent(appToken)}`;
+  const target = app.isPackaged ? `app://./index.html${hash}` : `${DEV_URL}/${hash}`;
+  cameraPipWindow.loadURL(target);
+  cameraPipWindow.on("closed", () => {
+    cameraPipWindow = null;
+  });
+}
+
+ipcMain.handle("concorde:open-camera-pip", (_event, { channelId, token }) => {
+  createCameraPipWindow(channelId, token);
+});
+
 // Atende qualquer app://<algo> lendo o arquivo correspondente de dentro de dist/ (funciona
 // normal mesmo empacotado dentro do .asar - o Electron trata .asar como pasta comum pra
 // leitura de arquivo). So' precisa estar registrado antes da janela carregar a URL.

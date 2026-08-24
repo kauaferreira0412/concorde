@@ -5,6 +5,7 @@ import { ProfileProvider } from "./context/ProfileContext.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import ServerPage from "./pages/ServerPage.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
+import CameraPipPage from "./pages/CameraPipPage.jsx";
 import UpdateRequiredGate from "./components/UpdateRequiredGate.jsx";
 import DesktopTitleBar from "./components/DesktopTitleBar.jsx";
 
@@ -27,6 +28,11 @@ export default function App() {
         <ProfileProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            {/* Janela SEPARADA das cameras, so' no app desktop (ver CameraPipPage.jsx pro
+                motivo/electron/main.cjs que abre isso) - fora de PrivateRoute de proposito,
+                o token do app vem pela propria URL (janela nova, sem sessionStorage
+                compartilhado), nao do fluxo normal de login. */}
+            <Route path="/camera-pip/:channelId" element={<CameraPipPage />} />
             <Route
               path="/admin"
               element={

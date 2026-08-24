@@ -45,6 +45,21 @@ public class VoiceController {
         return voicePresenceService.snapshot(channelId);
     }
 
+    /** Token so' de ASSISTIR camera (sem publicar nada) - usado pela janela SEPARADA de
+     *  verdade das cameras no app desktop (ver LiveKitService.generateCameraViewerToken pro
+     *  motivo/CameraPipPage.jsx no frontend). Nao mexe em presenca (VoicePresenceService) nem
+     *  em nenhuma punicao gravada - isso e' so' um espectador, nao uma "entrada na call" de
+     *  verdade pro resto do app. */
+    @PostMapping("/{channelId}/voice-token/viewer")
+    public VoiceTokenResponse getCameraViewerToken(@PathVariable Long channelId) {
+        Long userId = currentUser.id();
+        String displayName = displayNameService.resolveForChannel(channelId, userId);
+        String room = "channel-" + channelId;
+        String identity = "user-" + userId + "-camview";
+        String token = liveKitService.generateCameraViewerToken(room, identity, displayName);
+        return new VoiceTokenResponse(token, liveKitService.getWsUrl(), room, identity, false, false);
+    }
+
     /** O frontend chama isso ao clicar em um canal de voz, e usa o token para conectar no LiveKit. */
     @PostMapping("/{channelId}/voice-token")
     public VoiceTokenResponse getVoiceToken(@PathVariable Long channelId) {

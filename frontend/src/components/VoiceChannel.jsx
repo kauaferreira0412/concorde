@@ -14,7 +14,6 @@ import {
   UsersIcon,
   VolumeIcon,
   WidenIcon,
-  XIcon,
   ZoomInIcon,
   ZoomOutIcon,
 } from "./icons.jsx";
@@ -23,7 +22,7 @@ import VolumeSlider from "./VolumeSlider.jsx";
 import Avatar from "./Avatar.jsx";
 import { useTrackFps } from "../utils/useTrackFps";
 import CameraPipWindow from "./CameraPipWindow.jsx";
-import { createPortal } from "react-dom";
+import { useAuth } from "../context/AuthContext.jsx";
 
 // window.concordeDesktop so' existe dentro do app Electron (ver electron/preload.cjs). A janela
 // separada das cameras usa Document Picture-in-Picture (CameraPipWindow.jsx) NO NAVEGADOR - mas
@@ -32,8 +31,10 @@ import { createPortal } from "react-dom";
 // em si por cima) - o objeto ate' existe no "window" (nao da pra checar por feature-detection
 // comum), mas o pedido de janela nunca resolve nem rejeita, so' fica pendurado pra sempre
 // (reportado: "clico, pisca e nao aparece nada" - so' no app desktop, no navegador funciona).
-// Dentro do Electron a gente usa outro caminho pro MESMO resultado visual (cameras maiores,
-// numa visualizacao separada) - ver cameraPipSupported/CameraPipOverlay abaixo.
+// Dentro do Electron a gente abre uma janela DE VERDADE do proprio Electron em vez disso (ver
+// window.concordeDesktop.openCameraPip/CameraPipPage.jsx) - como e' um PROCESSO separado, nao
+// enxerga os tracks de video da janela principal, entao ela entra na MESMA sala do LiveKit por
+// conta propria so' pra assistir (token "hidden", ver VoiceController.getCameraViewerToken).
 const isElectronDesktop = typeof window !== "undefined" && !!window.concordeDesktop;
 
 // Tamanhos disponiveis pro tile de webcam - "size" vira uma classe CSS (.camera-tile-<size>,
@@ -394,21 +395,30 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
   const [cameraSizeIdx, setCameraSizeIdx] = useState(1);
   const cameraSize = CAMERA_SIZES[cameraSizeIdx];
   // Janela separada so' com as cameras - pedido explicito do usuario: ver as cameras maiores,
-  // lado a lado, numa visualizacao separada. No navegador usa Document Picture-in-Picture de
-  // verdade (CameraPipWindow.jsx); no app desktop usa uma sobreposicao DENTRO da propria janela
-  // (CameraPipOverlay logo abaixo - ver o comentario grande em isElectronDesktop pro motivo).
-  // "cameraPipSupported" esconde o botao so' quando NENHUM dos dois caminhos funciona
-  // (navegador sem essa API, tipo Firefox/Safari) - no Electron sempre e' true.
+  // lado a lado, numa janela DE VERDADE. No navegador usa Document Picture-in-Picture (ver
+  // CameraPipWindow.jsx, gerido por "cameraPipOpen" - liga/desliga no mesmo clique). No app
+  // desktop abre uma BrowserWindow de verdade do Electron por IPC (ver
+  // window.concordeDesktop.openCameraPip/CameraPipPage.jsx) - essa janela se vira sozinha
+  // (processo separado, com seu proprio ciclo de vida), entao o clique aqui e' so' UMA ACAO
+  // ("abrir/focar"), sem precisar de estado nenhum de "aberta ou nao" desse lado.
   const [cameraPipOpen, setCameraPipOpen] = useState(false);
   const cameraPipSupported = isElectronDesktop || (typeof window !== "undefined" && "documentPictureInPicture" in window);
-  // Sem camera nenhuma ligada, a secao inteira some (ver "cameraTracks.length > 0" abaixo),
-  // levando a janela do PiP junto (CameraPipWindow fecha sozinha ao desmontar) - mas sem isso
-  // aqui, se alguem ligasse a camera de novo depois, a secao voltaria tentando reabrir o PiP
-  // sozinha (sem clique nenhum da pessoa), e o navegador rejeita isso (documentPictureInPicture
-  // exige um gesto do usuario) - melhor so' resetar pra visualizacao normal nesse meio-tempo.
+  const { token } = useAuth();
+  // Sem camera nenhuma ligada, a secao inteira some (ver "cameraTracks.length > 0" abaixo) -
+  // sem isso aqui, se alguem ligasse a camera de novo depois, a secao voltaria tentando reabrir
+  // o PiP do navegador sozinha (sem clique nenhum da pessoa), e ele rejeita isso
+  // (documentPictureInPicture exige um gesto do usuario) - melhor so' resetar nesse meio-tempo.
   useEffect(() => {
     if (cameraTracks.length === 0) setCameraPipOpen(false);
   }, [cameraTracks.length]);
+
+  function handleCameraPipClick() {
+    if (isElectronDesktop) {
+      window.concordeDesktop.openCameraPip(channel.id, token);
+    } else {
+      setCameraPipOpen((v) => !v);
+    }
+  }
 
   // "Modo teatro" - POR TELA (um Set de sids), nao um botao global: ativar/desativar numa
   // transmissao nao deve mexer nas outras (bug relatado: parar de assistir uma tirava o modo
@@ -526,12 +536,12 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
                   <button
                     type="button"
                     className={"icon-btn" + (cameraPipOpen ? " icon-btn-active" : "")}
-                    onClick={() => setCameraPipOpen((v) => !v)}
+                    onClick={handleCameraPipClick}
                     title={
-                      cameraPipOpen
+                      isElectronDesktop
+                        ? "Abrir câmeras em outra janela"
+                        : cameraPipOpen
                         ? "Voltar pro Concorde"
-                        : isElectronDesktop
-                        ? "Ampliar câmeras"
                         : "Abrir câmeras em outra janela"
                     }
                   >
@@ -540,9 +550,7 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
                 )}
               </div>
             </div>
-            {cameraPipOpen && isElectronDesktop ? (
-              <p className="voice-hint">As câmeras estão ampliadas na tela agora.</p>
-            ) : cameraPipOpen ? (
+            {cameraPipOpen && !isElectronDesktop ? (
               <>
                 <p className="voice-hint">As câmeras estão numa janela separada agora.</p>
                 <CameraPipWindow onClose={() => setCameraPipOpen(false)} onError={showAlert}>
@@ -562,30 +570,6 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
             )}
           </section>
         )}
-
-        {/* App desktop (Electron): "janela separada" vira uma sobreposicao DENTRO da propria
-            janela do app (ver comentario grande em isElectronDesktop, no topo do arquivo, pro
-            motivo de Document Picture-in-Picture nao funcionar no Electron). Portal pro
-            document.body pra ficar por cima de TUDO (inclusive a barra de titulo customizada,
-            ver z-index em global.css), independente de onde essa secao esta' na arvore. */}
-        {cameraPipOpen &&
-          isElectronDesktop &&
-          createPortal(
-            <div className="camera-pip-overlay">
-              <div className="camera-pip-overlay-header">
-                <span>Câmeras</span>
-                <button type="button" className="icon-btn" onClick={() => setCameraPipOpen(false)} title="Voltar pro Concorde">
-                  <XIcon size={16} />
-                </button>
-              </div>
-              <div className="camera-pip-grid">
-                {cameraTracks.map((c) => (
-                  <CameraTile key={c.identity} track={c.track} name={c.name} isLocal={c.isLocal} size="xl" />
-                ))}
-              </div>
-            </div>,
-            document.body
-          )}
 
         <section className="voice-section">
           <div className="voice-section-header">

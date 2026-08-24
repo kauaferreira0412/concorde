@@ -103,6 +103,40 @@ public class LiveKitService {
         return builder.signWith(key, Jwts.SIG.HS256).compact();
     }
 
+    /**
+     * Token so' de ASSISTIR camera (nao publica nada) - usado pela janela SEPARADA de verdade
+     * das cameras no app desktop (ver CameraPipPage.jsx/electron/main.cjs). Document
+     * Picture-in-Picture (a API que faria isso no navegador) nao funciona dentro do Electron
+     * (falta a "casca" de navegador que essa API depende) - a alternativa e' abrir uma janela
+     * NATIVA de verdade do Electron, que e' um processo separado e nao consegue enxergar os
+     * tracks de video que a janela principal ja' tem em maos, entao ela entra na MESMA sala do
+     * LiveKit por conta propria, so' pra assistir. "hidden: true" e' o que evita ela aparecer
+     * como um participante "fantasma" pra todo mundo mais na call (LiveKit nem manda o evento
+     * de "esse participante entrou" pros outros clientes quando isso esta ligado) - sem
+     * precisar filtrar identity nenhuma na mao em VoiceCallContext.jsx.
+     */
+    public String generateCameraViewerToken(String roomName, String identity, String displayName) {
+        Instant now = Instant.now();
+
+        Map<String, Object> videoGrant = new HashMap<>();
+        videoGrant.put("room", roomName);
+        videoGrant.put("roomJoin", true);
+        videoGrant.put("canPublish", false);
+        videoGrant.put("canPublishData", false);
+        videoGrant.put("canSubscribe", true);
+        videoGrant.put("hidden", true);
+
+        return Jwts.builder()
+                .issuer(apiKey)
+                .subject(identity)
+                .claim("name", displayName)
+                .claim("video", videoGrant)
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusSeconds(ttlMinutes * 60)))
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
+    }
+
     private String toMetadataJson(String avatarUrl) {
         try {
             return JSON.writeValueAsString(Map.of("avatarUrl", avatarUrl));

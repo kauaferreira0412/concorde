@@ -58,4 +58,14 @@ contextBridge.exposeInMainWorld("concordeDesktop", {
   zoomIn: () => ipcRenderer.invoke("concorde:zoom-in"),
   zoomOut: () => ipcRenderer.invoke("concorde:zoom-out"),
   zoomReset: () => ipcRenderer.invoke("concorde:zoom-reset"),
+
+  /**
+   * Janela SEPARADA de verdade das cameras (nao Document Picture-in-Picture, que nao funciona
+   * dentro do Electron - ver CameraPipPage.jsx pro motivo). Abre uma BrowserWindow nova que
+   * entra na MESMA sala do LiveKit por conta propria, so' pra assistir - "token" aqui e' o
+   * token de LOGIN do app (nao o do LiveKit), pra essa janela nova (processo separado, sem
+   * sessionStorage compartilhado) conseguir se autenticar sozinha. So' uma janela de cada vez
+   * (clicar de novo so' foca a que ja esta aberta).
+   */
+  openCameraPip: (channelId, token) => ipcRenderer.invoke("concorde:open-camera-pip", { channelId, token }),
 });
