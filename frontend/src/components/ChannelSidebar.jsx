@@ -486,7 +486,7 @@ export default function ChannelSidebar({
                                 // O anel so' acende pra quem esta REALMENTE falando agora - so' da pra
                                 // saber disso de dentro da call (ver speakingIds no VoiceCallContext),
                                 // entao so' aparece no canal em que voce mesmo esta conectado.
-                                className={"voice-avatar small" + (speakingIds.has(identity) ? " speaking" : "")}
+                                className={"voice-avatar" + (speakingIds.has(identity) ? " speaking" : "")}
                               />
                               <span>{p.username}</span>
                               {p.deafened ? (

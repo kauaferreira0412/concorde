@@ -656,15 +656,17 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
    raro, canal de voz nao tem unread/mencao hoje) evita os dois disputarem o auto. */
 .channel-item-live + .channel-item-badges { margin-left: 6px; }
 
-/* Lista de quem esta na call, aninhada embaixo do canal de voz na propria sidebar. */
-.channel-voice-participants { padding: 2px 0 4px 12px; display: flex; flex-direction: column; gap: 1px; }
+/* Lista de quem esta na call, aninhada embaixo do canal de voz na propria sidebar - avatar e
+   nome maiores (pedido explicito do usuario: "ta pequeno demais") - avatar usa o tamanho
+   PADRAO do .voice-avatar agora (30px, ver classe mais abaixo), nao mais o ".small" (22px). */
+.channel-voice-participants { padding: 4px 0 6px 12px; display: flex; flex-direction: column; gap: 3px; }
 .channel-voice-participant {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
+  gap: 10px;
+  padding: 6px 8px;
   border-radius: var(--radius-sm);
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 .channel-voice-participant:hover { background: var(--bg-hover); }
