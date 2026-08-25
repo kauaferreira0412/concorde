@@ -1,5 +1,6 @@
 package com.codagis.concorde.domain;
 
+import com.codagis.concorde.enums.ServerPermission;
 import jakarta.persistence.*;
 import lombok.*;
 

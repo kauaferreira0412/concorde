@@ -1,6 +1,9 @@
 package com.codagis.concorde.service;
 
 import com.codagis.concorde.domain.*;
+import com.codagis.concorde.enums.ChannelType;
+import com.codagis.concorde.enums.PresenceStatus;
+import com.codagis.concorde.enums.ServerPermission;
 import com.codagis.concorde.dto.ServerDtos.*;
 import com.codagis.concorde.dto.ServerRoleDtos.*;
 import com.codagis.concorde.repository.*;

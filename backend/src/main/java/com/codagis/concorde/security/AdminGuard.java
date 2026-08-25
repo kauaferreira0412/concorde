@@ -1,6 +1,6 @@
 package com.codagis.concorde.security;
 
-import com.codagis.concorde.domain.Role;
+import com.codagis.concorde.enums.Role;
 import com.codagis.concorde.repository.UserRepository;
 import org.springframework.stereotype.Component;
 

@@ -2,7 +2,7 @@ package com.codagis.concorde.service;
 
 import com.codagis.concorde.domain.Channel;
 import com.codagis.concorde.domain.Message;
-import com.codagis.concorde.domain.Role;
+import com.codagis.concorde.enums.Role;
 import com.codagis.concorde.domain.User;
 import com.codagis.concorde.dto.MessageDtos.ChatMessage;
 import com.codagis.concorde.dto.MessageDtos.ReplyPreview;

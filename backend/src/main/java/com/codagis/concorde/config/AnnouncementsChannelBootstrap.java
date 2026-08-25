@@ -1,7 +1,7 @@
 package com.codagis.concorde.config;
 
 import com.codagis.concorde.domain.Channel;
-import com.codagis.concorde.domain.ChannelType;
+import com.codagis.concorde.enums.ChannelType;
 import com.codagis.concorde.domain.Server;
 import com.codagis.concorde.repository.ChannelRepository;
 import com.codagis.concorde.repository.ServerRepository;

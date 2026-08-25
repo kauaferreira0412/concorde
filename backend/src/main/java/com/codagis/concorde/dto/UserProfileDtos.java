@@ -1,7 +1,7 @@
 package com.codagis.concorde.dto;
 
-import com.codagis.concorde.domain.Role;
-import com.codagis.concorde.domain.PresenceStatus;
+import com.codagis.concorde.enums.Role;
+import com.codagis.concorde.enums.PresenceStatus;
 
 import java.time.Instant;
 

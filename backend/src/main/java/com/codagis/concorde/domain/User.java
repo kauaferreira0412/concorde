@@ -1,5 +1,7 @@
 package com.codagis.concorde.domain;
 
+import com.codagis.concorde.enums.Role;
+import com.codagis.concorde.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;

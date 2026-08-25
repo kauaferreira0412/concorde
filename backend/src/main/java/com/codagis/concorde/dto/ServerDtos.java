@@ -1,8 +1,8 @@
 package com.codagis.concorde.dto;
 
-import com.codagis.concorde.domain.ChannelType;
-import com.codagis.concorde.domain.Role;
-import com.codagis.concorde.domain.PresenceStatus;
+import com.codagis.concorde.enums.ChannelType;
+import com.codagis.concorde.enums.Role;
+import com.codagis.concorde.enums.PresenceStatus;
 import jakarta.validation.constraints.NotBlank;
 
 import java.util.List;

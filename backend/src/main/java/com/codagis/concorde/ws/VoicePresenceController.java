@@ -2,7 +2,7 @@ package com.codagis.concorde.ws;
 
 import com.codagis.concorde.domain.Channel;
 import com.codagis.concorde.domain.Membership;
-import com.codagis.concorde.domain.ServerPermission;
+import com.codagis.concorde.enums.ServerPermission;
 import com.codagis.concorde.repository.ChannelRepository;
 import com.codagis.concorde.repository.MembershipRepository;
 import com.codagis.concorde.repository.UserRepository;

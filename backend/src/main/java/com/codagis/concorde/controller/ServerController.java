@@ -1,6 +1,6 @@
 package com.codagis.concorde.controller;
 
-import com.codagis.concorde.domain.ServerPermission;
+import com.codagis.concorde.enums.ServerPermission;
 import com.codagis.concorde.dto.ServerDtos.*;
 import com.codagis.concorde.dto.ServerRoleDtos.*;
 import com.codagis.concorde.security.CurrentUser;

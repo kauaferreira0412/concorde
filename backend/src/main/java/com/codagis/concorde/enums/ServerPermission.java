@@ -1,4 +1,4 @@
-package com.codagis.concorde.domain;
+package com.codagis.concorde.enums;
 
 public enum ServerPermission {
     MOVE_MEMBERS,

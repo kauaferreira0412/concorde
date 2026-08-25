@@ -1,6 +1,6 @@
 package com.codagis.concorde.repository;
 
-import com.codagis.concorde.domain.Role;
+import com.codagis.concorde.enums.Role;
 import com.codagis.concorde.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 

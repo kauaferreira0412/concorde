@@ -1,7 +1,7 @@
 package com.codagis.concorde.dto;
 
-import com.codagis.concorde.domain.Role;
-import com.codagis.concorde.domain.UserStatus;
+import com.codagis.concorde.enums.Role;
+import com.codagis.concorde.enums.UserStatus;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

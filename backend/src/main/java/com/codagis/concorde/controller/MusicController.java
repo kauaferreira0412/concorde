@@ -1,7 +1,7 @@
 package com.codagis.concorde.controller;
 
 import com.codagis.concorde.domain.Channel;
-import com.codagis.concorde.domain.ChannelType;
+import com.codagis.concorde.enums.ChannelType;
 import com.codagis.concorde.repository.ChannelRepository;
 import com.codagis.concorde.repository.MembershipRepository;
 import com.codagis.concorde.security.CurrentUser;

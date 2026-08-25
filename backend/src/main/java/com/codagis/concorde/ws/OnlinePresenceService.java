@@ -1,7 +1,7 @@
 package com.codagis.concorde.ws;
 
-import com.codagis.concorde.domain.PresenceStatus;
-import com.codagis.concorde.domain.UserStatus;
+import com.codagis.concorde.enums.PresenceStatus;
+import com.codagis.concorde.enums.UserStatus;
 import com.codagis.concorde.repository.UserRepository;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;

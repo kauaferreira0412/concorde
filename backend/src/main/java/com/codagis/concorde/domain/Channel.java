@@ -1,5 +1,6 @@
 package com.codagis.concorde.domain;
 
+import com.codagis.concorde.enums.ChannelType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;

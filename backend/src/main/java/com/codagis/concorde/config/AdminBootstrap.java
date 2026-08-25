@@ -1,6 +1,6 @@
 package com.codagis.concorde.config;
 
-import com.codagis.concorde.domain.Role;
+import com.codagis.concorde.enums.Role;
 import com.codagis.concorde.domain.User;
 import com.codagis.concorde.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;

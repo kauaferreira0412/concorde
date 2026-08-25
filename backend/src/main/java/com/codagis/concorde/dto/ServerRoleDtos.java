@@ -1,6 +1,6 @@
 package com.codagis.concorde.dto;
 
-import com.codagis.concorde.domain.ServerPermission;
+import com.codagis.concorde.enums.ServerPermission;
 import jakarta.validation.constraints.NotBlank;
 
 import java.util.Set;
