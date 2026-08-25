@@ -443,10 +443,12 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   align-items: center;
   gap: 4px;
   min-width: 0;
-  max-width: 100%;
+  max-width: calc(100% + 12px);
+  margin: -4px -6px;
   background: transparent;
   border: none;
-  padding: 0;
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
   text-align: left;
   color: inherit;
 }
