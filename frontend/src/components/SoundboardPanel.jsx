@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { useAlert } from "../context/AlertContext.jsx";
+import { subscribeToSoundboard } from "../ws/chatSocket";
 import { MusicNoteIcon, PlusIcon, TrashIcon, XIcon } from "./icons.jsx";
 
 const ACCEPTED_TYPES = "audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/mp4,audio/aac";
@@ -12,8 +13,12 @@ const ACCEPTED_TYPES = "audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audi
  * ver music-bot/src/soundboard.js) - diferente do VoiceMod (que so' usa atalho de teclado), aqui
  * e' clique + escolha na hora mesmo (pedido explicito do usuario). O nome do som vem direto do
  * nome do arquivo (sem extensao) - arrastar/soltar ou clicar ja envia na hora, sem formulario.
+ *
+ * A lista tambem chega ao vivo via WebSocket (ver subscribeToSoundboard/SoundboardService.
+ * broadcastList no backend) - sem isso, subir um som no navegador nao aparecia no app desktop
+ * (nem vice-versa) ate' fechar e abrir o painel de novo (reportado pelo usuario).
  */
-export default function SoundboardPanel({ channelId }) {
+export default function SoundboardPanel({ channelId, stompClient, stompConnected }) {
   const { showAlert } = useAlert();
   const [clips, setClips] = useState(null); // null = carregando
   const [playingId, setPlayingId] = useState(null);
@@ -37,6 +42,12 @@ export default function SoundboardPanel({ channelId }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!stompClient || !stompConnected) return;
+    const sub = subscribeToSoundboard(stompClient, (list) => setClips(list));
+    return () => sub.unsubscribe();
+  }, [stompClient, stompConnected]);
 
   async function play(clip) {
     setPlayingId(clip.id);

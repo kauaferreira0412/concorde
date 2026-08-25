@@ -117,6 +117,19 @@ export function addPollOption(client, channelId, pollId, text) {
 }
 
 /**
+ * Fila PESSOAL (ver SoundboardService.broadcastList no backend) - toda vez que voce sobe ou
+ * apaga um som, a lista atualizada chega em TODAS as suas sessoes conectadas ao mesmo tempo
+ * (web + app desktop, por exemplo), sem precisar reabrir o painel em cada uma pra ver a
+ * mudanca (reportado pelo usuario: som subido no site nao aparecia no desktop sem subir de
+ * novo). onUpdate recebe a lista inteira de clipes (substitui, nao acrescenta).
+ */
+export function subscribeToSoundboard(client, onUpdate) {
+  return client.subscribe("/user/queue/soundboard", (frame) => {
+    onUpdate(JSON.parse(frame.body));
+  });
+}
+
+/**
  * Presenca de canal de voz: "quem esta conectado agora" e' visivel para QUALQUER membro
  * do servidor (nao precisa ter entrado na call). Ja o indicador de "quem esta falando"
  * fica restrito a quem realmente entrou na call, vindo do proprio LiveKit (ver VoiceChannel.jsx).

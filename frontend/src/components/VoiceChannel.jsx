@@ -627,7 +627,7 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
           )}
         </section>
 
-        <SoundboardPanel channelId={channel.id} />
+        <SoundboardPanel channelId={channel.id} stompClient={stompClient} stompConnected={stompConnected} />
 
         <ChannelAccessSection members={members} />
       </div>
