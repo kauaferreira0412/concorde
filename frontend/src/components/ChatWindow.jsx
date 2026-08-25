@@ -40,7 +40,12 @@ import {
 
 // Emojis curados pra reacao rapida (ver toggleReaction) - lista pequena de proposito, cobre o
 // basico sem precisar de um picker de emoji completo.
-const QUICK_REACTIONS = ["👍", "😂", "❤️", "😮", "😢", "🎉", "🔥", "👀"];
+const QUICK_REACTIONS = [
+  "👍", "👎", "❤️", "😂", "😅", "😍", "😮", "😢",
+  "😭", "😡", "🥳", "🎉", "🔥", "👀", "💯", "🙏",
+  "👏", "🤔", "😴", "💀", "🤡", "💔", "⭐", "✅",
+  "❌", "🚀", "🏆", "👌", "😱", "🤝", "🍕", "☕",
+];
 
 // /roll ou /r seguido de uma notacao de dado (ex: "/roll 2d20+5") - mesma notacao aceita pelo
 // backend (ver DiceService), checada aqui tambem so' pra dar um erro na hora em vez de a
@@ -73,8 +78,10 @@ const FILA_COMMAND_RE = /^\/fila(?:\s+(.+))?$/i;
 // sempre se um queueId diferente aparecer (ver MusicQueueCard.jsx).
 const MUSIC_QUEUE_MARKER_RE = /^\[\[MUSIC_QUEUE:(\d+):([^\]]+)\]\]$/;
 
-// /poll Pergunta | opção 1 | opção 2 | ... - enquete de escolha unica (ver PollController no
-// backend). /pollmulti e' igual, so' que permite votar em mais de uma opcao ao mesmo tempo.
+// /poll Pergunta - cria a enquete SO' com a pergunta (ver PollController no backend); as
+// opcoes sao adicionadas depois, uma de cada vez, direto no card no chat (so' quem criou pode
+// adicionar - ver PollCard.jsx). /pollmulti e' igual, so' que permite votar em mais de uma
+// opcao ao mesmo tempo.
 const POLL_COMMAND_RE = /^\/(poll|pollmulti)\s+(.+)$/i;
 
 // Autocomplete de "/" (ver getSlashMenuState).
@@ -86,8 +93,8 @@ const SLASH_COMMANDS = [
   { name: "continue", description: "Continuar a música pausada" },
   { name: "skip", description: "Pular pra próxima música da fila" },
   { name: "stop", description: "Parar a música da sua call" },
-  { name: "poll", description: "Enquete (escolha única): pergunta | opção 1 | opção 2 ..." },
-  { name: "pollmulti", description: "Enquete (múltipla escolha): pergunta | opção 1 | opção 2 ..." },
+  { name: "poll", description: "Enquete (escolha única) - depois adicione as opções no card" },
+  { name: "pollmulti", description: "Enquete (múltipla escolha) - depois adicione as opções no card" },
 ];
 const DICE_SIDES = [4, 6, 8, 10, 12, 20, 100];
 
@@ -487,17 +494,17 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       publishTyping(stompClient, channel.id, false);
     }
 
-    // /poll ou /pollmulti Pergunta | opção 1 | opção 2 ... - enquete no chat (ver PollController
-    // no backend). /pollmulti permite votar em mais de uma opção ao mesmo tempo.
+    // /poll ou /pollmulti Pergunta - cria a enquete SO' com a pergunta; voce (o criador) adiciona
+    // as opções depois, uma de cada vez, direto no card que aparece no chat (ver PollCard.jsx).
+    // /pollmulti permite votar em mais de uma opção ao mesmo tempo.
     const pollMatch = POLL_COMMAND_RE.exec(draft.trim());
     if (pollMatch) {
-      const parts = pollMatch[2].split("|").map((p) => p.trim()).filter(Boolean);
-      const [question, ...options] = parts;
-      if (!question || options.length < 2) {
-        showAlert("Use: /poll Pergunta | opção 1 | opção 2 (pelo menos 2 opções, separadas por |)");
+      const question = pollMatch[2].trim();
+      if (!question) {
+        showAlert("Use: /poll Pergunta da enquete");
         return;
       }
-      createPoll(stompClient, channel.id, question, options, pollMatch[1].toLowerCase() === "pollmulti");
+      createPoll(stompClient, channel.id, question, [], pollMatch[1].toLowerCase() === "pollmulti");
       setDraft("");
       return;
     }

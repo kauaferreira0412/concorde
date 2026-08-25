@@ -34,6 +34,8 @@ public class PollService {
         this.messageService = messageService;
     }
 
+    private static final int MAX_OPTIONS = 10;
+
     @Transactional
     public ChatMessage createPoll(Long channelId, Long userId, String question, List<String> optionTexts, boolean multipleChoice) {
         String q = question == null ? "" : question.trim();
@@ -44,8 +46,8 @@ public class PollService {
                 .map(o -> o == null ? "" : o.trim())
                 .filter(o -> !o.isBlank())
                 .toList();
-        if (cleanOptions.size() < 2 || cleanOptions.size() > 10) {
-            throw new IllegalArgumentException("Uma enquete precisa de 2 a 10 opções");
+        if (cleanOptions.size() > MAX_OPTIONS) {
+            throw new IllegalArgumentException("Uma enquete pode ter no máximo " + MAX_OPTIONS + " opções");
         }
 
         Poll poll = pollRepository.save(Poll.builder()
@@ -61,6 +63,32 @@ public class PollService {
                     .build());
         }
         return messageService.saveWithPoll(channelId, userId, "📊 " + q, poll.getId());
+    }
+
+    @Transactional
+    public ChatMessage addOption(Long channelId, Long userId, Long pollId, String text) {
+        Poll poll = pollRepository.findById(pollId)
+                .orElseThrow(() -> new IllegalArgumentException("Enquete não encontrada"));
+        if (!poll.getCreatedBy().equals(userId)) {
+            throw new IllegalStateException("Só quem criou a enquete pode adicionar opções");
+        }
+        String cleanText = text == null ? "" : text.trim();
+        if (cleanText.isBlank() || cleanText.length() > 100) {
+            throw new IllegalArgumentException("A opção precisa ter entre 1 e 100 caracteres");
+        }
+        List<PollOption> existing = pollOptionRepository.findByPollIdOrderByPositionAsc(pollId);
+        if (existing.size() >= MAX_OPTIONS) {
+            throw new IllegalArgumentException("Uma enquete pode ter no máximo " + MAX_OPTIONS + " opções");
+        }
+        pollOptionRepository.save(PollOption.builder()
+                .pollId(pollId)
+                .text(cleanText)
+                .position(existing.size())
+                .build());
+
+        Message message = messageRepository.findByPollId(pollId)
+                .orElseThrow(() -> new IllegalArgumentException("Mensagem dessa enquete não encontrada"));
+        return messageService.get(channelId, message.getId());
     }
 
     @Transactional

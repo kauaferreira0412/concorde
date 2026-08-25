@@ -268,7 +268,7 @@ public class MessageService {
         List<PollOptionDto> optionDtos = options.stream()
                 .map(o -> new PollOptionDto(o.getId(), o.getText(), votersByOption.getOrDefault(o.getId(), List.of())))
                 .toList();
-        return new PollDto(poll.getId(), poll.getQuestion(), poll.isMultipleChoice(), optionDtos);
+        return new PollDto(poll.getId(), poll.getQuestion(), poll.isMultipleChoice(), poll.getCreatedBy(), optionDtos);
     }
 
     private List<ReactionSummary> groupReactions(List<MessageReaction> reactions) {

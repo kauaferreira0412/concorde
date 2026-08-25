@@ -1037,6 +1037,35 @@ h3.chat-heading {
 .poll-card-option-text { flex: 1; font-size: 13.5px; color: var(--text-primary); }
 .poll-card-option-votes { font-size: 11.5px; color: var(--text-muted); flex-shrink: 0; }
 .poll-card-total { font-size: 11.5px; color: var(--text-muted); }
+.poll-card-empty { margin: 0; font-size: 12.5px; color: var(--text-muted); font-style: italic; }
+
+/* So' quem criou a enquete ve isso (ver PollCard.jsx) - botao discreto que vira um mini
+   formulario inline pra adicionar mais uma opcao, sem precisar de modal. */
+.poll-card-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.poll-card-add-btn:hover { border-color: var(--accent); color: var(--accent-text); }
+.poll-card-add-form { display: flex; gap: 6px; }
+.poll-card-add-form input { flex: 1; min-width: 0; padding: 6px 10px; font-size: 12.5px; }
+.poll-card-add-form button {
+  flex-shrink: 0;
+  padding: 0 12px;
+  font-size: 12.5px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-sm);
+}
+.poll-card-add-form button:hover:not(:disabled) { background: var(--accent-hover); }
 
 /* Card ao vivo da fila de musica (ver /fila em ChatWindow.jsx / MusicQueueCard.jsx) - mesmo
    visual "elevado" do dice-roll-card, mas ocupa mais largura pra caber titulo + duracao +
@@ -1260,18 +1289,20 @@ h3.chat-heading {
 .chat-reaction-count { color: var(--text-muted); font-weight: 600; }
 .chat-reaction.mine .chat-reaction-count { color: var(--accent-text); }
 
-/* Picker rapido de emoji (botao de carinha nas acoes da mensagem) - lista curada pequena,
-   nao e' um picker de emoji completo de proposito (ver QUICK_REACTIONS em ChatWindow.jsx). */
+/* Picker rapido de emoji (botao de carinha nas acoes da mensagem) - lista curada mas generosa
+   (ver QUICK_REACTIONS em ChatWindow.jsx), quebra em varias linhas em vez de esticar a largura
+   toda - nao e' um picker de emoji completo (sem busca/categorias) de proposito. */
 .chat-reaction-picker {
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
   margin-top: 6px;
-  padding: 4px;
+  padding: 5px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   width: fit-content;
+  max-width: 272px;
 }
 .chat-reaction-picker button {
   background: transparent;

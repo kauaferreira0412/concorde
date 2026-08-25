@@ -107,6 +107,15 @@ export function votePoll(client, channelId, pollId, optionId) {
   });
 }
 
+/** So' quem criou a enquete pode adicionar opcao nova (ver PollService.addOption no backend -
+ *  recusa silenciosamente se nao for o criador). */
+export function addPollOption(client, channelId, pollId, text) {
+  client.publish({
+    destination: `/app/channel.${channelId}.poll.addOption`,
+    body: JSON.stringify({ pollId, text }),
+  });
+}
+
 /**
  * Presenca de canal de voz: "quem esta conectado agora" e' visivel para QUALQUER membro
  * do servidor (nao precisa ter entrado na call). Ja o indicador de "quem esta falando"

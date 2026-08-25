@@ -2,6 +2,7 @@ package com.codagis.concorde.ws;
 
 import com.codagis.concorde.dto.MessageDtos.ChatEvent;
 import com.codagis.concorde.dto.MessageDtos.ChatMessage;
+import com.codagis.concorde.dto.PollDtos.AddPollOptionRequest;
 import com.codagis.concorde.dto.PollDtos.CreatePollRequest;
 import com.codagis.concorde.dto.PollDtos.VotePollRequest;
 import com.codagis.concorde.service.PollService;
@@ -32,6 +33,17 @@ public class PollController {
             broadcast(channelId, ChatEvent.created(saved));
         } catch (RuntimeException e) {
             System.err.println("Falha ao criar enquete no canal " + channelId + ": " + e.getMessage());
+        }
+    }
+
+    @MessageMapping("/channel.{channelId}.poll.addOption")
+    public void addOption(@DestinationVariable Long channelId, AddPollOptionRequest payload, Principal principal) {
+        Long userId = userId(principal);
+        try {
+            ChatMessage updated = pollService.addOption(channelId, userId, payload.pollId(), payload.text());
+            broadcast(channelId, ChatEvent.updated(updated));
+        } catch (RuntimeException e) {
+            System.err.println("Falha ao adicionar opção na enquete " + payload.pollId() + ": " + e.getMessage());
         }
     }
 
