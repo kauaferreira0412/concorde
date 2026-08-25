@@ -137,9 +137,9 @@ function getSlashMenuState(draft) {
 /** Renderiza o conteudo da mensagem com markdown "estilo Discord" (negrito/italico/sublinhado/
  *  tachado/codigo/citacao/listas/titulos/links, ver utils/markdown.jsx) + @mencoes clicaveis
  *  (mesmo pipeline - so' reconhece quem e' de verdade membro do servidor). */
-function MessageText({ content, memberUsernames, myUsername, members, openProfile }) {
+function MessageText({ content, memberUsernames, myUsername, members, openProfile, customEmojis }) {
   if (!content) return null;
-  const ctx = { memberUsernames, myUsername, members, openProfile };
+  const ctx = { memberUsernames, myUsername, members, openProfile, customEmojis };
   return (
     <div className="chat-markdown">
       {parseMarkdownBlocks(content).map((block, i) => {
@@ -215,6 +215,8 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
   const [slashDismissed, setSlashDismissed] = useState(false); // true = usuario fechou com Esc
   const [reactionPickerFor, setReactionPickerFor] = useState(null); // id da mensagem com o picker de emoji aberto
   const [myServerPermissions, setMyServerPermissions] = useState(new Set());
+  const [customEmojis, setCustomEmojis] = useState({}); // name -> imageUrl (ver CustomEmojiModal.jsx)
+  const [customEmojiList, setCustomEmojiList] = useState([]);
   const [typingUsers, setTypingUsers] = useState(new Map()); // userId -> username, de quem esta digitando AGORA
   const [showPinned, setShowPinned] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState([]);
@@ -271,6 +273,33 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       })
       .catch(() => {
         if (!cancelled) setMyServerPermissions(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [channel?.serverId]);
+
+  // Emojis customizados desse servidor (ver CustomEmojiModal.jsx) - usados tanto no texto
+  // (:nome: em markdown.jsx) quanto como opcao extra no picker de reacao rapida.
+  useEffect(() => {
+    if (!channel?.serverId) {
+      setCustomEmojis({});
+      setCustomEmojiList([]);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get(`/api/servers/${channel.serverId}/emojis`)
+      .then(({ data }) => {
+        if (cancelled) return;
+        setCustomEmojiList(data);
+        setCustomEmojis(Object.fromEntries(data.map((e) => [e.name, e.imageUrl])));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCustomEmojiList([]);
+          setCustomEmojis({});
+        }
       });
     return () => {
       cancelled = true;
@@ -903,6 +932,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                       myUsername={user?.username}
                       members={members}
                       openProfile={openProfile}
+                      customEmojis={customEmojis}
                     />
                   )}
                   {m.imageUrl && (
@@ -915,6 +945,8 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                     <div className="chat-reactions">
                       {m.reactions.map((r) => {
                         const mine = user?.id != null && r.userIds.includes(user.id);
+                        const customMatch = /^:([a-z0-9_]{2,30}):$/.exec(r.emoji);
+                        const customUrl = customMatch ? customEmojis[customMatch[1]] : null;
                         return (
                           <button
                             type="button"
@@ -923,7 +955,11 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                             onClick={() => handleToggleReaction(m.id, r.emoji)}
                             title={mine ? "Tirar sua reação" : "Reagir"}
                           >
-                            <span>{r.emoji}</span>
+                            {customUrl ? (
+                              <img src={customUrl} alt={r.emoji} className="chat-custom-emoji" />
+                            ) : (
+                              <span>{r.emoji}</span>
+                            )}
                             <span className="chat-reaction-count">{r.userIds.length}</span>
                           </button>
                         );
@@ -938,6 +974,16 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                   {QUICK_REACTIONS.map((emoji) => (
                     <button type="button" key={emoji} onClick={() => handleToggleReaction(m.id, emoji)}>
                       {emoji}
+                    </button>
+                  ))}
+                  {customEmojiList.map((e) => (
+                    <button
+                      type="button"
+                      key={e.id}
+                      title={`:${e.name}:`}
+                      onClick={() => handleToggleReaction(m.id, `:${e.name}:`)}
+                    >
+                      <img src={e.imageUrl} alt={e.name} className="chat-custom-emoji" />
                     </button>
                   ))}
                 </div>
@@ -1098,7 +1144,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                   ? "Adicionar legenda (opcional)..."
                   : sending
                   ? "Enviando..."
-                  : `Conversar em #${channel.name} (@ pra mencionar, **negrito**, *itálico*, /roll 2d20 pra rolar dado, /play pra tocar música, /poll pra enquete, Ctrl+V cola imagem, Shift+Enter quebra linha)`
+                  : `Conversar em #${channel.name} (@ pra mencionar, :nome: pra emoji, **negrito**, *itálico*, /roll 2d20 pra rolar dado, /play pra tocar música, /poll pra enquete, Ctrl+V cola imagem, Shift+Enter quebra linha)`
               }
               disabled={!stompConnected || sending}
             />

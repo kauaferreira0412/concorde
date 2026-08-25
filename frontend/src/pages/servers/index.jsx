@@ -8,6 +8,7 @@ import CreateChannelModal from "../../components/CreateChannelModal.jsx";
 import EditServerModal from "../../components/EditServerModal.jsx";
 import ServerRolesModal from "../../components/ServerRolesModal.jsx";
 import AuditLogModal from "../../components/AuditLogModal.jsx";
+import CustomEmojiModal from "../../components/CustomEmojiModal.jsx";
 import SettingsModal from "../../components/SettingsModal.jsx";
 import PartyConfetti from "../../components/PartyConfetti.jsx";
 import { VoiceCallProvider } from "../../context/VoiceCallContext.jsx";
@@ -31,6 +32,8 @@ export default function ServerPage() {
     setRolesServer,
     auditLogServer,
     setAuditLogServer,
+    emojiServer,
+    setEmojiServer,
     createChannelType,
     setCreateChannelType,
     showSettings,
@@ -71,6 +74,7 @@ export default function ServerPage() {
           onEditServer={setEditingServer}
           onOpenRoles={setRolesServer}
           onOpenAuditLog={setAuditLogServer}
+          onOpenEmojis={setEmojiServer}
           onMoveChannelCategory={handleMoveChannelCategory}
           stompClient={stompClient}
           stompConnected={stompConnected}
@@ -129,6 +133,7 @@ export default function ServerPage() {
         )}
         {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
         {auditLogServer && <AuditLogModal server={auditLogServer} onClose={() => setAuditLogServer(null)} />}
+        {emojiServer && <CustomEmojiModal server={emojiServer} onClose={() => setEmojiServer(null)} />}
       </div>
     </VoiceCallProvider>
   );

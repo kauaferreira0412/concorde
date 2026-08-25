@@ -28,6 +28,7 @@ import {
   ScreenShareIcon,
   SettingsIcon,
   ShieldIcon,
+  SmileIcon,
   TrashIcon,
   VolumeIcon,
 } from "./icons.jsx";
@@ -50,6 +51,7 @@ export default function ChannelSidebar({
   onEditServer,
   onOpenRoles,
   onOpenAuditLog,
+  onOpenEmojis,
   onMoveChannelCategory,
   stompClient,
   stompConnected,
@@ -542,6 +544,11 @@ export default function ChannelSidebar({
           {!collapsed && server && (isAdmin || myServerPermissions.has("MANAGE_ROLES")) && (
             <button className="icon-btn" onClick={() => onOpenRoles(server)} title="Perfis e permissões">
               <ShieldIcon size={15} />
+            </button>
+          )}
+          {!collapsed && server && (isAdmin || myServerPermissions.has("MANAGE_SERVER")) && (
+            <button className="icon-btn" onClick={() => onOpenEmojis(server)} title="Emojis do servidor">
+              <SmileIcon size={15} />
             </button>
           )}
           {!collapsed && server && (isAdmin || myServerPermissions.has("MANAGE_SERVER")) && (

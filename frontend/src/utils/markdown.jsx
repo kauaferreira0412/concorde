@@ -85,14 +85,14 @@ export function parseMarkdownBlocks(content) {
 // Fonte da regex de tokens inline (SEM o "g" aqui) - so' vira RegExp de verdade dentro de
 // renderInline, uma instancia NOVA a cada chamada (ver comentario la' embaixo pro motivo).
 const INLINE_SOURCE =
-  "`(?<code>[^`\\n]+)`|\\*\\*(?<bold>[^*\\n]+)\\*\\*|__(?<underline>[^_\\n]+)__|~~(?<strike>[^~\\n]+)~~|\\*(?<italic1>[^*\\n]+)\\*|_(?<italic2>[^_\\n]+)_|\\[(?<linktext>[^\\]\\n]+)\\]\\((?<linkurl>https?:\\/\\/[^\\s)]+)\\)|(?<autolink>https?:\\/\\/[^\\s<]+)|@(?<mention>\\w+)";
+  "`(?<code>[^`\\n]+)`|\\*\\*(?<bold>[^*\\n]+)\\*\\*|__(?<underline>[^_\\n]+)__|~~(?<strike>[^~\\n]+)~~|\\*(?<italic1>[^*\\n]+)\\*|_(?<italic2>[^_\\n]+)_|\\[(?<linktext>[^\\]\\n]+)\\]\\((?<linkurl>https?:\\/\\/[^\\s)]+)\\)|(?<autolink>https?:\\/\\/[^\\s<]+)|@(?<mention>\\w+)|:(?<emoji>[a-z0-9_]{2,30}):";
 
 /**
  * Formatacao inline (dentro de um paragrafo/item de lista/citacao) - negrito, italico,
  * sublinhado, tachado, codigo, links e @mencoes, tudo na mesma passada. `\n` simples vira
  * quebra de linha (<br/>).
  */
-export function renderInline(text, { memberUsernames = [], myUsername, members = [], openProfile } = {}, keyPrefix = "") {
+export function renderInline(text, { memberUsernames = [], myUsername, members = [], openProfile, customEmojis = {} } = {}, keyPrefix = "") {
   const knownMembers = new Set(memberUsernames.map((u) => u.toLowerCase()));
   const lines = (text || "").split("\n");
   const out = [];
@@ -115,9 +115,9 @@ export function renderInline(text, { memberUsernames = [], myUsername, members =
       const key = `${keyPrefix}-${lineIdx}-${tokenIdx++}`;
       const g = match.groups;
       if (g.code) out.push(<code key={key} className="chat-inline-code">{g.code}</code>);
-      else if (g.bold) out.push(<strong key={key}>{renderInline(g.bold, { memberUsernames, myUsername, members, openProfile }, key)}</strong>);
-      else if (g.underline) out.push(<u key={key}>{renderInline(g.underline, { memberUsernames, myUsername, members, openProfile }, key)}</u>);
-      else if (g.strike) out.push(<s key={key}>{renderInline(g.strike, { memberUsernames, myUsername, members, openProfile }, key)}</s>);
+      else if (g.bold) out.push(<strong key={key}>{renderInline(g.bold, { memberUsernames, myUsername, members, openProfile, customEmojis }, key)}</strong>);
+      else if (g.underline) out.push(<u key={key}>{renderInline(g.underline, { memberUsernames, myUsername, members, openProfile, customEmojis }, key)}</u>);
+      else if (g.strike) out.push(<s key={key}>{renderInline(g.strike, { memberUsernames, myUsername, members, openProfile, customEmojis }, key)}</s>);
       else if (g.italic1 || g.italic2) out.push(<em key={key}>{g.italic1 || g.italic2}</em>);
       else if (g.linktext) {
         out.push(
@@ -148,6 +148,15 @@ export function renderInline(text, { memberUsernames = [], myUsername, members =
               @{g.mention}
             </button>
           );
+        }
+      } else if (g.emoji) {
+        const url = customEmojis[g.emoji.toLowerCase()];
+        if (url) {
+          out.push(
+            <img key={key} src={url} alt={`:${g.emoji}:`} title={`:${g.emoji}:`} className="chat-custom-emoji" />
+          );
+        } else {
+          out.push(`:${g.emoji}:`);
         }
       }
       lastIndex = match.index + match[0].length;

@@ -16,6 +16,7 @@ export function useServersContainer() {
   const [editingServer, setEditingServer] = useState(null);
   const [rolesServer, setRolesServer] = useState(null);
   const [auditLogServer, setAuditLogServer] = useState(null);
+  const [emojiServer, setEmojiServer] = useState(null);
   const [createChannelType, setCreateChannelType] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [stompClient, setStompClient] = useState(null);
@@ -136,6 +137,8 @@ export function useServersContainer() {
     setRolesServer,
     auditLogServer,
     setAuditLogServer,
+    emojiServer,
+    setEmojiServer,
     createChannelType,
     setCreateChannelType,
     showSettings,

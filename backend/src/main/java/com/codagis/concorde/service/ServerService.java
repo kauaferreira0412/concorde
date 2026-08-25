@@ -34,6 +34,7 @@ public class ServerService {
     private final PermissionService permissionService;
     private final VoicePresenceService voicePresenceService;
     private final AuditLogService auditLogService;
+    private final CustomEmojiRepository customEmojiRepository;
 
     public ServerService(ServerRepository serverRepository, ChannelRepository channelRepository,
                           ChannelCategoryRepository channelCategoryRepository,
@@ -41,7 +42,7 @@ public class ServerService {
                           ServerRoleRepository serverRoleRepository, MessageRepository messageRepository,
                           AdminGuard adminGuard, OnlinePresenceService presenceService,
                           PermissionService permissionService, VoicePresenceService voicePresenceService,
-                          AuditLogService auditLogService) {
+                          AuditLogService auditLogService, CustomEmojiRepository customEmojiRepository) {
         this.serverRepository = serverRepository;
         this.channelRepository = channelRepository;
         this.channelCategoryRepository = channelCategoryRepository;
@@ -53,6 +54,7 @@ public class ServerService {
         this.presenceService = presenceService;
         this.permissionService = permissionService;
         this.voicePresenceService = voicePresenceService;
+        this.customEmojiRepository = customEmojiRepository;
         this.auditLogService = auditLogService;
     }
 
@@ -156,6 +158,7 @@ public class ServerService {
         serverRoleRepository.deleteByServerId(serverId);
         membershipRepository.deleteByServerId(serverId);
         auditLogService.deleteAllForServer(serverId);
+        customEmojiRepository.deleteByServerId(serverId);
         serverRepository.deleteById(serverId);
     }
 

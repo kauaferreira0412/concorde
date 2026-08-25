@@ -946,6 +946,13 @@ img.chat-header-avatar { object-fit: cover; }
   font-family: ui-monospace, "SF Mono", Consolas, monospace;
   font-size: 13px;
 }
+/* Emoji customizado do servidor (ver :nome: em markdown.jsx/CustomEmojiModal.jsx) - do
+   tamanho da linha de texto, um pouco maior que uma letra normal (como no Discord/Slack). */
+.chat-custom-emoji { height: 1.375em; width: auto; vertical-align: -0.4em; object-fit: contain; }
+
+/* Linha de upload no CustomEmojiModal.jsx - nome + botao de escolher imagem lado a lado. */
+.emoji-upload-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.emoji-upload-row input:not([type]) { flex: 1; min-width: 0; }
 .chat-code-block {
   margin: 6px 0 0;
   background: var(--bg-elevated);
