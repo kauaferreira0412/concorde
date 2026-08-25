@@ -96,7 +96,8 @@ export default function ChannelSidebar({
     (channelId) => {
       const target = textChannels.find((c) => c.id === channelId);
       if (target) onSelectChannel(target);
-    }
+    },
+    server?.name
   );
   const [connectedExpanded, setConnectedExpanded] = useState(true);
   const [textExpanded, setTextExpanded] = useState(true);

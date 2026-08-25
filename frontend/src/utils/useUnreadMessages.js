@@ -21,9 +21,10 @@ function saveLastRead(channelId, messageId) {
  * sincroniza entre dispositivos diferentes, mas evita precisar de infra nova pra isso.
  *
  * onSelectChannel e currentUsername vem de fora pra decidir o que NAO deve contar/notificar:
- * mensagem no canal que voce ja esta olhando, ou escrita por voce mesmo.
+ * mensagem no canal que voce ja esta olhando, ou escrita por voce mesmo. serverName so' e'
+ * usado pra dar contexto na notificacao (ver notifyDesktop).
  */
-export function useUnreadMessages(textChannels, selectedChannelId, stompClient, stompConnected, currentUsername, onNotificationClick) {
+export function useUnreadMessages(textChannels, selectedChannelId, stompClient, stompConnected, currentUsername, onNotificationClick, serverName) {
   const [unreadCounts, setUnreadCounts] = useState({}); // channelId -> quantidade
   // channelId -> true se alguma mensagem NAO LIDA daquele canal menciona voce (@seu_username) -
   // mostra um "@" destacado do lado do numerozinho de nao lidas (ver ChannelSidebar.jsx), pedido
@@ -113,17 +114,32 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [textChannels.map((c) => c.id).join(","), stompClient, stompConnected, currentUsername]);
 
+  /** Resume o texto igual o Discord faz na propria notificacao/preview - corta com "…" em vez
+   *  de deixar a notificacao gigante (o SO ja trunca sozinho, mas de um jeito feio, no meio de
+   *  qualquer palavra e sem aviso nenhum). */
+  function summarize(text, max = 120) {
+    const clean = text.replace(/\s+/g, " ").trim();
+    return clean.length > max ? clean.slice(0, max).trimEnd() + "…" : clean;
+  }
+
   function notifyDesktop(channelId, message) {
     if (!getDesktopNotificationsEnabled()) return;
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     const channelName = channelNameById.current.get(channelId) || "canal";
-    const body = message.content || (message.imageUrl ? "🖼️ Imagem" : "");
+    // Linha 1 = de ONDE vem (canal + servidor), linha 2 = a mensagem resumida - igual
+    // Discord/Slack/Telegram mostram remetente + canal + preview do texto, nao so' o texto cru.
+    const origin = serverName ? `#${channelName} · ${serverName}` : `#${channelName}`;
+    const preview = summarize(message.content || (message.imageUrl ? "🖼️ Imagem" : ""));
     try {
-      const notification = new Notification(`${message.authorUsername} em #${channelName}`, {
-        body,
+      const notification = new Notification(message.authorUsername, {
+        body: `${origin}\n${preview}`,
         // import.meta.env.BASE_URL: "/" no site, "./" no app desktop (ver vite.config.js) -
-        // caminho absoluto puro nao acha o icone dentro do pacote Electron (file://).
+        // caminho absoluto puro nao acha o icone dentro do pacote Electron (file://). O avatar
+        // de quem mandou vira o icone GRANDE (igual Discord/Telegram) - o icone PEQUENO/"dono
+        // da notificacao" (o logo do Concorde de verdade) e' o app.setAppUserModelId no Windows
+        // (ver main.cjs), que o SO usa sozinho, sem precisar passar nada aqui.
         icon: message.authorAvatarUrl || `${import.meta.env.BASE_URL}icon-192.png`,
+        badge: `${import.meta.env.BASE_URL}icon-192.png`,
         tag: `chat-${channelId}`, // agrupa notificacoes do mesmo canal em vez de empilhar
       });
       notification.onclick = () => {

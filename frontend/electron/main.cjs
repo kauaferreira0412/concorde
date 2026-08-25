@@ -7,6 +7,15 @@ const fs = require("fs");
 const APP_PROTOCOL = "concorde"; // concorde://invite/<code> - deep link, registrado no SO
 const DEV_URL = "http://localhost:5173";
 
+// Sem isso, as notificacoes nativas do Windows (ver notifyDesktop em useUnreadMessages.js)
+// aparecem com o iconzinho generico do Electron em vez do logo do Concorde (Windows usa o
+// AppUserModelID pra saber qual app "e' o dono" de uma notificacao/atalho e qual icone
+// mostrar) - precisa ser IDENTICO ao "appId" do electron-builder (ver package.json) pra
+// bater com o atalho que o instalador NSIS registra.
+if (process.platform === "win32") {
+  app.setAppUserModelId("com.concorde.app");
+}
+
 // Audio isolado de UMA janela (so' Windows) - usa a biblioteca "process-audio-capture"
 // (WASAPI Process Loopback por PID, ver package.json) pra pegar so' o audio do processo dono
 // da janela escolhida, sem vazar o audio do proprio Concorde nem de mais nada. "hwnd-utils" e'
