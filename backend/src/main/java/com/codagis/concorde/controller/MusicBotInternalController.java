@@ -1,7 +1,9 @@
 package com.codagis.concorde.controller;
 
 import com.codagis.concorde.domain.MusicBotSettings;
+import com.codagis.concorde.domain.SoundboardBotSettings;
 import com.codagis.concorde.service.MusicBotSettingsService;
+import com.codagis.concorde.service.SoundboardBotSettingsService;
 import com.codagis.concorde.ws.VoicePresenceService;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
@@ -14,13 +16,16 @@ public class MusicBotInternalController {
 
     private final VoicePresenceService voicePresenceService;
     private final MusicBotSettingsService musicBotSettingsService;
+    private final SoundboardBotSettingsService soundboardBotSettingsService;
     private final SimpMessagingTemplate messagingTemplate;
 
     public MusicBotInternalController(VoicePresenceService voicePresenceService,
                                        MusicBotSettingsService musicBotSettingsService,
+                                       SoundboardBotSettingsService soundboardBotSettingsService,
                                        SimpMessagingTemplate messagingTemplate) {
         this.voicePresenceService = voicePresenceService;
         this.musicBotSettingsService = musicBotSettingsService;
+        this.soundboardBotSettingsService = soundboardBotSettingsService;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -41,7 +46,8 @@ public class MusicBotInternalController {
     @PostMapping("/{channelId}/soundboard-presence")
     public void soundboardPresence(@PathVariable Long channelId, @RequestBody PresenceRequest req) {
         if (req.joined()) {
-            voicePresenceService.joinSoundboardBot(channelId, "Batera", null);
+            SoundboardBotSettings settings = soundboardBotSettingsService.get();
+            voicePresenceService.joinSoundboardBot(channelId, "Batera", settings.getAvatarUrl());
         } else {
             voicePresenceService.leaveSoundboardBot(channelId);
         }

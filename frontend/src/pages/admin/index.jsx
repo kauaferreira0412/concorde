@@ -36,6 +36,11 @@ export default function AdminPage() {
     botAvatarError,
     botAvatarInputRef,
     handleBotAvatarChange,
+    batAvatarUrl,
+    batAvatarUploading,
+    batAvatarError,
+    batAvatarInputRef,
+    handleBatAvatarChange,
     handleCreateUser,
     handleUserSaved,
     handleConfirmDelete,
@@ -94,6 +99,30 @@ export default function AdminPage() {
             </div>
           </div>
           {botAvatarError && <p className="auth-error">{botAvatarError}</p>}
+        </div>
+
+        <div className="admin-card">
+          <h2>Bot do soundboard (Batera)</h2>
+          <p className="admin-hint">Foto de perfil dele em qualquer call, de qualquer servidor.</p>
+          <div className="avatar-picker">
+            <Avatar name="Batera" url={batAvatarUrl} className="avatar-picker-preview" />
+            <div>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
+                ref={batAvatarInputRef}
+                onChange={handleBatAvatarChange}
+                hidden
+              />
+              <button type="button" onClick={() => batAvatarInputRef.current?.click()} disabled={batAvatarUploading}>
+                {batAvatarUploading ? "Enviando..." : "Trocar foto"}
+              </button>
+              <p className="admin-hint" style={{ margin: "6px 0 0" }}>
+                PNG, JPG, GIF ou WEBP, até 8MB.
+              </p>
+            </div>
+          </div>
+          {batAvatarError && <p className="auth-error">{batAvatarError}</p>}
         </div>
 
         <form className="admin-card" onSubmit={handleGrantAccess}>

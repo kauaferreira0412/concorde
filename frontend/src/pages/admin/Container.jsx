@@ -25,11 +25,20 @@ export function useAdminContainer() {
   const [botAvatarError, setBotAvatarError] = useState("");
   const botAvatarInputRef = useRef(null);
 
+  // Foto do Batera (bot do soundboard) - mesmo esquema do Melodion acima, so' que num bot
+  // separado (ver soundboardSession.js no music-bot e SoundboardBotSettingsController no
+  // backend).
+  const [batAvatarUrl, setBatAvatarUrl] = useState(null);
+  const [batAvatarUploading, setBatAvatarUploading] = useState(false);
+  const [batAvatarError, setBatAvatarError] = useState("");
+  const batAvatarInputRef = useRef(null);
+
   useEffect(() => {
     if (!isAdmin) return;
     reloadUsers();
     api.get("/api/servers").then(({ data }) => setServers(data));
     api.get("/api/music-bot/settings").then(({ data }) => setBotAvatarUrl(data.avatarUrl));
+    api.get("/api/soundboard-bot/settings").then(({ data }) => setBatAvatarUrl(data.avatarUrl));
   }, [isAdmin]);
 
   function reloadUsers() {
@@ -52,6 +61,25 @@ export function useAdminContainer() {
       setBotAvatarError(err.response?.data?.error || "Falha ao enviar a foto");
     } finally {
       setBotAvatarUploading(false);
+    }
+  }
+
+  async function handleBatAvatarChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setBatAvatarError("");
+    setBatAvatarUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await api.post("/api/soundboard-bot/avatar", formData);
+      setBatAvatarUrl(data.avatarUrl);
+    } catch (err) {
+      setBatAvatarError(err.response?.data?.error || "Falha ao enviar a foto");
+    } finally {
+      setBatAvatarUploading(false);
     }
   }
 
@@ -131,6 +159,11 @@ export function useAdminContainer() {
     botAvatarError,
     botAvatarInputRef,
     handleBotAvatarChange,
+    batAvatarUrl,
+    batAvatarUploading,
+    batAvatarError,
+    batAvatarInputRef,
+    handleBatAvatarChange,
     handleCreateUser,
     handleUserSaved,
     handleConfirmDelete,
