@@ -10,6 +10,7 @@ import { useServerMembers } from "../utils/useServerMembers";
 import {
   CameraIcon,
   CameraOffIcon,
+  ChevronDownIcon,
   ChevronsLeftIcon,
   ChevronsRightIcon,
   FolderIcon,
@@ -122,6 +123,11 @@ export default function ChannelSidebar({
   const [collapsedCategories, setCollapsedCategories] = useState(new Set());
   const [categoryMenu, setCategoryMenu] = useState(null); // { id, name, x, y }
   const categoryMenuRef = useRef(null);
+  // Menu de "Configuracoes do servidor" (clique no nome do servidor, ver hasAnyServerSettings
+  // acima) - junta editar servidor/emojis/perfis/log de auditoria num so' lugar, em vez de um
+  // botao pra cada um la' no cabecalho (ficava apertado demais, espremia o nome do servidor).
+  const [serverMenu, setServerMenu] = useState(null); // { x, y } | null
+  const serverMenuRef = useRef(null);
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null); // { id, name } | null
   const [deletingCategory, setDeletingCategory] = useState(null);
@@ -136,6 +142,13 @@ export default function ChannelSidebar({
     myServerPermissions.has("MUTE_MEMBERS") ||
     myServerPermissions.has("DEAFEN_MEMBERS") ||
     myServerPermissions.has("KICK_VOICE");
+  // Controla se o nome do servidor vira um botao clicavel (abre o menu de Configuracoes do
+  // servidor, ver serverMenu abaixo) - pra quem nao tem NENHUMA dessas, o nome fica so' texto.
+  const hasAnyServerSettings =
+    isAdmin ||
+    myServerPermissions.has("MANAGE_SERVER") ||
+    myServerPermissions.has("MANAGE_ROLES") ||
+    myServerPermissions.has("VIEW_AUDIT_LOG");
   // Arrastar alguem da lista de "quem esta na call" pra outro canal de voz (ver
   // draggable/onDrop abaixo) - so' existe enquanto o arraste esta rolando.
   const [draggingParticipant, setDraggingParticipant] = useState(null); // { channelId, userId }
@@ -194,6 +207,22 @@ export default function ChannelSidebar({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [categoryMenu]);
+
+  useEffect(() => {
+    if (!serverMenu) return;
+    function handlePointerDown(e) {
+      if (serverMenuRef.current && !serverMenuRef.current.contains(e.target)) setServerMenu(null);
+    }
+    function handleKeyDown(e) {
+      if (e.key === "Escape") setServerMenu(null);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [serverMenu]);
 
   function toggleCategoryCollapsed(categoryId) {
     setCollapsedCategories((prev) => {
@@ -528,7 +557,19 @@ export default function ChannelSidebar({
       <div className="channel-sidebar-header">
         {!collapsed && (
           <div className="channel-sidebar-title">
-            <strong>{server?.name || "Selecione um servidor"}</strong>
+            {server && hasAnyServerSettings ? (
+              <button
+                type="button"
+                className="channel-sidebar-name-btn"
+                onClick={(e) => setServerMenu({ x: e.clientX, y: e.clientY })}
+                title="Configurações do servidor"
+              >
+                <strong>{server.name}</strong>
+                <ChevronDownIcon size={13} />
+              </button>
+            ) : (
+              <strong>{server?.name || "Selecione um servidor"}</strong>
+            )}
             {server && (
               <span className="channel-sidebar-subtitle">
                 {members.length} membro{members.length === 1 ? "" : "s"} · {onlineCount} online
@@ -537,26 +578,6 @@ export default function ChannelSidebar({
           </div>
         )}
         <div className="channel-sidebar-header-actions">
-          {!collapsed && server && (isAdmin || myServerPermissions.has("VIEW_AUDIT_LOG")) && (
-            <button className="icon-btn" onClick={() => onOpenAuditLog(server)} title="Log de auditoria">
-              <ListIcon size={15} />
-            </button>
-          )}
-          {!collapsed && server && (isAdmin || myServerPermissions.has("MANAGE_ROLES")) && (
-            <button className="icon-btn" onClick={() => onOpenRoles(server)} title="Perfis e permissões">
-              <ShieldIcon size={15} />
-            </button>
-          )}
-          {!collapsed && server && (isAdmin || myServerPermissions.has("MANAGE_SERVER")) && (
-            <button className="icon-btn" onClick={() => onOpenEmojis(server)} title="Emojis do servidor">
-              <SmileIcon size={15} />
-            </button>
-          )}
-          {!collapsed && server && (isAdmin || myServerPermissions.has("MANAGE_SERVER")) && (
-            <button className="icon-btn" onClick={() => onEditServer(server)} title="Editar servidor">
-              <PencilIcon size={15} />
-            </button>
-          )}
           <button
             className="icon-btn collapse-toggle"
             onClick={toggleCollapsed}
@@ -794,6 +815,69 @@ export default function ChannelSidebar({
             >
               <TrashIcon size={14} /> Excluir canal
             </button>
+          </div>
+        </div>
+      )}
+
+      {serverMenu && server && (
+        <div
+          className="volume-popover"
+          ref={serverMenuRef}
+          style={{
+            left: Math.min(serverMenu.x, window.innerWidth - 220),
+            top: Math.min(serverMenu.y, window.innerHeight - 70),
+          }}
+        >
+          <p className="volume-popover-title">{server.name}</p>
+          <div className="participant-mod-actions">
+            {(isAdmin || myServerPermissions.has("MANAGE_SERVER")) && (
+              <button
+                type="button"
+                className="participant-mod-btn"
+                onClick={() => {
+                  onEditServer(server);
+                  setServerMenu(null);
+                }}
+              >
+                <PencilIcon size={14} /> Editar servidor
+              </button>
+            )}
+            {(isAdmin || myServerPermissions.has("MANAGE_SERVER")) && (
+              <button
+                type="button"
+                className="participant-mod-btn"
+                onClick={() => {
+                  onOpenEmojis(server);
+                  setServerMenu(null);
+                }}
+              >
+                <SmileIcon size={14} /> Emojis do servidor
+              </button>
+            )}
+            {(isAdmin || myServerPermissions.has("MANAGE_ROLES")) && (
+              <button
+                type="button"
+                className="participant-mod-btn"
+                onClick={() => {
+                  onOpenRoles(server);
+                  setServerMenu(null);
+                }}
+              >
+                <ShieldIcon size={14} /> Perfis e permissões
+              </button>
+            )}
+            {(isAdmin || myServerPermissions.has("VIEW_AUDIT_LOG")) && (
+              <button
+                type="button"
+                className="participant-mod-btn"
+                onClick={() => {
+                  onOpenAuditLog(server);
+                  setServerMenu(null);
+                }}
+              >
+                <ListIcon size={14} /> Log de auditoria
+              </button>
+            )}
           </div>
         </div>
       )}

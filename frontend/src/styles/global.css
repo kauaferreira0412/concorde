@@ -431,7 +431,28 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 }
 .collapse-toggle { flex-shrink: 0; }
 .channel-sidebar-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.channel-sidebar-header strong { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Nome do servidor - maior que antes (pedido explicito do usuario, ficava pequeno e
+   espremido pelos varios botoes de acao que existiam aqui, ver channel-sidebar-name-btn
+   abaixo pra onde eles foram). */
+.channel-sidebar-header strong { font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Quando o usuario tem alguma acao de servidor disponivel (editar/emojis/perfis/log), o
+   proprio nome vira um botao que abre um menu com tudo isso (ver serverMenu em
+   ChannelSidebar.jsx) - substitui os 4 botoes separados que ficavam no cabecalho. */
+.channel-sidebar-name-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+}
+.channel-sidebar-name-btn strong { min-width: 0; }
+.channel-sidebar-name-btn svg { flex-shrink: 0; color: var(--text-muted); }
+.channel-sidebar-name-btn:hover svg { color: var(--text-secondary); }
 .channel-sidebar-subtitle {
   font-size: 11px; font-weight: 600; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: 0.03em;
