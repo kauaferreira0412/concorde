@@ -588,9 +588,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     // e chamar syncScreenShares quando a mudanca for confirmada.
   }, []);
 
-  /** identity e' "user-<id>" pra gente (ver VoiceController no backend) ou "musicbot-<channelId>"
-   *  pro bot de musica (ver music-bot/index.js) - devolve a CHAVE de persistencia certa pra
-   *  gravar/ler o volume no localStorage, nao por sessao de call. Pro bot, usa a propria
+  /** identity e' "user-<id>" pra gente (ver VoiceController no backend) ou "musicbot-<channelId>"/
+   *  "soundboardbot-<channelId>" pros bots (Melodion, de musica, e Batera, do soundboard - ver
+   *  music-bot/src/session.js e soundboardSession.js) - devolve a CHAVE de persistencia certa
+   *  pra gravar/ler o volume no localStorage, nao por sessao de call. Pro bot, usa a propria
    *  identity (unica por canal) como chave - sem isso, o volume ajustado pra ele nunca batia
    *  no "if (userId)" abaixo (regex so' aceitava "user-N"), entao ficava preso so' no Map em
    *  memoria e resetava pro padrao toda vez que a pessoa saia e entrava de novo na call
@@ -598,16 +599,16 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   function userIdFromIdentity(identity) {
     const match = /^user-(\d+)$/.exec(identity || "");
     if (match) return match[1];
-    if (/^musicbot-\d+$/.test(identity || "")) return identity;
+    if (/^(musicbot|soundboardbot)-\d+$/.test(identity || "")) return identity;
     return null;
   }
 
   /** Lista NUMERICA (userId de verdade, o que o backend espera - ver
    *  VoicePresenceService.setWatching) de quem voce esta assistindo AGORA, a partir de
-   *  watchedShareIdentitiesRef (identities "user-<id>") - filtra fora o bot de musica (nunca
-   *  compartilha tela, "musicbot-<x>" nao bate no formato numerico) e qualquer identity que
-   *  nao reconheca. Usada tanto pra publicar de novo ao (re)conectar quanto ao mudar quem voce
-   *  assiste (ver toggleWatchScreenShare). */
+   *  watchedShareIdentitiesRef (identities "user-<id>") - filtra fora os bots (nunca
+   *  compartilham tela, "musicbot-<x>"/"soundboardbot-<x>" nao batem no formato numerico) e
+   *  qualquer identity que nao reconheca. Usada tanto pra publicar de novo ao (re)conectar
+   *  quanto ao mudar quem voce assiste (ver toggleWatchScreenShare). */
   function currentWatchingUserIds() {
     return [...watchedShareIdentitiesRef.current]
       .map((identity) => userIdFromIdentity(identity))

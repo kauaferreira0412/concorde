@@ -36,6 +36,17 @@ public class MusicBotInternalController {
         }
     }
 
+    // Batera (bot do soundboard) - participante SEPARADO do Melodion no LiveKit (ver
+    // music-bot/src/soundboardSession.js), por isso tem sua propria rota de presenca aqui.
+    @PostMapping("/{channelId}/soundboard-presence")
+    public void soundboardPresence(@PathVariable Long channelId, @RequestBody PresenceRequest req) {
+        if (req.joined()) {
+            voicePresenceService.joinSoundboardBot(channelId, "Batera", null);
+        } else {
+            voicePresenceService.leaveSoundboardBot(channelId);
+        }
+    }
+
     @PostMapping("/{channelId}/queue")
     public void queue(@PathVariable Long channelId, @RequestBody Map<String, Object> payload) {
         messagingTemplate.convertAndSend("/topic/channel." + channelId + ".music.queue", payload);

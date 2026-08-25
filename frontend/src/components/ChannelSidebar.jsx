@@ -476,7 +476,11 @@ export default function ChannelSidebar({
         {(presenceByChannel[c.id] || []).length > 0 && (
           <div className="channel-voice-participants">
             {presenceByChannel[c.id].map((p) => {
-              const identity = p.userId < 0 ? `musicbot-${c.id}` : `user-${p.userId}`;
+              // Melodion (musica) e Batera (soundboard) sao bots SEPARADOS no LiveKit, cada um
+              // com seu proprio userId "falso" (ver VoicePresenceService.botUserId/
+              // soundboardBotUserId no backend) - dá pra distinguir os dois so' comparando com
+              // -c.id (so' o Melodion usa exatamente isso, o Batera usa um deslocamento).
+              const identity = p.userId < 0 ? (p.userId === -c.id ? `musicbot-${c.id}` : `soundboardbot-${c.id}`) : `user-${p.userId}`;
               const isMe = p.userId === user?.id;
               const canAdjustVolume = activeChannel?.id === c.id && !isMe;
               const canModerate = !isMe && hasAnyModPermission;

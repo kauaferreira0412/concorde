@@ -4,6 +4,7 @@ import { broadcastQueue } from "./backendClient.js";
 import { advanceNext, enqueue } from "./playback.js";
 import { disconnectSession, getSession, moveSession, sessions, stopPlayback } from "./session.js";
 import { playSoundboardClip } from "./soundboard.js";
+import { disconnectSoundboardSession, moveSoundboardSession, soundboardSessions } from "./soundboardSession.js";
 
 function serializeQueue(session) {
   return {
@@ -127,6 +128,38 @@ router.post("/soundboard/play", async (req, res) => {
   } catch (err) {
     console.error(`Falha ao iniciar som no canal ${channelId}:`, err);
     res.status(500).json({ error: err.message || "Falha ao tocar o som" });
+  }
+});
+
+// Espelham /stop, /move e /mute acima, so' que pro Batera (bot do soundboard, ver
+// soundboardSession.js) - chamados pela mesma moderação de voz do backend
+// (VoiceModerationController) quando o alvo e' o Batera em vez do Melodion.
+router.post("/soundboard/stop", async (req, res) => {
+  const { channelId } = req.body || {};
+  if (!channelId) return res.status(400).json({ error: "channelId é obrigatório" });
+  await disconnectSoundboardSession(String(channelId));
+  res.json({ ok: true });
+});
+
+router.post("/soundboard/mute", (req, res) => {
+  const { channelId, muted } = req.body || {};
+  if (!channelId) return res.status(400).json({ error: "channelId é obrigatório" });
+  const session = soundboardSessions.get(String(channelId));
+  if (session) session.forceMuted = Boolean(muted);
+  res.json({ ok: true });
+});
+
+router.post("/soundboard/move", async (req, res) => {
+  const { fromChannelId, toChannelId } = req.body || {};
+  if (!fromChannelId || !toChannelId) {
+    return res.status(400).json({ error: "fromChannelId e toChannelId são obrigatórios" });
+  }
+  try {
+    await moveSoundboardSession(String(fromChannelId), String(toChannelId));
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(`Falha ao mover o Batera de ${fromChannelId} pra ${toChannelId}:`, err);
+    res.status(500).json({ error: err.message || "Falha ao mover o bot" });
   }
 });
 

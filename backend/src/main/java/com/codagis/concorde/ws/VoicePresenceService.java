@@ -122,6 +122,16 @@ public class VoicePresenceService {
         return -channelId;
     }
 
+    // Batera (bot do soundboard) e' um participante SEPARADO do Melodion (musica) - precisa de
+    // um userId "falso" proprio, senao os dois disputariam a mesma entrada no mapa de presenca
+    // (ver joinBot/leaveBot logo acima) e so' um deles apareceria pra quem esta' na call.
+    // Deslocado bem longe da faixa de channelId de verdade pra nunca colidir com botUserId().
+    private static final long SOUNDBOARD_BOT_OFFSET = 1_000_000_000L;
+
+    private Long soundboardBotUserId(Long channelId) {
+        return -channelId - SOUNDBOARD_BOT_OFFSET;
+    }
+
     public void joinBot(Long channelId, String name, String avatarUrl) {
         byChannel.computeIfAbsent(channelId, k -> new ConcurrentHashMap<>())
                 .put(botUserId(channelId), new VoiceParticipantInfo(botUserId(channelId), name, avatarUrl,
@@ -135,6 +145,25 @@ public class VoicePresenceService {
             return;
         }
         participants.remove(botUserId(channelId));
+        if (participants.isEmpty()) {
+            byChannel.remove(channelId);
+        }
+        broadcast(channelId);
+    }
+
+    public void joinSoundboardBot(Long channelId, String name, String avatarUrl) {
+        Long id = soundboardBotUserId(channelId);
+        byChannel.computeIfAbsent(channelId, k -> new ConcurrentHashMap<>())
+                .put(id, new VoiceParticipantInfo(id, name, avatarUrl, true, false, false, false, List.of()));
+        broadcast(channelId);
+    }
+
+    public void leaveSoundboardBot(Long channelId) {
+        Map<Long, VoiceParticipantInfo> participants = byChannel.get(channelId);
+        if (participants == null) {
+            return;
+        }
+        participants.remove(soundboardBotUserId(channelId));
         if (participants.isEmpty()) {
             byChannel.remove(channelId);
         }

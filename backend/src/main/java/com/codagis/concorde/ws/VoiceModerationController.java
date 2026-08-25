@@ -54,6 +54,14 @@ public class VoiceModerationController {
         return targetUserId != null && targetUserId.equals(-channelId);
     }
 
+    // Batera (bot do soundboard) - mesmo esquema de userId "falso" do VoicePresenceService
+    // (soundboardBotUserId), participante SEPARADO do Melodion no LiveKit.
+    private static final long SOUNDBOARD_BOT_OFFSET = 1_000_000_000L;
+
+    private boolean isSoundboardBot(Long channelId, Long targetUserId) {
+        return targetUserId != null && targetUserId.equals(-channelId - SOUNDBOARD_BOT_OFFSET);
+    }
+
     private void callBotBestEffort(String path, Map<String, Object> body) {
         try {
             restTemplate.postForObject(musicBotUrl + path, body, Map.class);
@@ -82,6 +90,10 @@ public class VoiceModerationController {
             callBotBestEffort("/move", Map.of("fromChannelId", channelId, "toChannelId", toChannel.getId()));
             return;
         }
+        if (isSoundboardBot(channelId, payload.targetUserId())) {
+            callBotBestEffort("/soundboard/move", Map.of("fromChannelId", channelId, "toChannelId", toChannel.getId()));
+            return;
+        }
         broadcast(channelId, new VoiceControlEvent("MOVE", payload.targetUserId(), toChannel.getId(),
                 toChannel.getName(), null, null));
         auditLogService.log(fromChannel.getServerId(), requesterId, "MOVE_MEMBER", payload.targetUserId(),
@@ -100,6 +112,10 @@ public class VoiceModerationController {
             callBotBestEffort("/stop", Map.of("channelId", channelId));
             return;
         }
+        if (isSoundboardBot(channelId, payload.targetUserId())) {
+            callBotBestEffort("/soundboard/stop", Map.of("channelId", channelId));
+            return;
+        }
         broadcast(channelId, new VoiceControlEvent("KICK", payload.targetUserId(), null, null, null, null));
         liveKitService.disconnectParticipant("channel-" + channelId, "user-" + payload.targetUserId());
         auditLogService.log(channel.getServerId(), requesterId, "KICK_VOICE", payload.targetUserId(), "CHANNEL", channelId, channel.getName());
@@ -116,6 +132,13 @@ public class VoiceModerationController {
                 presenceService.setForceMuted(channelId, payload.targetUserId(), payload.muted());
             }
             callBotBestEffort("/mute", Map.of("channelId", channelId, "muted", payload.muted()));
+            return;
+        }
+        if (isSoundboardBot(channelId, payload.targetUserId())) {
+            if (presenceService.isPresent(channelId, payload.targetUserId())) {
+                presenceService.setForceMuted(channelId, payload.targetUserId(), payload.muted());
+            }
+            callBotBestEffort("/soundboard/mute", Map.of("channelId", channelId, "muted", payload.muted()));
             return;
         }
         persistForceState(channel.getServerId(), payload.targetUserId(), payload.muted(), null);

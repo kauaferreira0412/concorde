@@ -2,8 +2,12 @@ import { AccessToken, TrackSource as GrantTrackSource } from "livekit-server-sdk
 import { AudioSource, LocalAudioTrack, Room, TrackPublishOptions, TrackSource } from "@livekit/rtc-node";
 import { CHANNELS, IDLE_DISCONNECT_MS, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_WS_URL, SAMPLE_RATE } from "./config.js";
 import { broadcastQueue, notifyBackendPresence } from "./backendClient.js";
-import { createMixer } from "./mixer.js";
 
+// Sessao do Melodion (bot de MUSICA). O soundboard e' um bot SEPARADO - Batera, ver
+// soundboardSession.js - com sua propria conexao/participante no LiveKit, pra nao dividir
+// faixa de audio com o Melodion (ver historico: os dois publicando Track.Source.Microphone
+// simultaneo fazia o frontend so' conseguir controlar UM dos dois - mutar/ensurdecer o bot
+// deixava de funcionar direito quando musica e soundboard tocavam junto).
 export const sessions = new Map();
 
 async function connectToRoom(channelId) {
@@ -32,7 +36,7 @@ async function connectToRoom(channelId) {
 }
 
 function createSessionState(channelId, connection) {
-  const session = {
+  return {
     channelId,
     room: connection.room,
     source: connection.source,
@@ -48,14 +52,7 @@ function createSessionState(channelId, connection) {
     queueOpen: false,
     queueName: null,
     queueId: null,
-    soundboardQueue: null,
   };
-  // Musica e soundboard se somam AQUI antes de sair pro LiveKit - ver mixer.js pro motivo
-  // (bug de nao conseguir mutar/ensurdecer o bot quando musica e soundboard tocavam cada
-  // um na sua propria faixa). Referencia o proprio "session" (nao "connection.source"
-  // direto), entao sobrevive normalmente a troca de canal em moveSession() abaixo.
-  session.mixer = createMixer(session);
-  return session;
 }
 
 function clearIdleTimer(session) {
@@ -106,7 +103,6 @@ export async function disconnectSession(channelId) {
   sessions.delete(channelId);
   clearIdleTimer(session);
   stopPlayback(session);
-  session.mixer.stop();
   session.nowPlaying = null;
   session.queue = [];
   session.queueOpen = false;

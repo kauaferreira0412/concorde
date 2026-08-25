@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { AudioFrame } from "@livekit/rtc-node";
 import { CHANNELS, MAX_QUEUE, PACE_AHEAD_MS, SAMPLE_RATE } from "./config.js";
 import { broadcastQueue } from "./backendClient.js";
 import { getSession, scheduleIdleDisconnect, stopPlayback } from "./session.js";
@@ -105,14 +106,14 @@ async function waitWhilePaused(session, ffmpeg) {
   return session.ffmpeg === ffmpeg;
 }
 
-// Se o bot estiver com forceMuted (ver /mute em routes.js), a musica entra como silencio no
-// mixer - mais simples que desligar o push e ter que lidar com o mixer parando/reiniciando.
-function buildPcmChunk(session, data) {
-  return session.forceMuted ? Buffer.alloc(data.length) : data;
+function buildFrame(session, data) {
+  const sampleCount = data.length / 2;
+  const int16 = session.forceMuted ? new Int16Array(sampleCount) : new Int16Array(data.buffer, data.byteOffset, sampleCount);
+  return new AudioFrame(int16, SAMPLE_RATE, CHANNELS, int16.length);
 }
 
 async function paceIfAhead(session) {
-  const queued = session.mixer.musicBufferedMs();
+  const queued = session.source.queuedDuration;
   if (queued > PACE_AHEAD_MS) {
     await new Promise((resolve) => setTimeout(resolve, queued - PACE_AHEAD_MS));
   }
@@ -132,7 +133,12 @@ export async function pumpAudio(session, ffmpeg) {
       leftover = Buffer.from(data.subarray(usableLength));
       if (usableLength === 0) continue;
 
-      session.mixer.pushMusic(buildPcmChunk(session, data.subarray(0, usableLength)));
+      const frame = buildFrame(session, data.subarray(0, usableLength));
+      try {
+        await session.source.captureFrame(frame);
+      } catch {
+        return;
+      }
       await paceIfAhead(session);
     }
   } catch (err) {
