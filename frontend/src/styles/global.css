@@ -1833,43 +1833,91 @@ h3.chat-heading {
 
 /* Soundboard (ver SoundboardPanel.jsx/SoundboardController no backend) - banco de sons
    PESSOAL de cada usuario, so' ele ve a lista. Clicar num som toca ele pra todo mundo na call. */
-.soundboard-upload {
+
+/* Dropzone compacta pra subir um som novo - arrastar/soltar OU clicar (ver SoundboardPanel.jsx),
+   nao e' mais um formulario com campo de nome: o nome vem direto do arquivo. */
+.soundboard-dropzone {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel-2);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
 }
-.soundboard-upload input[type="text"], .soundboard-upload input:not([type]) { flex: 1; min-width: 0; }
+.soundboard-dropzone:hover { border-color: var(--accent); color: var(--text-secondary); }
+.soundboard-dropzone.drag-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+.soundboard-dropzone.uploading { pointer-events: none; opacity: 0.7; }
+.soundboard-dropzone svg { flex-shrink: 0; }
+.soundboard-dropzone span { flex: 1; }
+.soundboard-dropzone-close { margin-left: auto; flex-shrink: 0; }
+
+/* Grade de chips, um do lado do outro - icone redondo + nome, lixeira so' aparece no hover
+   pra ficar mais limpo por padrao. */
 .soundboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .soundboard-clip {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   background: var(--bg-panel-2);
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  padding: 4px;
+  border-radius: var(--radius-pill);
+  padding: 3px;
+  max-width: 100%;
 }
+.soundboard-clip:hover { border-color: var(--border); }
 .soundboard-clip.playing { border-color: var(--accent); background: var(--accent-soft); }
 .soundboard-clip-play {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 1;
   min-width: 0;
   background: transparent;
   border: none;
-  padding: 6px 4px;
+  padding: 3px 10px 3px 3px;
   font-size: 12.5px;
+  font-weight: 500;
   color: var(--text-primary);
   cursor: pointer;
 }
-.soundboard-clip-play svg { flex-shrink: 0; color: var(--accent-text); }
-.soundboard-clip-play span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.soundboard-clip-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  flex-shrink: 0;
+}
+.soundboard-clip.playing .soundboard-clip-icon { background: var(--accent); color: #fff; }
+.soundboard-clip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+.soundboard-clip-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.soundboard-clip:hover .soundboard-clip-remove { opacity: 1; }
+.soundboard-clip-remove:hover { background: var(--danger-soft); color: var(--danger); }
 
 /* Quadrado "escolher assistir" (ver ScreenShareTile em VoiceChannel.jsx) - tamanho proprio,
    fixo e pequeno (nao usa o zoom de camera nem o de tela cheia - e' so' um "escolher"), mostra

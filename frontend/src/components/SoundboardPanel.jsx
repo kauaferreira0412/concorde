@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { useAlert } from "../context/AlertContext.jsx";
-import { PlusIcon, TrashIcon, VolumeIcon, XIcon } from "./icons.jsx";
+import { MusicNoteIcon, PlusIcon, TrashIcon, XIcon } from "./icons.jsx";
+
+const ACCEPTED_TYPES = "audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/mp4,audio/aac";
 
 /**
  * Banco de sons PESSOAL de cada usuario (ver SoundboardController/SoundboardClip no backend) -
  * ninguem mais ve quais sons voce upou nem a lista deles, so' voce. Clicar num som toca ele
  * PRA TODO MUNDO que estiver nessa call agora (o bot de musica publica esse audio no LiveKit,
  * ver music-bot/src/soundboard.js) - diferente do VoiceMod (que so' usa atalho de teclado), aqui
- * e' clique + escolha na hora mesmo (pedido explicito do usuario).
+ * e' clique + escolha na hora mesmo (pedido explicito do usuario). O nome do som vem direto do
+ * nome do arquivo (sem extensao) - arrastar/soltar ou clicar ja envia na hora, sem formulario.
  */
 export default function SoundboardPanel({ channelId }) {
   const { showAlert } = useAlert();
@@ -16,7 +19,8 @@ export default function SoundboardPanel({ channelId }) {
   const [playingId, setPlayingId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
-  const [newName, setNewName] = useState("");
+  const [dragActive, setDragActive] = useState(false);
+  const dragCounter = useRef(0);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -45,28 +49,53 @@ export default function SoundboardPanel({ channelId }) {
     }
   }
 
-  function pickFile() {
-    fileInputRef.current?.click();
-  }
-
-  async function handleFileChosen(e) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
+  async function uploadFile(file) {
     if (!file) return;
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("name", newName.trim() || file.name.replace(/\.[^/.]+$/, ""));
+      formData.append("name", file.name.replace(/\.[^/.]+$/, ""));
       const { data } = await api.post("/api/soundboard", formData);
       setClips((prev) => [data, ...(prev || [])]);
-      setNewName("");
       setShowUpload(false);
     } catch (err) {
       showAlert(err.response?.data?.error || "Não foi possível enviar esse áudio");
     } finally {
       setUploading(false);
     }
+  }
+
+  function handleFileChosen(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    uploadFile(file);
+  }
+
+  function handleDragEnter(e) {
+    e.preventDefault();
+    dragCounter.current += 1;
+    setDragActive(true);
+  }
+
+  function handleDragOver(e) {
+    e.preventDefault();
+  }
+
+  function handleDragLeave(e) {
+    e.preventDefault();
+    dragCounter.current -= 1;
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0;
+      setDragActive(false);
+    }
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    dragCounter.current = 0;
+    setDragActive(false);
+    uploadFile(e.dataTransfer.files?.[0]);
   }
 
   async function remove(clip) {
@@ -98,25 +127,27 @@ export default function SoundboardPanel({ channelId }) {
       </p>
 
       {showUpload && (
-        <div className="soundboard-upload">
-          <input
-            type="file"
-            accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/mp4,audio/aac"
-            ref={fileInputRef}
-            onChange={handleFileChosen}
-            hidden
-          />
-          <input
-            placeholder="Nome do som (opcional)"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            maxLength={60}
-          />
-          <button type="button" onClick={pickFile} disabled={uploading}>
-            {uploading ? "Enviando..." : "Escolher áudio"}
-          </button>
-          <button type="button" className="icon-btn" onClick={() => setShowUpload(false)} title="Cancelar">
-            <XIcon size={14} />
+        <div
+          className={"soundboard-dropzone" + (dragActive ? " drag-active" : "") + (uploading ? " uploading" : "")}
+          onClick={() => !uploading && fileInputRef.current?.click()}
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <input type="file" accept={ACCEPTED_TYPES} ref={fileInputRef} onChange={handleFileChosen} hidden />
+          <PlusIcon size={13} />
+          <span>{uploading ? "Enviando..." : "Arraste um áudio ou clique aqui (até 3MB)"}</span>
+          <button
+            type="button"
+            className="icon-btn soundboard-dropzone-close"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowUpload(false);
+            }}
+            title="Cancelar"
+          >
+            <XIcon size={13} />
           </button>
         </div>
       )}
@@ -130,11 +161,13 @@ export default function SoundboardPanel({ channelId }) {
           {clips.map((clip) => (
             <div key={clip.id} className={"soundboard-clip" + (playingId === clip.id ? " playing" : "")}>
               <button type="button" className="soundboard-clip-play" onClick={() => play(clip)} title={`Tocar "${clip.name}" na call`}>
-                <VolumeIcon size={15} />
-                <span>{clip.name}</span>
+                <span className="soundboard-clip-icon">
+                  <MusicNoteIcon size={12} />
+                </span>
+                <span className="soundboard-clip-name">{clip.name}</span>
               </button>
-              <button type="button" className="icon-btn icon-btn-danger" onClick={() => remove(clip)} title="Apagar som">
-                <TrashIcon size={13} />
+              <button type="button" className="soundboard-clip-remove" onClick={() => remove(clip)} title="Apagar som">
+                <TrashIcon size={12} />
               </button>
             </div>
           ))}
