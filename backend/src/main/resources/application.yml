@@ -20,88 +20,28 @@ spring:
     properties:
       hibernate:
         format_sql: true
-
-  # --- H2 (banco em arquivo, zero config) - descomente para voltar a usar sem Postgres ---
-  # datasource:
-  #   url: jdbc:h2:file:./data/concorde;AUTO_SERVER=TRUE
-  #   driver-class-name: org.h2.Driver
-  #   username: sa
-  #   password: ""
-  # h2:
-  #   console:
-  #     enabled: true
-  #     path: /h2-console
-
 app:
   cors:
-    # Localhost/rede local sempre liberados (dev direto), MAIS qualquer subdominio do ngrok
-    # (https://*.ngrok-free.app / .ngrok-free.dev / .ngrok.io) - assim, toda vez que voce roda
-    # o ngrok de novo e ganha uma URL nova/aleatoria, ela ja funciona sozinha, sem precisar
-    # editar nada aqui. Se um dia usar dominio fixo (ngrok pago, ou a VPS futura), so' cair
-    # nessa variavel PUBLIC_ORIGIN em vez de mexer na lista.
     allowed-origins: "http://localhost:5173,http://192.168.1.8:5173,https://*.ngrok-free.app,https://*.ngrok-free.dev,https://*.ngrok.io,${PUBLIC_ORIGIN:},app://."
   jwt:
     secret: "troque-este-segredo-por-um-valor-forte-de-32-bytes-no-minimo"
     expiration-minutes: 1440
-
-  # Controle de versao do app desktop (Electron) - ver DesktopVersionController. Cada vez que
-  # "npm run package:desktop" gera um instalador novo, ele grava o commit atual (git short SHA)
-  # tanto DENTRO do instalador (embutido no bundle, ver VITE_APP_BUILD_ID em
-  # package-desktop.mjs) quanto em desktop-min-version.txt (classpath, lido abaixo) - ou seja,
-  # TODA publicacao de instalador novo automaticamente descontinua a anterior, sem precisar
-  # editar nada aqui na mao. min-version-override so' existe pra forcar um valor manualmente
-  # se um dia precisar (ex: reverter uma publicacao) sem gerar instalador de novo - vazio por
-  # padrao, nesse caso usa o conteudo do arquivo.
   desktop:
     min-version-override: ${DESKTOP_MIN_VERSION:}
     download-url: ${DESKTOP_DOWNLOAD_URL:https://187-127-37-101.sslip.io/login}
-
-  # Bot de musica (ver MusicController/music-bot/index.js) - servico Node.js SEPARADO (nao e'
-  # Spring), o backend so' repassa /play e /stop autenticados pra ele. "localhost" so' funciona
-  # se voce rodar o bot manualmente na sua maquina em dev - em Docker (ver docker-compose*.yml)
-  # o nome do service ("music-bot") resolve sozinho na rede interna.
   music-bot:
     url: ${MUSIC_BOT_URL:http://localhost:4001}
-
-  # Conta de administrador criada automaticamente na primeira subida (se ainda nao existir).
-  # E' o UNICO jeito de ter uma primeira conta, ja que o cadastro publico foi removido:
-  # so o ADMIN pode criar outros usuarios e servidores dali em diante.
-  # Troque a senha aqui OU pela variavel de ambiente ADMIN_PASSWORD (mais seguro).
   admin:
     username: "admin"
     email: "admin@codagis.local"
     password: ${ADMIN_PASSWORD:}
-
-  # Config do LiveKit (servidor de voz/video/tela via WebRTC).
-  # Suba o LiveKit com Docker (veja README) e coloque a mesma api-key/api-secret aqui.
   livekit:
-    # Precisa ser o MESMO IP configurado como --node-ip no docker-compose.yml, senao o
-    # navegador conecta no sinal (WebSocket) mas o ICE (midia) nunca fecha. Quando for tunelar
-    # isso pelo ngrok tambem, defina a variavel LIVEKIT_PUBLIC_WS_URL (ex: wss://xxxx.ngrok-free.app)
-    # em vez de editar esse arquivo.
     ws-url: ${LIVEKIT_PUBLIC_WS_URL:ws://192.168.1.8:7880}
-    # So' pra chamadas ADMINISTRATIVAS server-a-server (ver LiveKitService.disconnectParticipant -
-    # forca desconexao de "conexao fantasma"/kick, ver VoicePresenceService/VoiceModerationController),
-    # NUNCA pro navegador. Em producao o Caddy (gateway) so' encaminha /rtc* pro LiveKit - as
-    # rotas administrativas (/twirp/*) nao passam por ele, entao essa chamada precisa ir DIRETO
-    # pela rede interna do Docker ("livekit:7880", ver docker-compose.prod.yml), nao pelo dominio
-    # publico. Vazio por padrao = usa o ws-url acima convertido pra http(s) (funciona sozinho em
-    # dev, onde o backend roda fora do Docker e fala direto com a porta do LiveKit no host).
     internal-url: ${LIVEKIT_INTERNAL_URL:}
     api-key: ${LIVEKIT_API_KEY:devkey}
     api-secret: ${LIVEKIT_API_SECRET:devsecret1234567890devsecret1234567890}
     token-ttl-minutes: 60
-
-  # Upload de avatar/imagens do chat para o Google Cloud Storage.
-  # 1. Baixe o JSON da conta de servico no Console do GCP (IAM > Contas de servico > Chaves)
-  #    -- ela precisa de permissao "Storage Object Admin" no bucket.
-  # 2. Cole o CONTEUDO INTEIRO do arquivo JSON na variavel de ambiente GCS_CREDENTIALS_JSON
-  #    (nao e' um caminho de arquivo - e' o JSON em si, como uma unica variavel).
-  #    No IntelliJ: Run > Edit Configurations > Environment variables > adiciona
-  #    GCS_CREDENTIALS_JSON colando o conteudo do .json ali.
-  #    No PowerShell (fora do IntelliJ): $env:GCS_CREDENTIALS_JSON = Get-Content .\chave.json -Raw
   gcs:
     credentials-json: ${GCS_CREDENTIALS_JSON:}
     bucket: ${GCS_BUCKET:venda-lume-storage}
-    # Pasta raiz dentro do bucket onde tudo desse app e' salvo (avatars/ e chat/ dentro dela)
     base-folder: ${GCS_BASE_FOLDER:potato}
