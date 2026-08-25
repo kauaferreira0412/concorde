@@ -1831,6 +1831,46 @@ h3.chat-heading {
 .screenshare-empty svg { color: var(--text-muted); }
 .screenshare-empty p { margin: 0; }
 
+/* Soundboard (ver SoundboardPanel.jsx/SoundboardController no backend) - banco de sons
+   PESSOAL de cada usuario, so' ele ve a lista. Clicar num som toca ele pra todo mundo na call. */
+.soundboard-upload {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.soundboard-upload input[type="text"], .soundboard-upload input:not([type]) { flex: 1; min-width: 0; }
+.soundboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+.soundboard-clip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+}
+.soundboard-clip.playing { border-color: var(--accent); background: var(--accent-soft); }
+.soundboard-clip-play {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  padding: 6px 4px;
+  font-size: 12.5px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.soundboard-clip-play svg { flex-shrink: 0; color: var(--accent-text); }
+.soundboard-clip-play span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* Quadrado "escolher assistir" (ver ScreenShareTile em VoiceChannel.jsx) - tamanho proprio,
    fixo e pequeno (nao usa o zoom de camera nem o de tela cheia - e' so' um "escolher"), mostra
    o nome de quem esta compartilhando centralizado ate' voce clicar pra entrar naquela

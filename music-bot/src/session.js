@@ -47,6 +47,9 @@ function createSessionState(channelId, connection) {
     queueOpen: false,
     queueName: null,
     queueId: null,
+    soundboardSource: null,
+    soundboardTrack: null,
+    soundboardQueue: null,
   };
 }
 
@@ -106,6 +109,7 @@ export async function disconnectSession(channelId) {
 
   try {
     await session.track.close();
+    if (session.soundboardTrack) await session.soundboardTrack.close();
     await session.room.disconnect();
   } catch (err) {
     console.warn(`[${channelId}] erro ao desconectar:`, err.message);
@@ -124,16 +128,20 @@ export async function moveSession(fromChannelId, toChannelId) {
   const newConnection = await connectToRoom(toChannelId);
   const oldRoom = session.room;
   const oldTrack = session.track;
+  const oldSoundboardTrack = session.soundboardTrack;
 
   sessions.delete(fromChannelId);
   session.channelId = toChannelId;
   session.room = newConnection.room;
   session.source = newConnection.source;
   session.track = newConnection.track;
+  session.soundboardSource = null;
+  session.soundboardTrack = null;
   sessions.set(toChannelId, session);
 
   try {
     await oldTrack.close();
+    if (oldSoundboardTrack) await oldSoundboardTrack.close();
     await oldRoom.disconnect();
   } catch (err) {
     console.warn(`[${fromChannelId}] erro desconectando da sala antiga após mover:`, err.message);

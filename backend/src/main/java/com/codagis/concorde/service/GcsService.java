@@ -23,6 +23,11 @@ public class GcsService {
     private static final Set<String> ALLOWED_CONTENT_TYPES =
             Set.of("image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp");
 
+    private static final Set<String> ALLOWED_AUDIO_CONTENT_TYPES =
+            Set.of("audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/ogg", "audio/webm", "audio/mp4", "audio/aac");
+
+    private static final long MAX_AUDIO_BYTES = 3L * 1024 * 1024;
+
     private final String credentialsJson;
     private final String bucketName;
     private final String baseFolder;
@@ -80,12 +85,52 @@ public class GcsService {
         return "https://storage.googleapis.com/%s/%s".formatted(bucketName, objectName);
     }
 
+    public String uploadAudio(MultipartFile file, String subFolder) {
+        if (storage == null) {
+            throw new IllegalStateException(
+                    "Google Cloud Storage nao configurado - defina a variavel GCS_CREDENTIALS_JSON com o JSON da conta de servico");
+        }
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("Arquivo vazio");
+        }
+        if (file.getSize() > MAX_AUDIO_BYTES) {
+            throw new IllegalArgumentException("Áudio muito grande - o máximo é 3MB (mantenha o som curto)");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_AUDIO_CONTENT_TYPES.contains(contentType.toLowerCase())) {
+            throw new IllegalArgumentException("Tipo de arquivo não permitido - envie um áudio (mp3, wav, ogg, webm, m4a ou aac)");
+        }
+
+        String extension = audioExtensionFor(contentType);
+        String objectName = "%s/%s/%s%s".formatted(baseFolder, subFolder, UUID.randomUUID(), extension);
+        BlobId blobId = BlobId.of(bucketName, objectName);
+        BlobInfo blobInfo = BlobInfo.newBuilder(blobId).setContentType(contentType).build();
+
+        try {
+            storage.create(blobInfo, file.getBytes());
+        } catch (IOException e) {
+            throw new IllegalStateException("Falha ao ler o arquivo enviado: " + e.getMessage(), e);
+        }
+
+        return "https://storage.googleapis.com/%s/%s".formatted(bucketName, objectName);
+    }
+
     private String extensionFor(String contentType) {
         return switch (contentType.toLowerCase()) {
             case "image/png" -> ".png";
             case "image/gif" -> ".gif";
             case "image/webp" -> ".webp";
             default -> ".jpg";
+        };
+    }
+
+    private String audioExtensionFor(String contentType) {
+        return switch (contentType.toLowerCase()) {
+            case "audio/wav", "audio/x-wav" -> ".wav";
+            case "audio/ogg" -> ".ogg";
+            case "audio/webm" -> ".webm";
+            case "audio/mp4", "audio/aac" -> ".m4a";
+            default -> ".mp3";
         };
     }
 }

@@ -23,6 +23,7 @@ import Avatar from "./Avatar.jsx";
 import { useTrackFps } from "../utils/useTrackFps";
 import CameraPipWindow from "./CameraPipWindow.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import SoundboardPanel from "./SoundboardPanel.jsx";
 
 // window.concordeDesktop so' existe dentro do app Electron (ver electron/preload.cjs). A janela
 // separada das cameras usa Document Picture-in-Picture (CameraPipWindow.jsx) NO NAVEGADOR - mas
@@ -625,6 +626,8 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
             </div>
           )}
         </section>
+
+        <SoundboardPanel channelId={channel.id} />
 
         <ChannelAccessSection members={members} />
       </div>

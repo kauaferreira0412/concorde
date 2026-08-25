@@ -9,6 +9,7 @@ export const CHANNELS = 1;
 export const IDLE_DISCONNECT_MS = 60_000;
 export const MAX_QUEUE = 50;
 export const PACE_AHEAD_MS = 300;
+export const SOUNDBOARD_MAX_DURATION_SEC = 15;
 
 export const COOKIES_PATH = "/app/data/cookies.txt";
 export const POT_PROVIDER_URL = process.env.POT_PROVIDER_URL || "http://pot-provider:4416";

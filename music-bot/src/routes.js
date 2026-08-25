@@ -3,6 +3,7 @@ import { Router } from "express";
 import { broadcastQueue } from "./backendClient.js";
 import { advanceNext, enqueue } from "./playback.js";
 import { disconnectSession, getSession, moveSession, sessions, stopPlayback } from "./session.js";
+import { playSoundboardClip } from "./soundboard.js";
 
 function serializeQueue(session) {
   return {
@@ -113,6 +114,20 @@ router.post("/pause", (req, res) => {
     session.resumePause = null;
   }
   res.json({ ok: true });
+});
+
+router.post("/soundboard/play", async (req, res) => {
+  const { channelId, url } = req.body || {};
+  if (!channelId || !url) return res.status(400).json({ error: "channelId e url são obrigatórios" });
+  try {
+    playSoundboardClip(String(channelId), String(url)).catch((err) => {
+      console.error(`[soundboard ${channelId}] falha ao tocar:`, err.message);
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(`Falha ao iniciar som no canal ${channelId}:`, err);
+    res.status(500).json({ error: err.message || "Falha ao tocar o som" });
+  }
 });
 
 router.post("/move", async (req, res) => {
