@@ -23,7 +23,7 @@ spring:
 
   # --- H2 (banco em arquivo, zero config) - descomente para voltar a usar sem Postgres ---
   # datasource:
-  #   url: jdbc:h2:file:./data/discordclone;AUTO_SERVER=TRUE
+  #   url: jdbc:h2:file:./data/concorde;AUTO_SERVER=TRUE
   #   driver-class-name: org.h2.Driver
   #   username: sa
   #   password: ""
