@@ -1,55 +1,32 @@
 services:
-  # Servidor de voz/video/compartilhamento de tela (SFU WebRTC).
-  # As mesmas api-key/api-secret precisam bater com backend/src/main/resources/application.yml
+
   livekit:
     image: livekit/livekit-server:latest
-    # --node-ip e' essencial no Docker Desktop (Windows/Mac): sem isso o LiveKit anuncia
-    # o IP interno do container para o WebRTC (ICE), que o navegador nao consegue alcancar,
-    # e a call falha com "could not establish pc connection".
-    # Usamos o IP real da maquina na rede local (nao 127.0.0.1) porque o Firefox descarta
-    # candidatos ICE loopback por padrao. Confira o IP atual com "ipconfig" -> adaptador
-    # Wi-Fi/Ethernet ativo, e troque aqui (e' o mesmo valor de app.livekit.ws-url no backend).
     command: --dev --bind 0.0.0.0 --node-ip=192.168.1.8
     ports:
-      - "7880:7880" # sinalizacao (WebSocket)
-      - "7881:7881" # TCP fallback
-      - "7882:7882/udp" # midia (RTP/WebRTC) - porta unica usada pelo modo --dev
-      - "50000-50100:50000-50100/udp" # faixa alternativa, mantida por seguranca/compatibilidade
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+      - "50000-50100:50000-50100/udp"
     environment:
       LIVEKIT_KEYS: "devkey: devsecret1234567890devsecret1234567890"
 
-  # Gera "PO Tokens" (prova de origem) pro yt-dlp usar - resolve o "Sign in to confirm you're
-  # not a bot" sem precisar de cookie/login nenhum (ver plugin instalado em music-bot/Dockerfile
-  # e YTDLP_EXTRA_ARGS em music-bot/index.js). So' precisa ser alcancavel PELO music-bot, nao
-  # expoe porta nenhuma pro host.
   pot-provider:
     image: brainicism/bgutil-ytdlp-pot-provider:latest
     restart: unless-stopped
 
-  # Bot de musica (/play) - opcional em dev, so' sobe se voce quiser testar isso localmente.
-  # O backend (fora do Docker em dev, ver README) precisa apontar MUSIC_BOT_URL pra
-  # http://localhost:4001 (a porta abaixo) - troque no application.yml ou como variavel de
-  # ambiente na hora de rodar o Spring Boot.
   music-bot:
     build: ./music-bot
     restart: unless-stopped
     ports:
       - "4001:4001"
     environment:
-      # "livekit" resolve pro service acima na rede interna do compose.
       LIVEKIT_WS_URL: ws://livekit:7880
       LIVEKIT_API_KEY: devkey
       LIVEKIT_API_SECRET: devsecret1234567890devsecret1234567890
-      # O backend roda FORA do Docker em dev (IntelliJ, ver README) - "host.docker.internal"
-      # e' o jeito do Docker Desktop (Windows/Mac) de alcancar a maquina host de dentro de um
-      # container. So' usado pra avisar "entrei/saí da call" (ver MusicBotInternalController) -
-      # se o backend nao estiver rodando nesse instante isso so' falha silenciosamente.
+
       BACKEND_URL: http://host.docker.internal:8080
-      # "pot-provider" resolve pro service acima na rede interna do compose.
       POT_PROVIDER_URL: http://pot-provider:4416
-    # cookies.txt (OPCIONAL, nunca commitado) do SEU login do YouTube - reforca o PO Token
-    # acima em alguns casos, mas nao e' mais o principal. Sem o arquivo, o bot continua
-    # funcionando do jeito de sempre.
     volumes:
       - ./music-bot/data:/app/data
     depends_on:

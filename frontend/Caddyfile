@@ -1,15 +1,6 @@
-# {$DOMAIN} vem da variavel de ambiente DOMAIN do docker-compose.prod.yml (ex:
-# 187-127-37-101.sslip.io). Com um dominio de verdade na frente, o Caddy busca certificado
-# HTTPS sozinho no Let's Encrypt (por isso as portas 80 e 443 do compose ficam abertas).
+
 {$DOMAIN} {
 	encode gzip
-
-	# "handle" e' avaliado na ordem escrita aqui (ao contrario de reverse_proxy/file_server
-	# soltos, que o Caddy reordena sozinho pela prioridade padrao dele - e ai o file_server
-	# roda ANTES do reverse_proxy e responde 405 pra qualquer POST/PUT antes de chegar no
-	# backend). Com "handle" a gente garante que API/WS/LiveKit sao checados primeiro, e so'
-	# cai no arquivo estatico se nao for nenhum desses.
-
 	# API REST e WebSocket STOMP do backend (mesma logica do proxy do Vite em dev).
 	handle /api/* {
 		reverse_proxy backend:8080
@@ -32,4 +23,14 @@
 		try_files {path} /index.html
 		file_server
 	}
+}
+
+# VetFacility (outro projeto, mesma VPS) - subdominio proprio, mesmo Caddy/certificado
+# automatico. O container "frontend" e' do docker-compose.prod.yml do vetfacility-frontend,
+# alcancavel aqui porque os dois entram na rede externa "webproxy" (ver docker-compose.prod.yml
+# deste projeto). O proprio nginx daquele container ja resolve /api/* pro backend do
+# vetfacility sozinho (ver vetfacility-frontend/nginx.conf) - aqui so' precisa encaminhar tudo.
+vetfacility.{$DOMAIN} {
+	encode gzip
+	reverse_proxy frontend:80
 }

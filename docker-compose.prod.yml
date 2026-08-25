@@ -1,10 +1,3 @@
-# Stack de PRODUCAO pra rodar na VPS (Postgres + backend + LiveKit + gateway Caddy).
-# Uso: copie .env.prod.example pra .env.prod, preencha, e suba com:
-#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
-#
-# O docker-compose.yml (sem sufixo) continua sendo o de DEV local (so' o LiveKit) -
-# nao mexe nele.
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -21,17 +14,12 @@ services:
     restart: unless-stopped
     command: --config /etc/livekit.yaml
     environment:
-      # Formato exigido pelo LiveKit: "chave: segredo" (mesmo valor que o backend usa
-      # em LIVEKIT_API_KEY / LIVEKIT_API_SECRET, ver abaixo).
       LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
     ports:
-      # 7880 (sinalizacao) NAO precisa ficar exposta aqui - o Caddy fala com ela por
-      # dentro da rede interna do Docker (service name "livekit"). So' o que e' midia
-      # de verdade (audio/video) precisa estar acessivel direto da internet:
-      - "7881:7881" # fallback TCP do WebRTC (quando UDP e' bloqueado no lado do cliente)
-      - "50000-50100:50000-50100/udp" # midia (RTP/WebRTC)
+      - "7881:7881"
+      - "50000-50100:50000-50100/udp"
 
   backend:
     build: ./backend
@@ -40,35 +28,16 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/discord_clone
       DB_PASSWORD: ${DB_PASSWORD}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      # SEM sufixo /rtc aqui - o livekit-client (SDK do frontend) ja adiciona /rtc e
-      # /rtc/validate sozinho por cima dessa URL. Se a gente ja mandar com /rtc, ele monta
-      # .../rtc/rtc e .../rtc/validate vira .../rtc/rtc/validate, que o LiveKit nao reconhece
-      # (404). O Caddyfile do gateway ja trata o path /rtc* e manda pro livekit:7880.
       LIVEKIT_PUBLIC_WS_URL: wss://${DOMAIN}
-      # "livekit" e' o service abaixo - resolve sozinho na rede interna do Docker. So' pra
-      # chamadas ADMINISTRATIVAS server-a-server (ver LiveKitService.disconnectParticipant) -
-      # o Caddy (gateway) so' encaminha /rtc* pro LiveKit, entao a rota /twirp/* (admin) nao
-      # daria pra alcancar pelo dominio publico (LIVEKIT_PUBLIC_WS_URL acima).
       LIVEKIT_INTERNAL_URL: http://livekit:7880
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
       PUBLIC_ORIGIN: https://${DOMAIN}
       GCS_CREDENTIALS_JSON: ${GCS_CREDENTIALS_JSON:-}
       GCS_BUCKET: ${GCS_BUCKET:-}
-      # Controle de versao do app desktop (ver DesktopVersionController) - "npm run
-      # package:desktop" ja grava sozinho o commit atual em
-      # backend/src/main/resources/desktop-min-version.txt a cada instalador novo publicado
-      # (vai junto no git push/deploy normal), entao normalmente NAO precisa mexer aqui.
-      # DESKTOP_MIN_VERSION so' existe como valvula de escape manual (forcar um valor sem
-      # publicar instalador novo) - vazio por padrao, nesse caso usa o arquivo.
       DESKTOP_MIN_VERSION: ${DESKTOP_MIN_VERSION:-}
       DESKTOP_DOWNLOAD_URL: ${DESKTOP_DOWNLOAD_URL:-https://187-127-37-101.sslip.io/login}
-      # "music-bot" e' o nome do service abaixo - resolve sozinho na rede interna do Docker.
       MUSIC_BOT_URL: http://music-bot:4001
-    # DNS publico explicito - em algumas VPS o /etc/resolv.conf do host aponta pro
-    # stub do systemd-resolved (127.0.0.53), que os containers nao conseguem alcancar,
-    # e qualquer chamada de rede pra fora (aqui, a API do Google Cloud Storage) falha
-    # com "connection refused" na resolucao de DNS.
     dns:
       - 8.8.8.8
       - 1.1.1.1
@@ -76,19 +45,10 @@ services:
       - postgres
       - livekit
       - music-bot
-
-  # Gera "PO Tokens" (prova de origem) pro yt-dlp usar - resolve o "Sign in to confirm you're
-  # not a bot" (comum em IP de VPS/datacenter) sem precisar de cookie/login nenhum, diferente
-  # do cookies.txt (que expira/precisa reexportar de vez em quando). Ver plugin instalado em
-  # music-bot/Dockerfile e YTDLP_EXTRA_ARGS em music-bot/index.js. So' precisa ser alcancavel
-  # PELO music-bot, nao expoe porta nenhuma pra internet.
   pot-provider:
     image: brainicism/bgutil-ytdlp-pot-provider:latest
     restart: unless-stopped
 
-  # Bot de musica (/play, ver MusicController.java/music-bot/index.js) - entra na call como
-  # participante de verdade e publica o audio. Servico Node.js separado do backend (Spring) de
-  # proposito - ver comentario no topo do music-bot/index.js.
   music-bot:
     build: ./music-bot
     restart: unless-stopped
@@ -96,23 +56,14 @@ services:
       LIVEKIT_WS_URL: wss://${DOMAIN}
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
-      # "backend" e' o service acima - resolve sozinho na rede interna do Docker. So' usado pra
-      # avisar "entrei/saí da call" (ver MusicBotInternalController), pra ele aparecer na lista
-      # de presenca de voz igual qualquer outro participante.
       BACKEND_URL: http://backend:8080
-      # "pot-provider" e' o service acima - resolve sozinho na rede interna do Docker.
       POT_PROVIDER_URL: http://pot-provider:4416
-    # cookies.txt (OPCIONAL, nunca commitado - ver .gitignore) exportado do SEU proprio login
-    # do YouTube - reforca o PO Token acima em alguns casos, mas nao e' mais o principal desde
-    # que o pot-provider existe. Sem o arquivo, o bot continua funcionando do jeito de sempre.
     volumes:
       - ./music-bot/data:/app/data
     dns:
       - 8.8.8.8
       - 1.1.1.1
-    # NAO depende de "backend" aqui de proposito - "backend" ja' depende de "music-bot" (ver
-    # acima), e o Docker Compose nao aceita depends_on circular. Sem problema: notifyBackendPresence
-    # no bot e' melhor esforco (ver music-bot/index.js), nao trava nada se o backend subir depois.
+
     depends_on:
       - livekit
       - pot-provider
@@ -126,11 +77,14 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     ports:
-      - "80:80" # necessario pro Caddy validar e renovar o certificado HTTPS sozinho
+      - "80:80"
       - "443:443"
     volumes:
-      - caddy_data:/data # certificado fica salvo aqui - sobrevive a rebuild/restart
+      - caddy_data:/data
       - caddy_config:/config
+    networks:
+      - default
+      - webproxy
     depends_on:
       - backend
       - livekit
@@ -139,3 +93,8 @@ volumes:
   pgdata:
   caddy_data:
   caddy_config:
+
+networks:
+  default: {}
+  webproxy:
+    name: webproxy
