@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import api from "../api/client";
 import Avatar from "./Avatar.jsx";
@@ -13,14 +14,23 @@ export default function ServerSidebar({ servers, selectedServerId, onSelect, onC
   // primeiro (ver GET /api/servers/{id}/voice-presence, junta a presenca de TODOS os canais de
   // voz do servidor - ver ServerService.getVoicePresence no backend).
   const [hoveredServerId, setHoveredServerId] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState(null); // {top, left} em pixels de tela
   const [voicePresence, setVoicePresence] = useState(null); // null = carregando, [] = ninguem na call
   const hoverTimeoutRef = useRef(null);
 
-  function handleHoverStart(serverId) {
+  function handleHoverStart(serverId, iconEl) {
     // Pequeno atraso antes de buscar - passar o mouse RAPIDO por varios servidores em sequencia
     // (rolando a lista) nao devia disparar uma chamada de API pra cada um.
     clearTimeout(hoverTimeoutRef.current);
     hoverTimeoutRef.current = setTimeout(() => {
+      // ".server-sidebar" tem "overflow-y:auto" - sem overflow-x definido, o CSS forca os DOIS
+      // eixos a cortar conteudo que vaza (regra do proprio spec: um eixo "auto" e o outro
+      // "visible" vira "auto" tambem) - um tooltip posicionado com "left:100%" (pra fora da
+      // barra estreita de 76px) ficava CORTADO/invisivel mesmo com os dados certos chegando
+      // (reportado: "nao ta mostrando"). Portal pro document.body em position:fixed, calculado
+      // a partir da posicao de VERDADE do icone na tela, escapa desse corte de vez.
+      const rect = iconEl.getBoundingClientRect();
+      setTooltipPos({ top: rect.top + rect.height / 2, left: rect.right + 14 });
       setHoveredServerId(serverId);
       setVoicePresence(null);
       api
@@ -35,16 +45,17 @@ export default function ServerSidebar({ servers, selectedServerId, onSelect, onC
     setHoveredServerId(null);
   }
 
+  const hoveredServer = servers.find((s) => s.id === hoveredServerId);
+
   return (
     <div className="server-sidebar">
       {servers.map((s) => {
         const isActive = s.id === selectedServerId;
-        const hovered = hoveredServerId === s.id;
         return (
           <div
             key={s.id}
             className="server-icon-wrap"
-            onMouseEnter={() => handleHoverStart(s.id)}
+            onMouseEnter={(e) => handleHoverStart(s.id, e.currentTarget)}
             onMouseLeave={handleHoverEnd}
           >
             <span className={"server-icon-pill" + (isActive ? " active" : "")} />
@@ -54,29 +65,6 @@ export default function ServerSidebar({ servers, selectedServerId, onSelect, onC
             >
               {s.iconUrl ? <img src={s.iconUrl} alt="" className="server-icon-img" /> : s.name.slice(0, 2).toUpperCase()}
             </button>
-            {hovered && (
-              <div className="server-hover-tooltip">
-                <p className="server-hover-tooltip-name">{s.name}</p>
-                {Array.isArray(voicePresence) && voicePresence.length > 0 && (
-                  <div className="server-hover-tooltip-voice">
-                    <HeadphonesIcon size={12} className="server-hover-tooltip-voice-icon" />
-                    <div className="server-hover-tooltip-avatars">
-                      {voicePresence.slice(0, MAX_AVATARS).map((p) => (
-                        <Avatar
-                          key={p.userId}
-                          name={p.username}
-                          url={p.avatarUrl}
-                          className="voice-avatar small server-hover-tooltip-avatar"
-                        />
-                      ))}
-                      {voicePresence.length > MAX_AVATARS && (
-                        <span className="server-hover-tooltip-avatar-more">+{voicePresence.length - MAX_AVATARS}</span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         );
       })}
@@ -86,6 +74,33 @@ export default function ServerSidebar({ servers, selectedServerId, onSelect, onC
           +
         </button>
       )}
+
+      {hoveredServer &&
+        tooltipPos &&
+        createPortal(
+          <div className="server-hover-tooltip" style={{ top: tooltipPos.top, left: tooltipPos.left }}>
+            <p className="server-hover-tooltip-name">{hoveredServer.name}</p>
+            {Array.isArray(voicePresence) && voicePresence.length > 0 && (
+              <div className="server-hover-tooltip-voice">
+                <HeadphonesIcon size={12} className="server-hover-tooltip-voice-icon" />
+                <div className="server-hover-tooltip-avatars">
+                  {voicePresence.slice(0, MAX_AVATARS).map((p) => (
+                    <Avatar
+                      key={p.userId}
+                      name={p.username}
+                      url={p.avatarUrl}
+                      className="voice-avatar small server-hover-tooltip-avatar"
+                    />
+                  ))}
+                  {voicePresence.length > MAX_AVATARS && (
+                    <span className="server-hover-tooltip-avatar-more">+{voicePresence.length - MAX_AVATARS}</span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

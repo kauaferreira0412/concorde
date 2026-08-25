@@ -454,15 +454,15 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .server-icon.add:hover { border-color: var(--success); color: var(--success); }
 
 /* Tooltip ao passar o mouse num servidor (ver ServerSidebar.jsx) - nome + avatares de quem
-   esta numa call de voz agora nesse servidor (so' aparece se tiver alguem). Fica a direita do
-   icone, vertical centralizado - "left:100%" + "margin-left" em vez de largura fixa, pra
-   acompanhar o icone de 46px sem precisar recalcular nada se ele mudar de tamanho. */
+   esta numa call de voz agora nesse servidor (so' aparece se tiver alguem). "position:fixed"
+   com top/left calculados em JS (posicao de VERDADE do icone na tela) e renderizado via portal
+   pro document.body - de proposito, NAO "position:absolute" dentro da sidebar: ".server-sidebar"
+   tem overflow-y:auto sem overflow-x definido, e o proprio spec do CSS forca os DOIS eixos a
+   cortar juntos nesse caso - um tooltip posicionado só com CSS relativo ao icone (sem portal)
+   ficava cortado/invisivel mesmo com os dados certos chegando (reportado: "nao ta mostrando"). */
 .server-hover-tooltip {
-  position: absolute;
-  left: 100%;
-  top: 50%;
+  position: fixed;
   transform: translateY(-50%);
-  margin-left: 14px;
   z-index: 60;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
