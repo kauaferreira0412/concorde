@@ -2,31 +2,59 @@ package com.codagis.concorde.service;
 
 import com.codagis.concorde.domain.Channel;
 import com.codagis.concorde.domain.Message;
-import com.codagis.concorde.enums.Role;
+import com.codagis.concorde.domain.MessageReaction;
+import com.codagis.concorde.domain.Poll;
+import com.codagis.concorde.domain.PollOption;
+import com.codagis.concorde.domain.PollVote;
 import com.codagis.concorde.domain.User;
 import com.codagis.concorde.dto.MessageDtos.ChatMessage;
+import com.codagis.concorde.dto.MessageDtos.ReactionSummary;
 import com.codagis.concorde.dto.MessageDtos.ReplyPreview;
+import com.codagis.concorde.dto.PollDtos.PollDto;
+import com.codagis.concorde.dto.PollDtos.PollOptionDto;
+import com.codagis.concorde.enums.Role;
+import com.codagis.concorde.enums.ServerPermission;
 import com.codagis.concorde.repository.ChannelRepository;
+import com.codagis.concorde.repository.MessageReactionRepository;
 import com.codagis.concorde.repository.MessageRepository;
+import com.codagis.concorde.repository.PollOptionRepository;
+import com.codagis.concorde.repository.PollRepository;
+import com.codagis.concorde.repository.PollVoteRepository;
 import com.codagis.concorde.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class MessageService {
 
     private final MessageRepository messageRepository;
+    private final MessageReactionRepository messageReactionRepository;
+    private final PollRepository pollRepository;
+    private final PollOptionRepository pollOptionRepository;
+    private final PollVoteRepository pollVoteRepository;
     private final UserRepository userRepository;
     private final ChannelRepository channelRepository;
+    private final PermissionService permissionService;
 
-    public MessageService(MessageRepository messageRepository, UserRepository userRepository, ChannelRepository channelRepository) {
+    public MessageService(MessageRepository messageRepository, MessageReactionRepository messageReactionRepository,
+                           PollRepository pollRepository, PollOptionRepository pollOptionRepository,
+                           PollVoteRepository pollVoteRepository, UserRepository userRepository,
+                           ChannelRepository channelRepository, PermissionService permissionService) {
         this.messageRepository = messageRepository;
+        this.messageReactionRepository = messageReactionRepository;
+        this.pollRepository = pollRepository;
+        this.pollOptionRepository = pollOptionRepository;
+        this.pollVoteRepository = pollVoteRepository;
         this.userRepository = userRepository;
         this.channelRepository = channelRepository;
+        this.permissionService = permissionService;
     }
 
     @Transactional
@@ -83,6 +111,22 @@ public class MessageService {
     }
 
     @Transactional
+    public ChatMessage saveWithPoll(Long channelId, Long authorId, String content, Long pollId) {
+        assertCanPostIn(channelId, authorId);
+        Message saved = messageRepository.save(Message.builder()
+                .channelId(channelId)
+                .authorId(authorId)
+                .content(content)
+                .pollId(pollId)
+                .build());
+        return toDto(saved);
+    }
+
+    public ChatMessage get(Long channelId, Long messageId) {
+        return toDto(findInChannel(channelId, messageId));
+    }
+
+    @Transactional
     public ChatMessage edit(Long channelId, Long messageId, Long requesterId, String newContent) {
         Message message = findInChannel(channelId, messageId);
         assertCanModify(message, requesterId);
@@ -98,7 +142,57 @@ public class MessageService {
     public void delete(Long channelId, Long messageId, Long requesterId) {
         Message message = findInChannel(channelId, messageId);
         assertCanModify(message, requesterId);
+        messageReactionRepository.deleteByMessageId(messageId);
+        if (message.getPollId() != null) {
+            pollVoteRepository.deleteByPollId(message.getPollId());
+            pollOptionRepository.deleteByPollId(message.getPollId());
+            pollRepository.deleteById(message.getPollId());
+        }
         messageRepository.delete(message);
+    }
+
+    @Transactional
+    public ChatMessage toggleReaction(Long channelId, Long messageId, Long userId, String emoji) {
+        Message message = findInChannel(channelId, messageId);
+        String normalizedEmoji = emoji == null ? "" : emoji.trim();
+        if (normalizedEmoji.isBlank() || normalizedEmoji.length() > 32) {
+            throw new IllegalArgumentException("Emoji inválido");
+        }
+        messageReactionRepository.findByMessageIdAndUserIdAndEmoji(messageId, userId, normalizedEmoji)
+                .ifPresentOrElse(
+                        messageReactionRepository::delete,
+                        () -> messageReactionRepository.save(MessageReaction.builder()
+                                .messageId(messageId)
+                                .userId(userId)
+                                .emoji(normalizedEmoji)
+                                .build())
+                );
+        return toDto(message);
+    }
+
+    @Transactional
+    public ChatMessage setPinned(Long channelId, Long messageId, Long requesterId, boolean pinned) {
+        Message message = findInChannel(channelId, messageId);
+        Channel channel = channelRepository.findById(channelId)
+                .orElseThrow(() -> new IllegalArgumentException("Canal não encontrado"));
+        permissionService.assertHas(channel.getServerId(), requesterId, ServerPermission.MANAGE_CHANNELS);
+        message.setPinned(pinned);
+        message.setPinnedAt(pinned ? Instant.now() : null);
+        return toDto(messageRepository.save(message));
+    }
+
+    public List<ChatMessage> listPinned(Long channelId) {
+        List<Message> pinned = messageRepository.findByChannelIdAndPinnedTrueOrderByPinnedAtDesc(channelId);
+        return toDtos(pinned);
+    }
+
+    public List<ChatMessage> search(Long channelId, String query) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+        List<Message> found = messageRepository
+                .findTop50ByChannelIdAndContentContainingIgnoreCaseOrderByIdDesc(channelId, query.trim());
+        return toDtos(found);
     }
 
     private Message findInChannel(Long channelId, Long messageId) {
@@ -132,20 +226,57 @@ public class MessageService {
     }
 
     public List<ChatMessage> history(Long channelId) {
-        return messageRepository.findTop50ByChannelIdOrderByIdDesc(channelId).stream()
+        List<Message> messages = messageRepository.findTop50ByChannelIdOrderByIdDesc(channelId).stream()
                 .sorted(Comparator.comparing(Message::getId))
-                .map(this::toDto)
+                .toList();
+        return toDtos(messages);
+    }
+
+    private List<ChatMessage> toDtos(List<Message> messages) {
+        List<Long> ids = messages.stream().map(Message::getId).toList();
+        Map<Long, List<MessageReaction>> reactionsByMessage = messageReactionRepository.findByMessageIdIn(ids).stream()
+                .collect(Collectors.groupingBy(MessageReaction::getMessageId));
+        return messages.stream()
+                .map(m -> toDto(m, reactionsByMessage.getOrDefault(m.getId(), List.of())))
                 .toList();
     }
 
     private ChatMessage toDto(Message m) {
+        return toDto(m, messageReactionRepository.findByMessageId(m.getId()));
+    }
+
+    private ChatMessage toDto(Message m, List<MessageReaction> reactions) {
         User author = userRepository.findById(m.getAuthorId()).orElse(null);
         String username = author != null ? author.getUsername() : "desconhecido";
         String avatarUrl = author != null ? author.getAvatarUrl() : null;
         ReplyPreview replyTo = m.getReplyToId() != null ? buildReplyPreview(m.getReplyToId()) : null;
+        PollDto poll = m.getPollId() != null ? buildPollDto(m.getPollId()) : null;
         return new ChatMessage(m.getId(), m.getChannelId(), m.getAuthorId(), username, avatarUrl, m.getContent(),
                 m.getImageUrl(), m.getCreatedAt(), m.getEditedAt(), m.getReplyToId(), replyTo,
-                m.getRollNotation(), m.getRollSides(), m.getRollResultsCsv(), m.getRollTotal());
+                m.getRollNotation(), m.getRollSides(), m.getRollResultsCsv(), m.getRollTotal(),
+                groupReactions(reactions), m.isPinned(), poll);
+    }
+
+    private PollDto buildPollDto(Long pollId) {
+        Poll poll = pollRepository.findById(pollId).orElse(null);
+        if (poll == null) {
+            return null;
+        }
+        List<PollOption> options = pollOptionRepository.findByPollIdOrderByPositionAsc(pollId);
+        Map<Long, List<Long>> votersByOption = pollVoteRepository.findByPollId(pollId).stream()
+                .collect(Collectors.groupingBy(PollVote::getOptionId, Collectors.mapping(PollVote::getUserId, Collectors.toList())));
+        List<PollOptionDto> optionDtos = options.stream()
+                .map(o -> new PollOptionDto(o.getId(), o.getText(), votersByOption.getOrDefault(o.getId(), List.of())))
+                .toList();
+        return new PollDto(poll.getId(), poll.getQuestion(), poll.isMultipleChoice(), optionDtos);
+    }
+
+    private List<ReactionSummary> groupReactions(List<MessageReaction> reactions) {
+        Map<String, List<Long>> byEmoji = new LinkedHashMap<>();
+        for (MessageReaction r : reactions) {
+            byEmoji.computeIfAbsent(r.getEmoji(), k -> new java.util.ArrayList<>()).add(r.getUserId());
+        }
+        return byEmoji.entrySet().stream().map(e -> new ReactionSummary(e.getKey(), e.getValue())).toList();
     }
 
     private ReplyPreview buildReplyPreview(Long originalId) {

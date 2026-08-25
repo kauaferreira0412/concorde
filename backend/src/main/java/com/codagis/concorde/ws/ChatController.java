@@ -5,8 +5,11 @@ import com.codagis.concorde.dto.MessageDtos.ChatMessage;
 import com.codagis.concorde.dto.MessageDtos.DeleteChatMessage;
 import com.codagis.concorde.dto.MessageDtos.EditChatMessage;
 import com.codagis.concorde.dto.MessageDtos.OutgoingChatMessage;
+import com.codagis.concorde.dto.MessageDtos.PinMessageRequest;
 import com.codagis.concorde.dto.MessageDtos.RollDiceRequest;
+import com.codagis.concorde.dto.MessageDtos.ToggleReactionRequest;
 import com.codagis.concorde.service.DiceService;
+import com.codagis.concorde.service.DisplayNameService;
 import com.codagis.concorde.service.MessageService;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -21,11 +24,14 @@ public class ChatController {
 
     private final MessageService messageService;
     private final DiceService diceService;
+    private final DisplayNameService displayNameService;
     private final SimpMessagingTemplate messagingTemplate;
 
-    public ChatController(MessageService messageService, DiceService diceService, SimpMessagingTemplate messagingTemplate) {
+    public ChatController(MessageService messageService, DiceService diceService, DisplayNameService displayNameService,
+                           SimpMessagingTemplate messagingTemplate) {
         this.messageService = messageService;
         this.diceService = diceService;
+        this.displayNameService = displayNameService;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -72,6 +78,39 @@ public class ChatController {
         } catch (RuntimeException e) {
             System.err.println("Falha ao apagar mensagem " + payload.messageId() + ": " + e.getMessage());
         }
+    }
+
+    @MessageMapping("/channel.{channelId}.react")
+    public void react(@DestinationVariable Long channelId, ToggleReactionRequest payload, Principal principal) {
+        Long userId = userId(principal);
+        try {
+            ChatMessage updated = messageService.toggleReaction(channelId, payload.messageId(), userId, payload.emoji());
+            broadcast(channelId, ChatEvent.updated(updated));
+        } catch (RuntimeException e) {
+            System.err.println("Falha ao reagir na mensagem " + payload.messageId() + ": " + e.getMessage());
+        }
+    }
+
+    @MessageMapping("/channel.{channelId}.pin")
+    public void pin(@DestinationVariable Long channelId, PinMessageRequest payload, Principal principal) {
+        Long requesterId = userId(principal);
+        try {
+            ChatMessage updated = messageService.setPinned(channelId, payload.messageId(), requesterId, payload.pinned());
+            broadcast(channelId, ChatEvent.updated(updated));
+        } catch (RuntimeException e) {
+            System.err.println("Falha ao fixar/desafixar mensagem " + payload.messageId() + ": " + e.getMessage());
+        }
+    }
+
+    public record TypingRequest(boolean typing) {}
+    public record TypingEvent(Long userId, String username, boolean typing) {}
+
+    @MessageMapping("/channel.{channelId}.typing")
+    public void typing(@DestinationVariable Long channelId, TypingRequest payload, Principal principal) {
+        Long userId = userId(principal);
+        String username = displayNameService.resolveForChannel(channelId, userId);
+        messagingTemplate.convertAndSend("/topic/channel." + channelId + ".typing",
+                new TypingEvent(userId, username, payload.typing()));
     }
 
     private Long userId(Principal principal) {

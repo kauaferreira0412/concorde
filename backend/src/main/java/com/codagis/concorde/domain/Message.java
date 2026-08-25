@@ -2,6 +2,7 @@ package com.codagis.concorde.domain;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
 
@@ -16,7 +17,10 @@ import java.time.Instant;
         @Index(name = "idx_messages_roll_notation", columnList = "rollNotation"),
         @Index(name = "idx_messages_roll_sides", columnList = "rollSides"),
         @Index(name = "idx_messages_roll_results_csv", columnList = "rollResultsCsv"),
-        @Index(name = "idx_messages_roll_total", columnList = "rollTotal")
+        @Index(name = "idx_messages_roll_total", columnList = "rollTotal"),
+        @Index(name = "idx_messages_pinned", columnList = "pinned"),
+        @Index(name = "idx_messages_pinned_at", columnList = "pinnedAt"),
+        @Index(name = "idx_messages_poll_id", columnList = "pollId")
 })
 @Getter
 @Setter
@@ -52,4 +56,13 @@ public class Message {
     private Integer rollSides;
     private String rollResultsCsv;
     private Integer rollTotal;
+
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean pinned = false;
+
+    private Instant pinnedAt;
+
+    private Long pollId;
 }
