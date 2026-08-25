@@ -2051,6 +2051,23 @@ h3.chat-heading {
   white-space: nowrap;
 }
 .screenshare-tile-pick-hint { font-size: 10.5px; color: var(--text-muted); }
+/* Substitui o <video> da sua PROPRIA transmissao quando o Concorde esta fora de foco (ver
+   previewPaused/useAppFocused em VoiceChannel.jsx) - economiza processamento nao desenhando
+   uma previa que ninguem esta olhando. Preenche o tile inteiro (mesmo espaco do video real). */
+.screenshare-preview-paused {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+  background: var(--bg-app);
+  color: var(--text-muted);
+  font-size: 12px;
+}
 /* Botao de "parar de assistir" no canto oposto ao de tela cheia (ver .camera-tile-maximize),
    mesmo estilo discreto-ate-o-hover. */
 .screenshare-tile-stop {

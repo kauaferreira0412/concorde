@@ -21,6 +21,7 @@ import { MemberRow } from "./MemberList.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
 import Avatar from "./Avatar.jsx";
 import { useTrackFps } from "../utils/useTrackFps";
+import { useAppFocused } from "../utils/useAppFocused";
 import CameraPipWindow from "./CameraPipWindow.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import SoundboardPanel from "./SoundboardPanel.jsx";
@@ -201,12 +202,20 @@ function ScreenShareTile({
   const watchersRef = useRef(null);
   const fps = useTrackFps(share.track);
 
+  // Previa da PROPRIA transmissao (isLocal) so' fica ligada enquanto o Concorde esta em foco -
+  // com o usuario mexendo em outro app/aba, ninguem esta olhando essa previa mesmo, entao
+  // desanexar o track evita o navegador continuar decodificando/desenhando esse video a toa
+  // (pedido explicito do usuario: economizar recurso de processamento). A transmissao em SI
+  // continua indo normal pra quem esta assistindo do outro lado - so' a previa local pausa.
+  const appFocused = useAppFocused();
+  const previewPaused = share.isLocal && !appFocused;
+
   useEffect(() => {
     const el = videoRef.current;
-    if (!el || !share.track) return;
+    if (!el || !share.track || previewPaused) return;
     share.track.attach(el);
     return () => share.track.detach(el);
-  }, [share.track]);
+  }, [share.track, previewPaused]);
 
   // Fecha o popover de "quem esta vendo" ao clicar em qualquer lugar fora dele - mesmo padrao
   // do menu de canal (ver ChannelSidebar.jsx).
@@ -253,7 +262,20 @@ function ScreenShareTile({
             }
       }
     >
-      <video ref={videoRef} autoPlay playsInline muted={share.isLocal} onDoubleClick={handleMaximize} />
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted={share.isLocal}
+        onDoubleClick={handleMaximize}
+        style={previewPaused ? { display: "none" } : undefined}
+      />
+      {previewPaused && (
+        <div className="screenshare-preview-paused">
+          <EyeOffIcon size={20} />
+          <span>Prévia pausada - você está fora do Concorde</span>
+        </div>
+      )}
       {!isFullscreen && (
         <>
           <span className="camera-tile-name">{share.name}</span>
