@@ -744,7 +744,48 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
   letter-spacing: -0.01em;
   border-bottom: 1px solid var(--border-soft);
   background: var(--bg-panel);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
+.chat-header-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-header-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+/* Painel deslizante de mensagens fixadas/busca (ver botoes no chat-header) - lista simples de
+   resultados clicaveis, cada um pula pra mensagem correspondente se ela estiver carregada. */
+.chat-side-panel {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-panel-2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.chat-side-panel-title { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
+.chat-side-panel-empty { margin: 4px 0; font-size: 13px; color: var(--text-muted); }
+.chat-side-panel-search {
+  width: 100%;
+  margin-bottom: 4px;
+}
+.chat-side-panel-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  text-align: left;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.chat-side-panel-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.chat-side-panel-item strong { color: var(--text-primary); font-weight: 600; flex-shrink: 0; }
+.chat-side-panel-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Canal "Atualizações" (so' admin posta, ver Channel.adminOnly) - faixa de destaque sutil no
    cabecalho, pra ficar claro de cara que e' um canal diferente dos outros. */
 .chat-header-announcements { border-bottom-color: rgba(47, 107, 255, 0.35); background: var(--accent-soft); }
@@ -947,6 +988,56 @@ h3.chat-heading {
 .dice-roll-notation { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
 .dice-roll-total { font-size: 22px; font-weight: 800; font-family: var(--font-display); color: var(--accent-text); }
 
+/* Card de enquete (ver /poll em ChatWindow.jsx / PollCard.jsx) - mesmo visual "elevado" do
+   dice-roll-card. Cada opcao e' um botao com uma barra de progresso proporcional aos votos
+   (largura em % do total) atras do texto - clique de novo tira o SEU voto (toggle). */
+.poll-card {
+  margin-top: 4px;
+  padding: 12px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+}
+.poll-card-question { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
+.poll-card-hint {
+  font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--text-muted); background: var(--bg-panel-2); padding: 2px 7px; border-radius: var(--radius-pill);
+}
+.poll-card-options { display: flex; flex-direction: column; gap: 6px; }
+.poll-card-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+}
+.poll-card-option:hover { border-color: var(--border); }
+.poll-card-option.voted { border-color: var(--accent); }
+.poll-card-option-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent-soft);
+  transition: width 0.2s ease;
+  z-index: 0;
+}
+.poll-card-option-check, .poll-card-option-text, .poll-card-option-votes { position: relative; z-index: 1; }
+.poll-card-option-check { width: 14px; flex-shrink: 0; color: var(--accent-text); display: flex; }
+.poll-card-option-text { flex: 1; font-size: 13.5px; color: var(--text-primary); }
+.poll-card-option-votes { font-size: 11.5px; color: var(--text-muted); flex-shrink: 0; }
+.poll-card-total { font-size: 11.5px; color: var(--text-muted); }
+
 /* Card ao vivo da fila de musica (ver /fila em ChatWindow.jsx / MusicQueueCard.jsx) - mesmo
    visual "elevado" do dice-roll-card, mas ocupa mais largura pra caber titulo + duracao +
    botao de remover numa linha por musica. */
@@ -1148,6 +1239,59 @@ h3.chat-heading {
 }
 .chat-replying-bar strong { color: var(--text-primary); }
 .chat-replying-bar .icon-btn { margin-left: auto; flex-shrink: 0; }
+
+/* Reacoes com emoji embaixo do conteudo da mensagem (ver ChatWindow.jsx/MessageReaction no
+   backend) - cada pill mostra o emoji + quantas pessoas reagiram, clicavel pra dar/tirar a
+   SUA reacao (toggle). ".mine" destaca quando voce e' uma delas. */
+.chat-reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.chat-reaction {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.chat-reaction:hover { background: var(--bg-hover); }
+.chat-reaction.mine { background: var(--accent-soft); border-color: var(--accent); }
+.chat-reaction-count { color: var(--text-muted); font-weight: 600; }
+.chat-reaction.mine .chat-reaction-count { color: var(--accent-text); }
+
+/* Picker rapido de emoji (botao de carinha nas acoes da mensagem) - lista curada pequena,
+   nao e' um picker de emoji completo de proposito (ver QUICK_REACTIONS em ChatWindow.jsx). */
+.chat-reaction-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 6px;
+  padding: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  width: fit-content;
+}
+.chat-reaction-picker button {
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  font-size: 17px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  line-height: 1;
+}
+.chat-reaction-picker button:hover { background: var(--bg-hover); }
+
+/* "Fulano esta digitando..." (ver ChatController.typing no backend) - abaixo da ultima
+   mensagem, some sozinho quando ninguem mais esta digitando (ver ChatWindow.jsx). */
+.chat-typing-indicator {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-muted);
+}
 
 /* Botoes de editar/apagar so aparecem ao passar o mouse na mensagem (padrao Discord/Slack) */
 .chat-message-actions {

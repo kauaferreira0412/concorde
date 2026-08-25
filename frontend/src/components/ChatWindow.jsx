@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/client";
-import { subscribeToChannel, sendChatMessage, editChatMessage, deleteChatMessage, rollDice } from "../ws/chatSocket";
+import {
+  subscribeToChannel,
+  sendChatMessage,
+  editChatMessage,
+  deleteChatMessage,
+  rollDice,
+  toggleReaction,
+  pinMessage,
+  publishTyping,
+  subscribeToTyping,
+  createPoll,
+} from "../ws/chatSocket";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useAlert } from "../context/AlertContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
@@ -13,7 +24,23 @@ import ConfirmModal from "./ConfirmModal.jsx";
 import ImageLightbox from "./ImageLightbox.jsx";
 import DiceRollCard from "./DiceRollCard.jsx";
 import MusicQueueCard from "./MusicQueueCard.jsx";
-import { CheckIcon, MegaphoneIcon, PencilIcon, PlusIcon, ReplyIcon, TrashIcon, XIcon } from "./icons.jsx";
+import PollCard from "./PollCard.jsx";
+import {
+  CheckIcon,
+  MegaphoneIcon,
+  PencilIcon,
+  PinIcon,
+  PlusIcon,
+  ReplyIcon,
+  SearchIcon,
+  SmileIcon,
+  TrashIcon,
+  XIcon,
+} from "./icons.jsx";
+
+// Emojis curados pra reacao rapida (ver toggleReaction) - lista pequena de proposito, cobre o
+// basico sem precisar de um picker de emoji completo.
+const QUICK_REACTIONS = ["👍", "😂", "❤️", "😮", "😢", "🎉", "🔥", "👀"];
 
 // /roll ou /r seguido de uma notacao de dado (ex: "/roll 2d20+5") - mesma notacao aceita pelo
 // backend (ver DiceService), checada aqui tambem so' pra dar um erro na hora em vez de a
@@ -46,6 +73,10 @@ const FILA_COMMAND_RE = /^\/fila(?:\s+(.+))?$/i;
 // sempre se um queueId diferente aparecer (ver MusicQueueCard.jsx).
 const MUSIC_QUEUE_MARKER_RE = /^\[\[MUSIC_QUEUE:(\d+):([^\]]+)\]\]$/;
 
+// /poll Pergunta | opção 1 | opção 2 | ... - enquete de escolha unica (ver PollController no
+// backend). /pollmulti e' igual, so' que permite votar em mais de uma opcao ao mesmo tempo.
+const POLL_COMMAND_RE = /^\/(poll|pollmulti)\s+(.+)$/i;
+
 // Autocomplete de "/" (ver getSlashMenuState).
 const SLASH_COMMANDS = [
   { name: "roll", description: "Rolar dados de RPG (ex: 2d20+5)" },
@@ -55,6 +86,8 @@ const SLASH_COMMANDS = [
   { name: "continue", description: "Continuar a música pausada" },
   { name: "skip", description: "Pular pra próxima música da fila" },
   { name: "stop", description: "Parar a música da sua call" },
+  { name: "poll", description: "Enquete (escolha única): pergunta | opção 1 | opção 2 ..." },
+  { name: "pollmulti", description: "Enquete (múltipla escolha): pergunta | opção 1 | opção 2 ..." },
 ];
 const DICE_SIDES = [4, 6, 8, 10, 12, 20, 100];
 
@@ -173,10 +206,21 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
   const [mentionIndex, setMentionIndex] = useState(0);
   const [slashIndex, setSlashIndex] = useState(0);
   const [slashDismissed, setSlashDismissed] = useState(false); // true = usuario fechou com Esc
+  const [reactionPickerFor, setReactionPickerFor] = useState(null); // id da mensagem com o picker de emoji aberto
+  const [myServerPermissions, setMyServerPermissions] = useState(new Set());
+  const [typingUsers, setTypingUsers] = useState(new Map()); // userId -> username, de quem esta digitando AGORA
+  const [showPinned, setShowPinned] = useState(false);
+  const [pinnedMessages, setPinnedMessages] = useState([]);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
   const draftInputRef = useRef(null);
   const messageRefs = useRef(new Map()); // messageId -> elemento na tela, pra "pular pra" no clique do reply
+  const typingTimersRef = useRef(new Map()); // userId -> timeout, pra sumir sozinho sem novo evento
+  const iAmTypingRef = useRef(false); // evita mandar "estou digitando" de novo a cada tecla
 
   const mentionMatches = useMemo(() => {
     if (mentionQuery === null) return [];
@@ -194,10 +238,37 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     setMessages([]);
     setEditingId(null);
     setReplyingTo(null);
+    setShowPinned(false);
+    setPinnedMessages([]);
+    setShowSearch(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setTypingUsers(new Map());
     clearPendingImage();
     api.get(`/api/channels/${channel.id}/messages`).then(({ data }) => setMessages(data));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel]);
+
+  // Permissoes do usuario NESSE servidor (ver ChannelSidebar.jsx, mesmo padrao) - so' usado
+  // aqui pra decidir quem ve o botao de fixar mensagem (exige MANAGE_CHANNELS no backend).
+  useEffect(() => {
+    if (!channel?.serverId) {
+      setMyServerPermissions(new Set());
+      return;
+    }
+    let cancelled = false;
+    api
+      .get(`/api/servers/${channel.serverId}/me/permissions`)
+      .then(({ data }) => {
+        if (!cancelled) setMyServerPermissions(new Set(data));
+      })
+      .catch(() => {
+        if (!cancelled) setMyServerPermissions(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [channel?.serverId]);
 
   useEffect(() => {
     if (!channel || !stompClient || !stompConnected) return;
@@ -211,6 +282,48 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       }
     });
     return () => sub.unsubscribe();
+  }, [channel, stompClient, stompConnected]);
+
+  // "Fulano esta digitando..." - o servidor so' retransmite (sem estado nenhum la', ver
+  // ChatController.typing no backend), entao quem decide quando SUMIR sozinho e' o cliente:
+  // cada evento "typing: true" reseta um timer de alguns segundos, e some se nenhum outro
+  // chegar antes dele estourar (cobre o caso de alguem fechar a aba/cair no meio digitando).
+  useEffect(() => {
+    if (!channel || !stompClient || !stompConnected) return;
+    const timers = typingTimersRef.current;
+    const sub = subscribeToTyping(stompClient, channel.id, (event) => {
+      if (event.userId === user?.id) return; // nao mostra "eu mesmo digitando" pra mim
+      clearTimeout(timers.get(event.userId));
+      if (event.typing) {
+        setTypingUsers((prev) => {
+          const next = new Map(prev);
+          next.set(event.userId, event.username);
+          return next;
+        });
+        timers.set(
+          event.userId,
+          setTimeout(() => {
+            setTypingUsers((prev) => {
+              const next = new Map(prev);
+              next.delete(event.userId);
+              return next;
+            });
+          }, 4000)
+        );
+      } else {
+        setTypingUsers((prev) => {
+          const next = new Map(prev);
+          next.delete(event.userId);
+          return next;
+        });
+      }
+    });
+    return () => {
+      sub.unsubscribe();
+      timers.forEach((t) => clearTimeout(t));
+      timers.clear();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel, stompClient, stompConnected]);
 
   useEffect(() => {
@@ -273,6 +386,16 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     setMentionIndex(0);
     setSlashIndex(0);
     setSlashDismissed(false);
+
+    if (!stompConnected) return;
+    const hasText = value.trim().length > 0;
+    if (hasText && !iAmTypingRef.current) {
+      iAmTypingRef.current = true;
+      publishTyping(stompClient, channel.id, true);
+    } else if (!hasText && iAmTypingRef.current) {
+      iAmTypingRef.current = false;
+      publishTyping(stompClient, channel.id, false);
+    }
   }
 
   function pickMention(username) {
@@ -358,6 +481,26 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     e.preventDefault();
     if (!stompConnected || sending) return;
     if (!draft.trim() && !pendingImage) return;
+
+    if (iAmTypingRef.current) {
+      iAmTypingRef.current = false;
+      publishTyping(stompClient, channel.id, false);
+    }
+
+    // /poll ou /pollmulti Pergunta | opção 1 | opção 2 ... - enquete no chat (ver PollController
+    // no backend). /pollmulti permite votar em mais de uma opção ao mesmo tempo.
+    const pollMatch = POLL_COMMAND_RE.exec(draft.trim());
+    if (pollMatch) {
+      const parts = pollMatch[2].split("|").map((p) => p.trim()).filter(Boolean);
+      const [question, ...options] = parts;
+      if (!question || options.length < 2) {
+        showAlert("Use: /poll Pergunta | opção 1 | opção 2 (pelo menos 2 opções, separadas por |)");
+        return;
+      }
+      createPoll(stompClient, channel.id, question, options, pollMatch[1].toLowerCase() === "pollmulti");
+      setDraft("");
+      return;
+    }
 
     // Comando /roll (ou /r) - "notação de mesa" (2d20+5, d6, 1d100-2) em vez de mandar uma
     // mensagem normal. Validado aqui tambem (nao so' no backend, ver DiceService) pra avisar
@@ -540,6 +683,57 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     setTimeout(() => el.classList.remove("chat-message-flash"), 1200);
   }
 
+  function handleToggleReaction(messageId, emoji) {
+    if (!stompConnected) return;
+    toggleReaction(stompClient, channel.id, messageId, emoji);
+    setReactionPickerFor(null);
+  }
+
+  const canPin = myServerPermissions.has("MANAGE_CHANNELS");
+
+  function handleTogglePin(m) {
+    if (!stompConnected) return;
+    pinMessage(stompClient, channel.id, m.id, !m.pinned);
+  }
+
+  function openPinned() {
+    setShowSearch(false);
+    setShowPinned((prev) => {
+      const next = !prev;
+      if (next) {
+        api.get(`/api/channels/${channel.id}/messages/pinned`).then(({ data }) => setPinnedMessages(data));
+      }
+      return next;
+    });
+  }
+
+  function openSearch() {
+    setShowPinned(false);
+    setShowSearch((prev) => !prev);
+  }
+
+  useEffect(() => {
+    if (!showSearch || !channel) return;
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    const handle = setTimeout(() => {
+      api
+        .get(`/api/channels/${channel.id}/messages/search`, { params: { q: searchQuery.trim() } })
+        .then(({ data }) => setSearchResults(data))
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [searchQuery, showSearch, channel]);
+
+  function jumpFromPanel(id) {
+    setShowPinned(false);
+    setShowSearch(false);
+    requestAnimationFrame(() => jumpToMessage(id));
+  }
+
   if (!channel) {
     return <div className="chat-window empty">Selecione um canal de texto</div>;
   }
@@ -547,8 +741,59 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
   return (
     <div className="chat-window">
       <div className={"chat-header" + (channel.adminOnly ? " chat-header-announcements" : "")}>
-        {channel.adminOnly ? <MegaphoneIcon size={15} className="chat-header-announcements-icon" /> : "#"} {channel.name}
+        <span className="chat-header-name">
+          {channel.adminOnly ? <MegaphoneIcon size={15} className="chat-header-announcements-icon" /> : "#"} {channel.name}
+        </span>
+        <div className="chat-header-actions">
+          <button type="button" className={"icon-btn" + (showPinned ? " icon-btn-active" : "")} onClick={openPinned} title="Mensagens fixadas">
+            <PinIcon size={16} />
+          </button>
+          <button type="button" className={"icon-btn" + (showSearch ? " icon-btn-active" : "")} onClick={openSearch} title="Buscar no histórico">
+            <SearchIcon size={16} />
+          </button>
+        </div>
       </div>
+
+      {showPinned && (
+        <div className="chat-side-panel">
+          <div className="chat-side-panel-title">Mensagens fixadas</div>
+          {pinnedMessages.length === 0 ? (
+            <p className="chat-side-panel-empty">Nenhuma mensagem fixada nesse canal ainda.</p>
+          ) : (
+            pinnedMessages.map((m) => (
+              <button type="button" key={m.id} className="chat-side-panel-item" onClick={() => jumpFromPanel(m.id)}>
+                <strong>{m.authorUsername}</strong>
+                <span>{m.content || (m.imageUrl ? "🖼️ Imagem" : "")}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
+      {showSearch && (
+        <div className="chat-side-panel">
+          <input
+            autoFocus
+            className="chat-side-panel-search"
+            placeholder="Buscar mensagens neste canal..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searching ? (
+            <p className="chat-side-panel-empty">Buscando...</p>
+          ) : searchQuery.trim() && searchResults.length === 0 ? (
+            <p className="chat-side-panel-empty">Nada encontrado.</p>
+          ) : (
+            searchResults.map((m) => (
+              <button type="button" key={m.id} className="chat-side-panel-item" onClick={() => jumpFromPanel(m.id)}>
+                <strong>{m.authorUsername}</strong>
+                <span>{m.content || (m.imageUrl ? "🖼️ Imagem" : "")}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
       {stompError ? (
         <div className="chat-status error">⚠️ {stompError}</div>
       ) : !stompConnected ? (
@@ -635,6 +880,8 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                       resultsCsv={m.rollResultsCsv}
                       total={m.rollTotal}
                     />
+                  ) : m.poll ? (
+                    <PollCard poll={m.poll} channelId={channel.id} myUserId={user?.id} stompClient={stompClient} stompConnected={stompConnected} />
                   ) : MUSIC_QUEUE_MARKER_RE.test(m.content || "") ? (
                     <MusicQueueCard
                       channelId={Number(MUSIC_QUEUE_MARKER_RE.exec(m.content)[1])}
@@ -656,21 +903,68 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                       <img src={m.imageUrl} alt="Imagem enviada no chat" className="chat-image" />
                     </button>
                   )}
+
+                  {m.reactions?.length > 0 && (
+                    <div className="chat-reactions">
+                      {m.reactions.map((r) => {
+                        const mine = user?.id != null && r.userIds.includes(user.id);
+                        return (
+                          <button
+                            type="button"
+                            key={r.emoji}
+                            className={"chat-reaction" + (mine ? " mine" : "")}
+                            onClick={() => handleToggleReaction(m.id, r.emoji)}
+                            title={mine ? "Tirar sua reação" : "Reagir"}
+                          >
+                            <span>{r.emoji}</span>
+                            <span className="chat-reaction-count">{r.userIds.length}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </>
+              )}
+
+              {editingId !== m.id && reactionPickerFor === m.id && (
+                <div className="chat-reaction-picker">
+                  {QUICK_REACTIONS.map((emoji) => (
+                    <button type="button" key={emoji} onClick={() => handleToggleReaction(m.id, emoji)}>
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
 
             {editingId !== m.id && (
               <div className="chat-message-actions">
+                <button
+                  className="icon-btn"
+                  onClick={() => setReactionPickerFor((prev) => (prev === m.id ? null : m.id))}
+                  title="Reagir"
+                >
+                  <SmileIcon size={15} />
+                </button>
                 <button className="icon-btn" onClick={() => startReply(m)} title="Responder">
                   <ReplyIcon size={15} />
                 </button>
+                {canPin && (
+                  <button
+                    className={"icon-btn" + (m.pinned ? " icon-btn-active" : "")}
+                    onClick={() => handleTogglePin(m)}
+                    title={m.pinned ? "Desafixar mensagem" : "Fixar mensagem"}
+                  >
+                    <PinIcon size={15} />
+                  </button>
+                )}
                 {canModify(m) && (
                   <>
-                    {/* Editar nao faz sentido numa rolagem de dado (resultado ja' sorteado) nem
-                        num card de fila (editar o marcador especial so' quebraria o card) -
-                        so' da pra apagar os dois (ver DiceRollCard/MusicQueueCard acima). */}
-                    {!m.rollNotation && !MUSIC_QUEUE_MARKER_RE.test(m.content || "") && (
+                    {/* Editar nao faz sentido numa rolagem de dado (resultado ja' sorteado), num
+                        card de fila (editar o marcador especial so' quebraria o card) nem numa
+                        enquete (opcoes ja' foram criadas) - so' da pra apagar os tres (ver
+                        DiceRollCard/MusicQueueCard/PollCard acima). */}
+                    {!m.rollNotation && !m.poll && !MUSIC_QUEUE_MARKER_RE.test(m.content || "") && (
                       <button className="icon-btn" onClick={() => startEdit(m)} title="Editar mensagem">
                         <PencilIcon size={15} />
                       </button>
@@ -684,6 +978,11 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
             )}
           </div>
         ))}
+        {typingUsers.size > 0 && (
+          <div className="chat-typing-indicator">
+            {[...typingUsers.values()].join(", ")} {typingUsers.size === 1 ? "está" : "estão"} digitando...
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -792,7 +1091,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                   ? "Adicionar legenda (opcional)..."
                   : sending
                   ? "Enviando..."
-                  : `Conversar em #${channel.name} (@ pra mencionar, **negrito**, *itálico*, /roll 2d20 pra rolar dado, /play pra tocar música, Ctrl+V cola imagem, Shift+Enter quebra linha)`
+                  : `Conversar em #${channel.name} (@ pra mencionar, **negrito**, *itálico*, /roll 2d20 pra rolar dado, /play pra tocar música, /poll pra enquete, Ctrl+V cola imagem, Shift+Enter quebra linha)`
               }
               disabled={!stompConnected || sending}
             />

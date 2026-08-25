@@ -54,6 +54,59 @@ export function rollDice(client, channelId, notation) {
   });
 }
 
+/** Liga/desliga a MINHA reacao com esse emoji nessa mensagem (toggle, ver MessageService.
+ *  toggleReaction no backend) - o resultado (reactions atualizadas) chega via o mesmo evento
+ *  UPDATED que edicao de texto usa, ver subscribeToChannel acima. */
+export function toggleReaction(client, channelId, messageId, emoji) {
+  client.publish({
+    destination: `/app/channel.${channelId}.react`,
+    body: JSON.stringify({ messageId, emoji }),
+  });
+}
+
+/** Fixa/desafixa uma mensagem no canal (exige permissao MANAGE_CHANNELS, ver MessageService.
+ *  setPinned) - tambem chega de volta via evento UPDATED. */
+export function pinMessage(client, channelId, messageId, pinned) {
+  client.publish({
+    destination: `/app/channel.${channelId}.pin`,
+    body: JSON.stringify({ messageId, pinned }),
+  });
+}
+
+/** "Fulano esta digitando..." - sem estado nenhum no servidor, so' retransmite (ver
+ *  ChatController.typing no backend); o proprio cliente decide quando parar de mostrar
+ *  (ver ChatWindow.jsx). */
+export function publishTyping(client, channelId, typing) {
+  client.publish({
+    destination: `/app/channel.${channelId}.typing`,
+    body: JSON.stringify({ typing }),
+  });
+}
+
+/** onEvent recebe { userId, username, typing }. */
+export function subscribeToTyping(client, channelId, onEvent) {
+  return client.subscribe(`/topic/channel.${channelId}.typing`, (frame) => {
+    onEvent(JSON.parse(frame.body));
+  });
+}
+
+/** Cria uma enquete nova (ver /poll em ChatWindow.jsx) - vira uma mensagem normal no chat
+ *  com o campo "poll" preenchido (ver PollController/PollService no backend). */
+export function createPoll(client, channelId, question, options, multipleChoice) {
+  client.publish({
+    destination: `/app/channel.${channelId}.poll.create`,
+    body: JSON.stringify({ question, options, multipleChoice }),
+  });
+}
+
+/** Vota (ou tira o voto, toggle) numa opcao de uma enquete existente. */
+export function votePoll(client, channelId, pollId, optionId) {
+  client.publish({
+    destination: `/app/channel.${channelId}.poll.vote`,
+    body: JSON.stringify({ pollId, optionId }),
+  });
+}
+
 /**
  * Presenca de canal de voz: "quem esta conectado agora" e' visivel para QUALQUER membro
  * do servidor (nao precisa ter entrado na call). Ja o indicador de "quem esta falando"

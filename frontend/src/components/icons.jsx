@@ -454,3 +454,42 @@ export function SkipForwardIcon(props) {
     </svg>
   );
 }
+
+export function PinIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <line x1="12" y1="17" x2="12" y2="22" />
+      <path d="M5 17h14l-1.5-2.5a3 3 0 0 1-.5-1.7V9a5 5 0 0 0-10 0v3.8a3 3 0 0 1-.5 1.7L5 17z" />
+    </svg>
+  );
+}
+
+export function SearchIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <circle cx="11" cy="11" r="7" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+export function SmileIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+      <line x1="9" y1="9" x2="9.01" y2="9" />
+      <line x1="15" y1="9" x2="15.01" y2="9" />
+    </svg>
+  );
+}
+
+export function BarChartIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <line x1="4" y1="20" x2="4" y2="12" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="20" y1="20" x2="20" y2="16" />
+    </svg>
+  );
+}
