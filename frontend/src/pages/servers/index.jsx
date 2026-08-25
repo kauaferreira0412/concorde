@@ -7,6 +7,7 @@ import CreateServerModal from "../../components/CreateServerModal.jsx";
 import CreateChannelModal from "../../components/CreateChannelModal.jsx";
 import EditServerModal from "../../components/EditServerModal.jsx";
 import ServerRolesModal from "../../components/ServerRolesModal.jsx";
+import AuditLogModal from "../../components/AuditLogModal.jsx";
 import SettingsModal from "../../components/SettingsModal.jsx";
 import PartyConfetti from "../../components/PartyConfetti.jsx";
 import { VoiceCallProvider } from "../../context/VoiceCallContext.jsx";
@@ -28,6 +29,8 @@ export default function ServerPage() {
     setEditingServer,
     rolesServer,
     setRolesServer,
+    auditLogServer,
+    setAuditLogServer,
     createChannelType,
     setCreateChannelType,
     showSettings,
@@ -44,6 +47,7 @@ export default function ServerPage() {
     openCreateChannel,
     handleCreateChannel,
     handleDeleteChannel,
+    handleMoveChannelCategory,
   } = useServersContainer();
 
   return (
@@ -66,6 +70,8 @@ export default function ServerPage() {
           onOpenSettings={() => setShowSettings(true)}
           onEditServer={setEditingServer}
           onOpenRoles={setRolesServer}
+          onOpenAuditLog={setAuditLogServer}
+          onMoveChannelCategory={handleMoveChannelCategory}
           stompClient={stompClient}
           stompConnected={stompConnected}
           user={user}
@@ -122,6 +128,7 @@ export default function ServerPage() {
           />
         )}
         {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+        {auditLogServer && <AuditLogModal server={auditLogServer} onClose={() => setAuditLogServer(null)} />}
       </div>
     </VoiceCallProvider>
   );

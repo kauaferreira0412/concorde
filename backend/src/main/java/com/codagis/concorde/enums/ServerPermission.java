@@ -8,5 +8,6 @@ public enum ServerPermission {
     MANAGE_CHANNELS,
     MANAGE_MEMBERS,
     MANAGE_ROLES,
-    MANAGE_SERVER
+    MANAGE_SERVER,
+    VIEW_AUDIT_LOG
 }

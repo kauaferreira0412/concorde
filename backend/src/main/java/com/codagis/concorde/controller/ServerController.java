@@ -1,9 +1,11 @@
 package com.codagis.concorde.controller;
 
 import com.codagis.concorde.enums.ServerPermission;
+import com.codagis.concorde.dto.AuditLogDtos.AuditLogEntryResponse;
 import com.codagis.concorde.dto.ServerDtos.*;
 import com.codagis.concorde.dto.ServerRoleDtos.*;
 import com.codagis.concorde.security.CurrentUser;
+import com.codagis.concorde.service.AuditLogService;
 import com.codagis.concorde.service.GcsService;
 import com.codagis.concorde.service.ServerService;
 import com.codagis.concorde.dto.VoiceDtos.VoiceParticipantInfo;
@@ -21,11 +23,14 @@ public class ServerController {
     private final ServerService serverService;
     private final CurrentUser currentUser;
     private final GcsService gcsService;
+    private final AuditLogService auditLogService;
 
-    public ServerController(ServerService serverService, CurrentUser currentUser, GcsService gcsService) {
+    public ServerController(ServerService serverService, CurrentUser currentUser, GcsService gcsService,
+                             AuditLogService auditLogService) {
         this.serverService = serverService;
         this.currentUser = currentUser;
         this.gcsService = gcsService;
+        this.auditLogService = auditLogService;
     }
 
     @GetMapping
@@ -127,5 +132,35 @@ public class ServerController {
     @PutMapping("/{serverId}/members/{userId}/roles")
     public void setMemberRoles(@PathVariable Long serverId, @PathVariable Long userId, @RequestBody SetMemberRolesRequest req) {
         serverService.setMemberRoles(currentUser.id(), serverId, userId, req.roleIds());
+    }
+
+    @GetMapping("/{serverId}/audit-log")
+    public List<AuditLogEntryResponse> auditLog(@PathVariable Long serverId) {
+        return auditLogService.list(serverId, currentUser.id());
+    }
+
+    @GetMapping("/{serverId}/categories")
+    public List<CategoryResponse> listCategories(@PathVariable Long serverId) {
+        return serverService.listCategories(serverId, currentUser.id());
+    }
+
+    @PostMapping("/{serverId}/categories")
+    public CategoryResponse createCategory(@PathVariable Long serverId, @Valid @RequestBody CreateCategoryRequest req) {
+        return serverService.createCategory(serverId, currentUser.id(), req);
+    }
+
+    @PutMapping("/{serverId}/categories/{categoryId}")
+    public CategoryResponse updateCategory(@PathVariable Long serverId, @PathVariable Long categoryId, @Valid @RequestBody UpdateCategoryRequest req) {
+        return serverService.updateCategory(serverId, currentUser.id(), categoryId, req);
+    }
+
+    @DeleteMapping("/{serverId}/categories/{categoryId}")
+    public void deleteCategory(@PathVariable Long serverId, @PathVariable Long categoryId) {
+        serverService.deleteCategory(serverId, currentUser.id(), categoryId);
+    }
+
+    @PutMapping("/{serverId}/channels/{channelId}/category")
+    public ChannelResponse moveChannelToCategory(@PathVariable Long serverId, @PathVariable Long channelId, @RequestBody MoveChannelRequest req) {
+        return serverService.moveChannelToCategory(serverId, currentUser.id(), channelId, req.categoryId());
     }
 }

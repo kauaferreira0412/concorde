@@ -568,6 +568,35 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .channel-category-header .channel-group-title { margin: 0; }
 .channel-category-header:first-child { margin-top: 0; }
 
+/* Subcabecalho de uma CATEGORIA (pasta) dentro de "CANAIS DE TEXTO"/"CANAIS DE VOZ" - mais
+   discreto que o cabecalho principal acima, so' um pouco recuado (ver ChannelSidebar.jsx
+   renderCategoryHeader). Botao direito abre renomear/excluir. */
+.channel-category-subheader {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 5px 6px 5px 4px;
+  margin: 6px 0 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+.channel-category-subheader:hover { background: var(--bg-hover); color: var(--text-secondary); }
+.channel-category-subheader .channel-group-title { margin: 0; font-size: 10.5px; }
+.channel-category-subheader svg { flex-shrink: 0; }
+
+/* Botao "+ categoria" no topo da lista de canais - mesmo estilo tracejado do "+ canal", mais
+   compacto (fica sozinho numa linha, nao um por tipo de canal). */
+.channel-item.category-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  margin: 0 0 8px;
+  padding: 5px 10px;
+}
+
 /* "Conectados agora" - expansivel, abaixo do nome do servidor */
 .connected-block {
   border-bottom: 1px solid var(--border-soft);
@@ -2491,6 +2520,23 @@ h3.chat-heading {
   gap: 14px;
 }
 .settings-content .settings-section-title:first-child { margin-top: 0; }
+
+/* Log de auditoria (ver AuditLogModal.jsx/AuditLogService no backend) - lista simples,
+   mais recente primeiro. */
+.audit-log-list { display: flex; flex-direction: column; gap: 2px; max-height: 55vh; overflow-y: auto; }
+.audit-log-entry {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+.audit-log-entry:last-child { border-bottom: none; }
+.audit-log-entry-text { color: var(--text-secondary); }
+.audit-log-entry-text strong { color: var(--text-primary); font-weight: 600; }
+.audit-log-entry-time { flex-shrink: 0; font-size: 11px; color: var(--text-muted); }
 .settings-modal .settings-actions {
   flex-shrink: 0;
   padding: 14px 22px;

@@ -484,6 +484,27 @@ export function SmileIcon(props) {
   );
 }
 
+export function FolderIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+    </svg>
+  );
+}
+
+export function ListIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <line x1="9" y1="6" x2="20" y2="6" />
+      <line x1="9" y1="12" x2="20" y2="12" />
+      <line x1="9" y1="18" x2="20" y2="18" />
+      <line x1="4" y1="6" x2="4.01" y2="6" />
+      <line x1="4" y1="12" x2="4.01" y2="12" />
+      <line x1="4" y1="18" x2="4.01" y2="18" />
+    </svg>
+  );
+}
+
 export function BarChartIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>

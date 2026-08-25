@@ -24,6 +24,7 @@ public class ServerService {
 
     private final ServerRepository serverRepository;
     private final ChannelRepository channelRepository;
+    private final ChannelCategoryRepository channelCategoryRepository;
     private final MembershipRepository membershipRepository;
     private final UserRepository userRepository;
     private final ServerRoleRepository serverRoleRepository;
@@ -32,14 +33,18 @@ public class ServerService {
     private final OnlinePresenceService presenceService;
     private final PermissionService permissionService;
     private final VoicePresenceService voicePresenceService;
+    private final AuditLogService auditLogService;
 
     public ServerService(ServerRepository serverRepository, ChannelRepository channelRepository,
+                          ChannelCategoryRepository channelCategoryRepository,
                           MembershipRepository membershipRepository, UserRepository userRepository,
                           ServerRoleRepository serverRoleRepository, MessageRepository messageRepository,
                           AdminGuard adminGuard, OnlinePresenceService presenceService,
-                          PermissionService permissionService, VoicePresenceService voicePresenceService) {
+                          PermissionService permissionService, VoicePresenceService voicePresenceService,
+                          AuditLogService auditLogService) {
         this.serverRepository = serverRepository;
         this.channelRepository = channelRepository;
+        this.channelCategoryRepository = channelCategoryRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
         this.serverRoleRepository = serverRoleRepository;
@@ -48,6 +53,7 @@ public class ServerService {
         this.presenceService = presenceService;
         this.permissionService = permissionService;
         this.voicePresenceService = voicePresenceService;
+        this.auditLogService = auditLogService;
     }
 
     public List<VoiceParticipantInfo> getVoicePresence(Long serverId, Long userId) {
@@ -146,8 +152,10 @@ public class ServerService {
         channelRepository.findByServerIdOrderByIdAsc(serverId)
                 .forEach(channel -> messageRepository.deleteByChannelId(channel.getId()));
         channelRepository.deleteByServerId(serverId);
+        channelCategoryRepository.deleteByServerId(serverId);
         serverRoleRepository.deleteByServerId(serverId);
         membershipRepository.deleteByServerId(serverId);
+        auditLogService.deleteAllForServer(serverId);
         serverRepository.deleteById(serverId);
     }
 
@@ -190,11 +198,18 @@ public class ServerService {
     public ChannelResponse createChannel(Long serverId, Long userId, CreateChannelRequest req) {
         assertMember(serverId, userId);
         permissionService.assertHas(serverId, userId, ServerPermission.MANAGE_CHANNELS);
+        Long categoryId = req.categoryId() != null ? requireCategoryOfServer(serverId, req.categoryId()).getId() : null;
+        int position = (int) channelRepository.findByServerIdOrderByIdAsc(serverId).stream()
+                .filter(c -> java.util.Objects.equals(c.getCategoryId(), categoryId))
+                .count();
         Channel channel = channelRepository.save(Channel.builder()
                 .serverId(serverId)
                 .name(req.name())
                 .type(req.type() == null ? ChannelType.TEXT : req.type())
+                .categoryId(categoryId)
+                .position(position)
                 .build());
+        auditLogService.log(serverId, userId, "CREATE_CHANNEL", null, "CHANNEL", channel.getId(), channel.getName());
         return toResponse(channel);
     }
 
@@ -209,6 +224,78 @@ public class ServerService {
         }
         messageRepository.deleteByChannelId(channelId);
         channelRepository.delete(channel);
+        auditLogService.log(serverId, userId, "DELETE_CHANNEL", null, "CHANNEL", channelId, channel.getName());
+    }
+
+    @Transactional
+    public ChannelResponse moveChannelToCategory(Long serverId, Long userId, Long channelId, Long categoryId) {
+        assertMember(serverId, userId);
+        permissionService.assertHas(serverId, userId, ServerPermission.MANAGE_CHANNELS);
+        Channel channel = channelRepository.findById(channelId)
+                .orElseThrow(() -> new IllegalArgumentException("Canal não encontrado"));
+        if (!channel.getServerId().equals(serverId)) {
+            throw new IllegalArgumentException("Canal não pertence a esse servidor");
+        }
+        Long validCategoryId = categoryId != null ? requireCategoryOfServer(serverId, categoryId).getId() : null;
+        channel.setCategoryId(validCategoryId);
+        channel.setPosition((int) channelRepository.findByServerIdOrderByIdAsc(serverId).stream()
+                .filter(c -> java.util.Objects.equals(c.getCategoryId(), validCategoryId) && !c.getId().equals(channelId))
+                .count());
+        return toResponse(channelRepository.save(channel));
+    }
+
+    public List<CategoryResponse> listCategories(Long serverId, Long userId) {
+        assertMember(serverId, userId);
+        return channelCategoryRepository.findByServerIdOrderByPositionAsc(serverId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional
+    public CategoryResponse createCategory(Long serverId, Long userId, CreateCategoryRequest req) {
+        assertMember(serverId, userId);
+        permissionService.assertHas(serverId, userId, ServerPermission.MANAGE_CHANNELS);
+        int position = channelCategoryRepository.findByServerIdOrderByPositionAsc(serverId).size();
+        ChannelCategory category = channelCategoryRepository.save(ChannelCategory.builder()
+                .serverId(serverId)
+                .name(req.name())
+                .position(position)
+                .build());
+        auditLogService.log(serverId, userId, "CREATE_CATEGORY", null, "CATEGORY", category.getId(), category.getName());
+        return toResponse(category);
+    }
+
+    @Transactional
+    public CategoryResponse updateCategory(Long serverId, Long userId, Long categoryId, UpdateCategoryRequest req) {
+        assertMember(serverId, userId);
+        permissionService.assertHas(serverId, userId, ServerPermission.MANAGE_CHANNELS);
+        ChannelCategory category = requireCategoryOfServer(serverId, categoryId);
+        category.setName(req.name());
+        return toResponse(channelCategoryRepository.save(category));
+    }
+
+    @Transactional
+    public void deleteCategory(Long serverId, Long userId, Long categoryId) {
+        assertMember(serverId, userId);
+        permissionService.assertHas(serverId, userId, ServerPermission.MANAGE_CHANNELS);
+        ChannelCategory category = requireCategoryOfServer(serverId, categoryId);
+        channelRepository.findByServerIdOrderByIdAsc(serverId).stream()
+                .filter(c -> categoryId.equals(c.getCategoryId()))
+                .forEach(c -> {
+                    c.setCategoryId(null);
+                    channelRepository.save(c);
+                });
+        channelCategoryRepository.delete(category);
+        auditLogService.log(serverId, userId, "DELETE_CATEGORY", null, "CATEGORY", categoryId, category.getName());
+    }
+
+    private ChannelCategory requireCategoryOfServer(Long serverId, Long categoryId) {
+        ChannelCategory category = channelCategoryRepository.findById(categoryId)
+                .orElseThrow(() -> new IllegalArgumentException("Categoria não encontrada"));
+        if (!category.getServerId().equals(serverId)) {
+            throw new IllegalArgumentException("Essa categoria não é desse servidor");
+        }
+        return category;
     }
 
     @Transactional
@@ -221,6 +308,7 @@ public class ServerService {
         }
         membershipRepository.findByServerIdAndUserId(serverId, targetUserId)
                 .ifPresent(membershipRepository::delete);
+        auditLogService.log(serverId, requesterId, "REMOVE_MEMBER", targetUserId, "MEMBER", targetUserId, null);
     }
 
     @Transactional
@@ -251,7 +339,9 @@ public class ServerService {
                 .color(blankToNull(req.color()))
                 .permissions(req.permissions() == null ? new HashSet<>() : new HashSet<>(req.permissions()))
                 .build();
-        return toResponse(serverRoleRepository.save(role));
+        ServerRole saved = serverRoleRepository.save(role);
+        auditLogService.log(serverId, requesterId, "CREATE_ROLE", null, "ROLE", saved.getId(), saved.getName());
+        return toResponse(saved);
     }
 
     @Transactional
@@ -261,7 +351,9 @@ public class ServerService {
         role.setName(req.name());
         role.setColor(blankToNull(req.color()));
         role.setPermissions(req.permissions() == null ? new HashSet<>() : new HashSet<>(req.permissions()));
-        return toResponse(serverRoleRepository.save(role));
+        ServerRole saved = serverRoleRepository.save(role);
+        auditLogService.log(serverId, requesterId, "UPDATE_ROLE", null, "ROLE", saved.getId(), saved.getName());
+        return toResponse(saved);
     }
 
     @Transactional
@@ -274,6 +366,7 @@ public class ServerService {
             }
         });
         serverRoleRepository.delete(role);
+        auditLogService.log(serverId, requesterId, "DELETE_ROLE", null, "ROLE", roleId, role.getName());
     }
 
     @Transactional
@@ -289,6 +382,8 @@ public class ServerService {
         filtered.retainAll(existingIdsOfServer);
         membership.setRoleIds(filtered);
         membershipRepository.save(membership);
+        auditLogService.log(serverId, requesterId, "SET_MEMBER_ROLES", targetUserId, "MEMBER", targetUserId,
+                filtered.size() + " perfil(is)");
     }
 
     private ServerRole requireRoleOfServer(Long serverId, Long roleId) {
@@ -309,6 +404,11 @@ public class ServerService {
     }
 
     private ChannelResponse toResponse(Channel channel) {
-        return new ChannelResponse(channel.getId(), channel.getServerId(), channel.getName(), channel.getType(), channel.isAdminOnly());
+        return new ChannelResponse(channel.getId(), channel.getServerId(), channel.getName(), channel.getType(),
+                channel.isAdminOnly(), channel.getCategoryId(), channel.getPosition());
+    }
+
+    private CategoryResponse toResponse(ChannelCategory category) {
+        return new CategoryResponse(category.getId(), category.getServerId(), category.getName(), category.getPosition());
     }
 }

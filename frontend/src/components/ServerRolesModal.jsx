@@ -15,6 +15,7 @@ const PERMISSIONS = [
   { value: "MANAGE_MEMBERS", label: "Gerenciar membros (remover do servidor, editar apelido)" },
   { value: "MANAGE_ROLES", label: "Gerenciar perfis (criar/editar/atribuir)" },
   { value: "MANAGE_SERVER", label: "Editar dados do servidor (nome, ícone, descrição)" },
+  { value: "VIEW_AUDIT_LOG", label: "Ver o log de auditoria (quem fez o quê)" },
 ];
 
 /** Formulario de criar/editar um Perfil - nome + quais permissoes ele carrega. */

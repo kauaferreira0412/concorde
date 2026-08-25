@@ -15,6 +15,7 @@ export function useServersContainer() {
   const [showCreateServer, setShowCreateServer] = useState(false);
   const [editingServer, setEditingServer] = useState(null);
   const [rolesServer, setRolesServer] = useState(null);
+  const [auditLogServer, setAuditLogServer] = useState(null);
   const [createChannelType, setCreateChannelType] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [stompClient, setStompClient] = useState(null);
@@ -114,6 +115,11 @@ export function useServersContainer() {
     });
   }
 
+  async function handleMoveChannelCategory(channelId, categoryId) {
+    const { data } = await api.put(`/api/servers/${selectedServerId}/channels/${channelId}/category`, { categoryId });
+    setChannels((prev) => prev.map((c) => (c.id === channelId ? data : c)));
+  }
+
   return {
     user,
     logout,
@@ -128,6 +134,8 @@ export function useServersContainer() {
     setEditingServer,
     rolesServer,
     setRolesServer,
+    auditLogServer,
+    setAuditLogServer,
     createChannelType,
     setCreateChannelType,
     showSettings,
@@ -144,5 +152,6 @@ export function useServersContainer() {
     openCreateChannel,
     handleCreateChannel,
     handleDeleteChannel,
+    handleMoveChannelCategory,
   };
 }

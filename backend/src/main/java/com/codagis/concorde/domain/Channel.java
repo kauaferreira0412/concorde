@@ -13,7 +13,9 @@ import java.time.Instant;
         @Index(name = "idx_channels_name", columnList = "name"),
         @Index(name = "idx_channels_type", columnList = "type"),
         @Index(name = "idx_channels_admin_only", columnList = "adminOnly"),
-        @Index(name = "idx_channels_created_at", columnList = "createdAt")
+        @Index(name = "idx_channels_created_at", columnList = "createdAt"),
+        @Index(name = "idx_channels_category_id", columnList = "categoryId"),
+        @Index(name = "idx_channels_position", columnList = "position")
 })
 @Getter
 @Setter
@@ -43,4 +45,11 @@ public class Channel {
 
     @Builder.Default
     private Instant createdAt = Instant.now();
+
+    private Long categoryId;
+
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    @Builder.Default
+    private int position = 0;
 }

@@ -12,16 +12,19 @@ import {
   CameraOffIcon,
   ChevronsLeftIcon,
   ChevronsRightIcon,
+  FolderIcon,
   HangUpIcon,
   HashIcon,
   HeadphonesIcon,
   HeadphonesOffIcon,
+  ListIcon,
   LogOutIcon,
   MegaphoneIcon,
   MicIcon,
   MicOffIcon,
   PencilIcon,
   PhoneOffIcon,
+  PlusIcon,
   ScreenShareIcon,
   SettingsIcon,
   ShieldIcon,
@@ -31,6 +34,7 @@ import {
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
+import CategoryModal from "./CategoryModal.jsx";
 
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", INVISIBLE: "offline" };
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", INVISIBLE: "Invisível" };
@@ -45,6 +49,8 @@ export default function ChannelSidebar({
   onOpenSettings,
   onEditServer,
   onOpenRoles,
+  onOpenAuditLog,
+  onMoveChannelCategory,
   stompClient,
   stompConnected,
   user,
@@ -107,6 +113,16 @@ export default function ChannelSidebar({
   const channelMenuRef = useRef(null);
   const [deletingChannel, setDeletingChannel] = useState(null); // canal com o ConfirmModal aberto
   const [myServerPermissions, setMyServerPermissions] = useState(new Set());
+  // Categorias (pastas de canal, ver ChannelCategory no backend) - carregadas e geridas aqui
+  // mesmo (mesmo padrao de myServerPermissions acima), sem passar pelo Container.jsx.
+  const [categories, setCategories] = useState([]);
+  const [collapsedCategories, setCollapsedCategories] = useState(new Set());
+  const [categoryMenu, setCategoryMenu] = useState(null); // { id, name, x, y }
+  const categoryMenuRef = useRef(null);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null); // { id, name } | null
+  const [deletingCategory, setDeletingCategory] = useState(null);
+  const [movingChannel, setMovingChannel] = useState(false); // abre o submenu "Mover para categoria" no channelMenu
   // Criar/apagar canal (ver "+ canal de texto/voz" mais abaixo e o menu de botao direito em
   // cada canal) - mesma permissao MANAGE_CHANNELS pros dois, pode ser concedida pra qualquer
   // membro via Perfis (ver ServerRolesModal.jsx), nao e' so' o admin/dono.
@@ -142,6 +158,95 @@ export default function ChannelSidebar({
   }, [server?.id]);
 
   useEffect(() => {
+    if (!server?.id) {
+      setCategories([]);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get(`/api/servers/${server.id}/categories`)
+      .then(({ data }) => {
+        if (!cancelled) setCategories(data);
+      })
+      .catch(() => {
+        if (!cancelled) setCategories([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [server?.id]);
+
+  useEffect(() => {
+    if (!categoryMenu) return;
+    function handlePointerDown(e) {
+      if (categoryMenuRef.current && !categoryMenuRef.current.contains(e.target)) setCategoryMenu(null);
+    }
+    function handleKeyDown(e) {
+      if (e.key === "Escape") setCategoryMenu(null);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [categoryMenu]);
+
+  function toggleCategoryCollapsed(categoryId) {
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
+      return next;
+    });
+  }
+
+  async function handleSaveCategory(name) {
+    if (editingCategory) {
+      const { data } = await api.put(`/api/servers/${server.id}/categories/${editingCategory.id}`, { name });
+      setCategories((prev) => prev.map((c) => (c.id === data.id ? data : c)));
+      setEditingCategory(null);
+    } else {
+      const { data } = await api.post(`/api/servers/${server.id}/categories`, { name });
+      setCategories((prev) => [...prev, data]);
+      setCreatingCategory(false);
+    }
+  }
+
+  async function handleConfirmDeleteCategory(category) {
+    try {
+      await api.delete(`/api/servers/${server.id}/categories/${category.id}`);
+      setCategories((prev) => prev.filter((c) => c.id !== category.id));
+    } catch (err) {
+      showAlert(err.response?.data?.error || "Não foi possível excluir essa categoria");
+    }
+  }
+
+  /** Agrupa uma lista de canais (so' texto OU so' voz) por categoria - "sem categoria" vem
+   *  primeiro (e so' aparece se tiver algum canal ali, pra nao mudar nada visualmente nos
+   *  servidores que ainda nao usam categoria nenhuma), o resto na ordem das categorias. */
+  function groupByCategory(list) {
+    const byCategory = new Map();
+    const uncategorized = [];
+    list.forEach((c) => {
+      if (c.categoryId == null) {
+        uncategorized.push(c);
+      } else {
+        if (!byCategory.has(c.categoryId)) byCategory.set(c.categoryId, []);
+        byCategory.get(c.categoryId).push(c);
+      }
+    });
+    const groups = [];
+    if (uncategorized.length > 0) {
+      groups.push({ category: null, channels: uncategorized.sort((a, b) => a.position - b.position) });
+    }
+    categories.forEach((cat) => {
+      groups.push({ category: cat, channels: (byCategory.get(cat.id) || []).sort((a, b) => a.position - b.position) });
+    });
+    return groups;
+  }
+
+  useEffect(() => {
     if (!participantMenu) return;
     function handlePointerDown(e) {
       if (participantMenuRef.current && !participantMenuRef.current.contains(e.target)) setParticipantMenu(null);
@@ -158,6 +263,7 @@ export default function ChannelSidebar({
   }, [participantMenu]);
 
   useEffect(() => {
+    setMovingChannel(false);
     if (!channelMenu) return;
     function handlePointerDown(e) {
       if (channelMenuRef.current && !channelMenuRef.current.contains(e.target)) setChannelMenu(null);
@@ -264,6 +370,156 @@ export default function ChannelSidebar({
     }
   }, [participants, participantMenu, presenceByChannel]);
 
+  /** Um botao de canal de TEXTO - extraido pra funcao pra poder ser chamado tanto solto
+   *  (canais sem categoria) quanto dentro de um grupo de categoria, sem duplicar o JSX. */
+  function renderTextChannel(c) {
+    return (
+      <button
+        key={c.id}
+        className={"channel-item" + (c.id === selectedChannelId ? " active" : "")}
+        onClick={() => onSelectChannel(c)}
+        onContextMenu={(e) => {
+          if (!canManageChannels) return;
+          e.preventDefault();
+          setChannelMenu({ id: c.id, name: c.name, x: e.clientX, y: e.clientY });
+        }}
+      >
+        {c.adminOnly ? (
+          <MegaphoneIcon size={16} className="channel-item-icon" />
+        ) : (
+          <HashIcon size={16} className="channel-item-icon" />
+        )}
+        {c.name}
+        {(mentionedChannels[c.id] || unreadCounts[c.id] > 0) && (
+          <span className="channel-item-badges">
+            {mentionedChannels[c.id] && (
+              <span className="channel-mention-badge" title="Você foi mencionado aqui">
+                @
+              </span>
+            )}
+            {unreadCounts[c.id] > 0 && (
+              <span className="channel-unread-badge">{unreadCounts[c.id] > 99 ? "99+" : unreadCounts[c.id]}</span>
+            )}
+          </span>
+        )}
+      </button>
+    );
+  }
+
+  /** Um bloco de canal de VOZ (botao + lista de "quem esta conectado" aninhada) - mesma logica
+   *  de antes, so' extraida pra funcao pelo mesmo motivo do renderTextChannel acima. */
+  function renderVoiceChannel(c) {
+    return (
+      <div key={c.id}>
+        <button
+          className={
+            "channel-item" +
+            (c.id === selectedChannelId ? " active" : "") +
+            (activeChannel?.id === c.id ? " connected-active" : "") +
+            (dragOverChannelId === c.id ? " drop-target" : "")
+          }
+          onClick={() => onSelectChannel(c)}
+          onContextMenu={(e) => {
+            if (!canManageChannels) return;
+            e.preventDefault();
+            setChannelMenu({ id: c.id, name: c.name, x: e.clientX, y: e.clientY });
+          }}
+          onDragOver={(e) => {
+            if (!canMove || !draggingParticipant || draggingParticipant.channelId === c.id) return;
+            e.preventDefault();
+            setDragOverChannelId(c.id);
+          }}
+          onDragLeave={() => setDragOverChannelId((prev) => (prev === c.id ? null : prev))}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOverChannelId(null);
+            if (!canMove || !draggingParticipant || draggingParticipant.channelId === c.id) return;
+            moveParticipant(draggingParticipant.channelId, draggingParticipant.userId, c.id);
+          }}
+        >
+          <VolumeIcon size={16} className="channel-item-icon" />
+          {c.name}
+          {activeChannel?.id === c.id && <span className="channel-item-live">CONECTADO</span>}
+        </button>
+        {(presenceByChannel[c.id] || []).length > 0 && (
+          <div className="channel-voice-participants">
+            {presenceByChannel[c.id].map((p) => {
+              const identity = p.userId < 0 ? `musicbot-${c.id}` : `user-${p.userId}`;
+              const isMe = p.userId === user?.id;
+              const canAdjustVolume = activeChannel?.id === c.id && !isMe;
+              const canModerate = !isMe && hasAnyModPermission;
+              return (
+                <div
+                  key={p.userId}
+                  className="channel-voice-participant"
+                  draggable={canMove && !isMe}
+                  onDragStart={() => setDraggingParticipant({ channelId: c.id, userId: p.userId })}
+                  onDragEnd={() => setDraggingParticipant(null)}
+                  onContextMenu={(e) => {
+                    if (!canAdjustVolume && !canModerate) return;
+                    e.preventDefault();
+                    api.get(`/api/channels/${c.id}/voice-presence`).then(({ data }) => {
+                      setPresenceByChannel((prev) => ({ ...prev, [c.id]: data }));
+                    });
+                    setParticipantMenu({
+                      channelId: c.id,
+                      userId: p.userId,
+                      identity,
+                      username: p.username,
+                      x: e.clientX,
+                      y: e.clientY,
+                    });
+                  }}
+                  title={
+                    canAdjustVolume || canModerate
+                      ? "Clique com o botão direito pra ver as opções"
+                      : canMove && !isMe
+                      ? "Arraste pra outro canal de voz pra mover"
+                      : undefined
+                  }
+                >
+                  <Avatar
+                    name={p.username}
+                    url={p.avatarUrl}
+                    className={"voice-avatar" + (speakingIds.has(identity) ? " speaking" : "")}
+                  />
+                  <span>{p.username}</span>
+                  {p.deafened ? (
+                    <HeadphonesOffIcon size={12} className="voice-status-icon" />
+                  ) : (
+                    !p.micEnabled && <MicOffIcon size={12} className="voice-status-icon danger" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  /** Cabecalho de uma categoria dentro de uma secao (texto OU voz) - clique recolhe/expande,
+   *  botao direito abre o menu de renomear/excluir (so' pra quem tem MANAGE_CHANNELS). */
+  function renderCategoryHeader(category) {
+    const isCollapsed = collapsedCategories.has(category.id);
+    return (
+      <button
+        key={`cat-${category.id}`}
+        className="channel-category-subheader"
+        onClick={() => toggleCategoryCollapsed(category.id)}
+        onContextMenu={(e) => {
+          if (!canManageChannels) return;
+          e.preventDefault();
+          setCategoryMenu({ id: category.id, name: category.name, x: e.clientX, y: e.clientY });
+        }}
+      >
+        <span className={"connected-chevron" + (!isCollapsed ? " open" : "")}>▸</span>
+        <FolderIcon size={13} />
+        <span className="channel-group-title">{category.name.toUpperCase()}</span>
+      </button>
+    );
+  }
+
   return (
     <div className={"channel-sidebar" + (collapsed ? " collapsed" : "")}>
       <div className="channel-sidebar-header">
@@ -278,6 +534,11 @@ export default function ChannelSidebar({
           </div>
         )}
         <div className="channel-sidebar-header-actions">
+          {!collapsed && server && (isAdmin || myServerPermissions.has("VIEW_AUDIT_LOG")) && (
+            <button className="icon-btn" onClick={() => onOpenAuditLog(server)} title="Log de auditoria">
+              <ListIcon size={15} />
+            </button>
+          )}
           {!collapsed && server && (isAdmin || myServerPermissions.has("MANAGE_ROLES")) && (
             <button className="icon-btn" onClick={() => onOpenRoles(server)} title="Perfis e permissões">
               <ShieldIcon size={15} />
@@ -336,42 +597,23 @@ export default function ChannelSidebar({
           </p>
         ) : (
           <>
+            {canManageChannels && (
+              <button className="channel-item add category-add" onClick={() => setCreatingCategory(true)}>
+                <PlusIcon size={13} /> categoria
+              </button>
+            )}
+
             <button className="channel-category-header" onClick={() => setTextExpanded((v) => !v)}>
               <span className={"connected-chevron" + (textExpanded ? " open" : "")}>▸</span>
               <span className="channel-group-title">CANAIS DE TEXTO</span>
             </button>
             {textExpanded && (
               <>
-                {textChannels.map((c) => (
-                  <button
-                    key={c.id}
-                    className={"channel-item" + (c.id === selectedChannelId ? " active" : "")}
-                    onClick={() => onSelectChannel(c)}
-                    onContextMenu={(e) => {
-                      if (!canManageChannels) return;
-                      e.preventDefault();
-                      setChannelMenu({ id: c.id, name: c.name, x: e.clientX, y: e.clientY });
-                    }}
-                  >
-                    {c.adminOnly ? (
-                      <MegaphoneIcon size={16} className="channel-item-icon" />
-                    ) : (
-                      <HashIcon size={16} className="channel-item-icon" />
-                    )}
-                    {c.name}
-                    {(mentionedChannels[c.id] || unreadCounts[c.id] > 0) && (
-                      <span className="channel-item-badges">
-                        {mentionedChannels[c.id] && (
-                          <span className="channel-mention-badge" title="Você foi mencionado aqui">
-                            @
-                          </span>
-                        )}
-                        {unreadCounts[c.id] > 0 && (
-                          <span className="channel-unread-badge">{unreadCounts[c.id] > 99 ? "99+" : unreadCounts[c.id]}</span>
-                        )}
-                      </span>
-                    )}
-                  </button>
+                {groupByCategory(textChannels).map((group) => (
+                  <div key={group.category?.id ?? "none"}>
+                    {group.category && renderCategoryHeader(group.category)}
+                    {!collapsedCategories.has(group.category?.id) && group.channels.map(renderTextChannel)}
+                  </div>
                 ))}
                 {canManageChannels && (
                   <button className="channel-item add" onClick={() => onCreateChannel("TEXT")}>
@@ -387,118 +629,10 @@ export default function ChannelSidebar({
             </button>
             {voiceExpanded && (
               <>
-                {voiceChannels.map((c) => (
-                  <div key={c.id}>
-                    <button
-                      className={
-                        "channel-item" +
-                        (c.id === selectedChannelId ? " active" : "") +
-                        (activeChannel?.id === c.id ? " connected-active" : "") +
-                        (dragOverChannelId === c.id ? " drop-target" : "")
-                      }
-                      onClick={() => onSelectChannel(c)}
-                      onContextMenu={(e) => {
-                        if (!canManageChannels) return;
-                        e.preventDefault();
-                        setChannelMenu({ id: c.id, name: c.name, x: e.clientX, y: e.clientY });
-                      }}
-                      // Arrastar alguem da lista de "quem esta na call" (abaixo) e soltar aqui
-                      // move essa pessoa pra este canal - so' aceita o drop se voce tiver
-                      // permissao de mover gente (ver canMove/handleDropMove).
-                      onDragOver={(e) => {
-                        if (!canMove || !draggingParticipant || draggingParticipant.channelId === c.id) return;
-                        e.preventDefault();
-                        setDragOverChannelId(c.id);
-                      }}
-                      onDragLeave={() => setDragOverChannelId((prev) => (prev === c.id ? null : prev))}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        setDragOverChannelId(null);
-                        if (!canMove || !draggingParticipant || draggingParticipant.channelId === c.id) return;
-                        moveParticipant(draggingParticipant.channelId, draggingParticipant.userId, c.id);
-                      }}
-                    >
-                      <VolumeIcon size={16} className="channel-item-icon" />
-                      {c.name}
-                      {activeChannel?.id === c.id && <span className="channel-item-live">CONECTADO</span>}
-                    </button>
-                    {(presenceByChannel[c.id] || []).length > 0 && (
-                      <div className="channel-voice-participants">
-                        {presenceByChannel[c.id].map((p) => {
-                          // Bot de musica (userId sintetico NEGATIVO, ver VoicePresenceService.
-                          // joinBot) publica no LiveKit com a identidade "musicbot-{channelId}",
-                          // NAO "user-{id}" como todo mundo - sem esse caso especial, o slider de
-                          // volume nunca encontrava o participante de verdade (canAdjustVolume
-                          // sempre false) e o Melodion nao podia ser ajustado como os outros.
-                          const identity = p.userId < 0 ? `musicbot-${c.id}` : `user-${p.userId}`;
-                          const isMe = p.userId === user?.id;
-                          // Volume so' da pra ajustar de dentro da MESMA call (e' o LiveKit
-                          // que controla isso) e nunca pra voce mesmo. Moderacao funciona sem
-                          // voce estar na call, so' precisa de permissao - nunca em voce mesmo.
-                          const canAdjustVolume = activeChannel?.id === c.id && !isMe;
-                          const canModerate = !isMe && hasAnyModPermission;
-                          return (
-                            <div
-                              key={p.userId}
-                              className="channel-voice-participant"
-                              draggable={canMove && !isMe}
-                              onDragStart={() => setDraggingParticipant({ channelId: c.id, userId: p.userId })}
-                              onDragEnd={() => setDraggingParticipant(null)}
-                              onContextMenu={(e) => {
-                                if (!canAdjustVolume && !canModerate) return;
-                                e.preventDefault();
-                                // Busca o snapshot de verdade NA HORA que o menu abre - o
-                                // broadcast em tempo real (STOMP) as vezes fica ate' 12s
-                                // desatualizado pra um cliente especifico (ver poll de reforco
-                                // logo acima, useEffect com refetchAll), o que fazia um segundo
-                                // moderador achar que a pessoa NAO estava mutada (rotulo errado
-                                // "Mutar" em vez de "Desmutar") e clicar em "Mutar" de novo em
-                                // vez de liberar - reportado como "outro moderador nao consegue
-                                // desmutar". Um GET direto aqui elimina essa espera.
-                                api.get(`/api/channels/${c.id}/voice-presence`).then(({ data }) => {
-                                  setPresenceByChannel((prev) => ({ ...prev, [c.id]: data }));
-                                });
-                                // So' guarda a "localizacao" (quem/onde/posicao do clique) - NAO guarda
-                                // forceMuted/forceDeafened aqui: isso e' lido AO VIVO de
-                                // presenceByChannel na hora de renderizar (ver mais abaixo), senao
-                                // o menu ficava com o rotulo "Mutar"/"Desmutar" desatualizado assim
-                                // que o estado mudava (inclusive pela sua propria acao no menu).
-                                setParticipantMenu({
-                                  channelId: c.id,
-                                  userId: p.userId,
-                                  identity,
-                                  username: p.username,
-                                  x: e.clientX,
-                                  y: e.clientY,
-                                });
-                              }}
-                              title={
-                                canAdjustVolume || canModerate
-                                  ? "Clique com o botão direito pra ver as opções"
-                                  : canMove && !isMe
-                                  ? "Arraste pra outro canal de voz pra mover"
-                                  : undefined
-                              }
-                            >
-                              <Avatar
-                                name={p.username}
-                                url={p.avatarUrl}
-                                // O anel so' acende pra quem esta REALMENTE falando agora - so' da pra
-                                // saber disso de dentro da call (ver speakingIds no VoiceCallContext),
-                                // entao so' aparece no canal em que voce mesmo esta conectado.
-                                className={"voice-avatar" + (speakingIds.has(identity) ? " speaking" : "")}
-                              />
-                              <span>{p.username}</span>
-                              {p.deafened ? (
-                                <HeadphonesOffIcon size={12} className="voice-status-icon" />
-                              ) : (
-                                !p.micEnabled && <MicOffIcon size={12} className="voice-status-icon danger" />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                {groupByCategory(voiceChannels).map((group) => (
+                  <div key={group.category?.id ?? "none"}>
+                    {group.category && renderCategoryHeader(group.category)}
+                    {!collapsedCategories.has(group.category?.id) && group.channels.map(renderVoiceChannel)}
                   </div>
                 ))}
                 {canManageChannels && (
@@ -607,6 +741,41 @@ export default function ChannelSidebar({
         >
           <p className="volume-popover-title">#{channelMenu.name}</p>
           <div className="participant-mod-actions">
+            {categories.length > 0 && !movingChannel && (
+              <button type="button" className="participant-mod-btn" onClick={() => setMovingChannel(true)}>
+                <FolderIcon size={14} /> Mover para categoria
+              </button>
+            )}
+            {movingChannel && (
+              <>
+                <p className="participant-mod-submenu-label">Mover para</p>
+                <button
+                  type="button"
+                  className="participant-mod-btn"
+                  onClick={() => {
+                    onMoveChannelCategory(channelMenu.id, null);
+                    setChannelMenu(null);
+                    setMovingChannel(false);
+                  }}
+                >
+                  Sem categoria
+                </button>
+                {categories.map((cat) => (
+                  <button
+                    type="button"
+                    key={cat.id}
+                    className="participant-mod-btn"
+                    onClick={() => {
+                      onMoveChannelCategory(channelMenu.id, cat.id);
+                      setChannelMenu(null);
+                      setMovingChannel(false);
+                    }}
+                  >
+                    <FolderIcon size={14} /> {cat.name}
+                  </button>
+                ))}
+              </>
+            )}
             <button
               type="button"
               className="participant-mod-btn danger"
@@ -619,6 +788,63 @@ export default function ChannelSidebar({
             </button>
           </div>
         </div>
+      )}
+
+      {categoryMenu && (
+        <div
+          className="volume-popover"
+          ref={categoryMenuRef}
+          style={{
+            left: Math.min(categoryMenu.x, window.innerWidth - 200),
+            top: Math.min(categoryMenu.y, window.innerHeight - 70),
+          }}
+        >
+          <p className="volume-popover-title">{categoryMenu.name}</p>
+          <div className="participant-mod-actions">
+            <button
+              type="button"
+              className="participant-mod-btn"
+              onClick={() => {
+                setEditingCategory(categoryMenu);
+                setCategoryMenu(null);
+              }}
+            >
+              <PencilIcon size={14} /> Renomear
+            </button>
+            <button
+              type="button"
+              className="participant-mod-btn danger"
+              onClick={() => {
+                setDeletingCategory(categoryMenu);
+                setCategoryMenu(null);
+              }}
+            >
+              <TrashIcon size={14} /> Excluir categoria
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(creatingCategory || editingCategory) && (
+        <CategoryModal
+          initialName={editingCategory?.name}
+          onClose={() => {
+            setCreatingCategory(false);
+            setEditingCategory(null);
+          }}
+          onSave={handleSaveCategory}
+        />
+      )}
+
+      {deletingCategory && (
+        <ConfirmModal
+          title="Excluir categoria"
+          message={`Tem certeza que quer excluir a categoria "${deletingCategory.name}"? Os canais dela não são apagados, so' ficam sem categoria.`}
+          confirmLabel="Excluir"
+          danger
+          onClose={() => setDeletingCategory(null)}
+          onConfirm={() => handleConfirmDeleteCategory(deletingCategory)}
+        />
       )}
 
       {deletingChannel && (

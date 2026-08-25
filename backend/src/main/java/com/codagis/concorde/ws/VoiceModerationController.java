@@ -6,6 +6,7 @@ import com.codagis.concorde.enums.ServerPermission;
 import com.codagis.concorde.dto.VoiceDtos.VoiceControlEvent;
 import com.codagis.concorde.repository.ChannelRepository;
 import com.codagis.concorde.repository.MembershipRepository;
+import com.codagis.concorde.service.AuditLogService;
 import com.codagis.concorde.service.LiveKitService;
 import com.codagis.concorde.service.PermissionService;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,12 +31,14 @@ public class VoiceModerationController {
     private final VoicePresenceService presenceService;
     private final SimpMessagingTemplate messagingTemplate;
     private final LiveKitService liveKitService;
+    private final AuditLogService auditLogService;
     private final String musicBotUrl;
     private final RestTemplate restTemplate = new RestTemplate();
 
     public VoiceModerationController(ChannelRepository channelRepository, MembershipRepository membershipRepository,
                                       PermissionService permissionService, VoicePresenceService presenceService,
                                       SimpMessagingTemplate messagingTemplate, LiveKitService liveKitService,
+                                      AuditLogService auditLogService,
                                       @Value("${app.music-bot.url}") String musicBotUrl) {
         this.channelRepository = channelRepository;
         this.membershipRepository = membershipRepository;
@@ -43,6 +46,7 @@ public class VoiceModerationController {
         this.presenceService = presenceService;
         this.messagingTemplate = messagingTemplate;
         this.liveKitService = liveKitService;
+        this.auditLogService = auditLogService;
         this.musicBotUrl = musicBotUrl;
     }
 
@@ -80,12 +84,15 @@ public class VoiceModerationController {
         }
         broadcast(channelId, new VoiceControlEvent("MOVE", payload.targetUserId(), toChannel.getId(),
                 toChannel.getName(), null, null));
+        auditLogService.log(fromChannel.getServerId(), requesterId, "MOVE_MEMBER", payload.targetUserId(),
+                "CHANNEL", toChannel.getId(), toChannel.getName());
     }
 
     @MessageMapping("/channel.{channelId}.voice.kick")
     public void kick(@DestinationVariable Long channelId, KickPayload payload, Principal principal) {
         Channel channel = requireChannel(channelId);
-        permissionService.assertHas(channel.getServerId(), userIdOf(principal), ServerPermission.KICK_VOICE);
+        Long requesterId = userIdOf(principal);
+        permissionService.assertHas(channel.getServerId(), requesterId, ServerPermission.KICK_VOICE);
         if (!presenceService.isPresent(channelId, payload.targetUserId())) {
             return;
         }
@@ -95,13 +102,15 @@ public class VoiceModerationController {
         }
         broadcast(channelId, new VoiceControlEvent("KICK", payload.targetUserId(), null, null, null, null));
         liveKitService.disconnectParticipant("channel-" + channelId, "user-" + payload.targetUserId());
+        auditLogService.log(channel.getServerId(), requesterId, "KICK_VOICE", payload.targetUserId(), "CHANNEL", channelId, channel.getName());
     }
 
     @Transactional
     @MessageMapping("/channel.{channelId}.voice.force-mute")
     public void forceMute(@DestinationVariable Long channelId, ForceMutePayload payload, Principal principal) {
         Channel channel = requireChannel(channelId);
-        permissionService.assertHas(channel.getServerId(), userIdOf(principal), ServerPermission.MUTE_MEMBERS);
+        Long requesterId = userIdOf(principal);
+        permissionService.assertHas(channel.getServerId(), requesterId, ServerPermission.MUTE_MEMBERS);
         if (isMusicBot(channelId, payload.targetUserId())) {
             if (presenceService.isPresent(channelId, payload.targetUserId())) {
                 presenceService.setForceMuted(channelId, payload.targetUserId(), payload.muted());
@@ -110,6 +119,8 @@ public class VoiceModerationController {
             return;
         }
         persistForceState(channel.getServerId(), payload.targetUserId(), payload.muted(), null);
+        auditLogService.log(channel.getServerId(), requesterId, payload.muted() ? "FORCE_MUTE" : "FORCE_UNMUTE",
+                payload.targetUserId(), "CHANNEL", channelId, channel.getName());
         if (!presenceService.isPresent(channelId, payload.targetUserId())) {
             return;
         }
@@ -121,8 +132,11 @@ public class VoiceModerationController {
     @MessageMapping("/channel.{channelId}.voice.force-deafen")
     public void forceDeafen(@DestinationVariable Long channelId, ForceDeafenPayload payload, Principal principal) {
         Channel channel = requireChannel(channelId);
-        permissionService.assertHas(channel.getServerId(), userIdOf(principal), ServerPermission.DEAFEN_MEMBERS);
+        Long requesterId = userIdOf(principal);
+        permissionService.assertHas(channel.getServerId(), requesterId, ServerPermission.DEAFEN_MEMBERS);
         persistForceState(channel.getServerId(), payload.targetUserId(), payload.deafened(), payload.deafened());
+        auditLogService.log(channel.getServerId(), requesterId, payload.deafened() ? "FORCE_DEAFEN" : "FORCE_UNDEAFEN",
+                payload.targetUserId(), "CHANNEL", channelId, channel.getName());
         if (!presenceService.isPresent(channelId, payload.targetUserId())) {
             return;
         }
