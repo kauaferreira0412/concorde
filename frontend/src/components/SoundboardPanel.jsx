@@ -133,7 +133,7 @@ export default function SoundboardPanel({ channelId, stompClient, stompConnected
           </button>
         </div>
       </div>
-      <p className="voice-hint">
+      <p className="voice-hint soundboard-hint">
         Seu banco de sons é particular - só você vê o que tem aqui. Clicar num som toca ele pra todo mundo na call.
       </p>
 
@@ -145,10 +145,11 @@ export default function SoundboardPanel({ channelId, stompClient, stompConnected
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
+          title="Arraste um áudio ou clique aqui (até 3MB)"
         >
           <input type="file" accept={ACCEPTED_TYPES} ref={fileInputRef} onChange={handleFileChosen} hidden />
-          <PlusIcon size={13} />
-          <span>{uploading ? "Enviando..." : "Arraste um áudio ou clique aqui (até 3MB)"}</span>
+          <PlusIcon size={15} />
+          <span>{uploading ? "Enviando..." : "Arraste ou clique"}</span>
           <button
             type="button"
             className="icon-btn soundboard-dropzone-close"
@@ -158,7 +159,7 @@ export default function SoundboardPanel({ channelId, stompClient, stompConnected
             }}
             title="Cancelar"
           >
-            <XIcon size={13} />
+            <XIcon size={11} />
           </button>
         </div>
       )}

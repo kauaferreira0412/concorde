@@ -1864,34 +1864,49 @@ h3.chat-heading {
 
 /* Soundboard (ver SoundboardPanel.jsx/SoundboardController no backend) - banco de sons
    PESSOAL de cada usuario, so' ele ve a lista. Clicar num som toca ele pra todo mundo na call. */
+.soundboard-hint { margin-bottom: 10px !important; }
 
-/* Dropzone compacta pra subir um som novo - arrastar/soltar OU clicar (ver SoundboardPanel.jsx),
-   nao e' mais um formulario com campo de nome: o nome vem direto do arquivo. */
+/* Dropzone pequena e quadrada pra subir um som novo - arrastar/soltar OU clicar (ver
+   SoundboardPanel.jsx), fica ao lado dos chips em vez de uma barra comprida ocupando a
+   largura toda. Nao e' mais um formulario com campo de nome: o nome vem direto do arquivo. */
 .soundboard-dropzone {
+  position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 4px;
+  width: 88px;
+  height: 64px;
   margin-bottom: 10px;
-  padding: 8px 10px;
+  padding: 6px;
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-panel-2);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 10px;
+  line-height: 1.25;
+  text-align: center;
   cursor: pointer;
 }
 .soundboard-dropzone:hover { border-color: var(--accent); color: var(--text-secondary); }
 .soundboard-dropzone.drag-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
 .soundboard-dropzone.uploading { pointer-events: none; opacity: 0.7; }
 .soundboard-dropzone svg { flex-shrink: 0; }
-.soundboard-dropzone span { flex: 1; }
-.soundboard-dropzone-close { margin-left: auto; flex-shrink: 0; }
+.soundboard-dropzone-close {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+}
 
-/* Grade de chips, um do lado do outro - icone redondo + nome, lixeira so' aparece no hover
-   pra ficar mais limpo por padrao. */
+/* Grade de chips, um do lado do outro - icone redondo + nome, lixeira sempre visivel (nao so'
+   no hover - sumia demais e ninguem achava). */
 .soundboard-grid {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: 6px;
 }
 .soundboard-clip {
@@ -1944,10 +1959,7 @@ h3.chat-heading {
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s ease;
 }
-.soundboard-clip:hover .soundboard-clip-remove { opacity: 1; }
 .soundboard-clip-remove:hover { background: var(--danger-soft); color: var(--danger); }
 
 /* Quadrado "escolher assistir" (ver ScreenShareTile em VoiceChannel.jsx) - tamanho proprio,
