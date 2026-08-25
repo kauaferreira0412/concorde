@@ -2,10 +2,10 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./context/AuthContext.jsx";
 import { AlertProvider } from "./context/AlertContext.jsx";
 import { ProfileProvider } from "./context/ProfileContext.jsx";
-import LoginPage from "./pages/LoginPage.jsx";
-import ServerPage from "./pages/ServerPage.jsx";
-import AdminPage from "./pages/AdminPage.jsx";
-import CameraPipPage from "./pages/CameraPipPage.jsx";
+import LoginPage from "./pages/login";
+import ServerPage from "./pages/servers";
+import AdminPage from "./pages/admin";
+import CameraPipPage from "./pages/camera-pip";
 import UpdateRequiredGate from "./components/UpdateRequiredGate.jsx";
 import DesktopTitleBar from "./components/DesktopTitleBar.jsx";
 

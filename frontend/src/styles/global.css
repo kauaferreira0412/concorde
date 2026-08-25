@@ -193,19 +193,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   gap: 14px;
   box-shadow: var(--shadow-md);
 }
-.auth-logo {
-  width: 76px;
-  height: 76px;
-  border-radius: 50%;
-  background: var(--bg-panel-2);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 0 0 6px var(--accent-soft);
-  margin-bottom: 4px;
-}
-.auth-logo img { width: 56px; height: 56px; object-fit: contain; }
 .auth-heading { text-align: center; margin-bottom: 6px; }
 .auth-card h1 {
   margin: 0;
@@ -215,50 +202,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   letter-spacing: -0.02em;
 }
 .auth-subtitle { color: var(--text-secondary); font-size: 13.5px; margin: 4px 0 0; }
-
-.auth-field {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-.auth-field input {
-  width: 100%;
-  padding-left: 38px;
-}
-.auth-field-icon {
-  position: absolute;
-  left: 12px;
-  color: var(--text-muted);
-  pointer-events: none;
-  flex-shrink: 0;
-}
-.auth-field:focus-within .auth-field-icon { color: var(--accent-text); }
-.auth-field-toggle {
-  position: absolute;
-  right: 6px;
-  background: transparent;
-  border: none;
-  padding: 6px;
-  color: var(--text-muted);
-  display: flex;
-}
-.auth-field-toggle:hover { color: var(--text-primary); background: var(--bg-hover); }
-.auth-field:has(.auth-field-toggle) input { padding-right: 34px; }
-
-/* Checkbox "Lembrar acesso" (ver LoginPage.jsx) - fica entre os campos e o botao de entrar,
-   discreto (nao e' o foco principal da tela). */
-.auth-remember {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  user-select: none;
-  margin: -4px 0 0;
-}
-.auth-remember input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 
 .auth-card > button[type="submit"] {
   background: var(--accent);
@@ -323,69 +266,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   border: 1px solid var(--danger);
 }
 .update-required-card > button.danger:hover { background: var(--danger-soft); }
-
-/* Secao de destaque "Baixar app para Windows" abaixo do card de login - so' aparece no
-   navegador (ver isElectronDesktop em LoginPage.jsx), nunca dentro do proprio app desktop.
-   Card proprio (nao um link discreto) pra ficar visivel de verdade, com icone + texto
-   explicando o que ganha usando o app desktop em vez do navegador. */
-.auth-download-card {
-  margin-top: 20px;
-  width: 380px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 24px 28px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 8px;
-  box-shadow: var(--shadow-md);
-}
-.auth-download-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent-text);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 4px;
-}
-.auth-download-card h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.auth-download-card p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.55;
-}
-.auth-download-btn {
-  margin-top: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--accent);
-  color: #fff;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 13.5px;
-  padding: 11px 20px;
-  border-radius: var(--radius-md);
-  box-shadow: var(--glow-accent);
-}
-.auth-download-btn:hover { background: var(--accent-hover); }
-
-/* ============================================================
-   App shell
-   ============================================================ */
-.app-shell { display: flex; height: 100%; }
 
 .server-sidebar {
   width: 76px;
@@ -2147,23 +2027,6 @@ h3.chat-heading {
    ganha da de 1 classe so', nao precisa de !important. */
 .camera-pip-grid .camera-tile { width: 100%; height: 100%; aspect-ratio: 16 / 9; }
 
-/* Pagina da janela SEPARADA de verdade das cameras no app desktop (ver CameraPipPage.jsx) -
-   #root ja ganha o padding-top da barra de titulo customizada sozinho (ver
-   "html[data-desktop-titlebar] #root" acima), so' precisa preencher o resto da altura. */
-.camera-pip-page { height: 100%; display: flex; flex-direction: column; }
-.camera-pip-page .camera-pip-grid { flex: 1; }
-.camera-pip-page-empty, .camera-pip-page-error {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  font-size: 14px;
-  text-align: center;
-  padding: 24px;
-}
-.camera-pip-page-error { color: var(--danger); }
-
 /* ============================================================
    Lightbox (visualizador de imagem em tela cheia - ver ImageLightbox.jsx)
    ============================================================ */
@@ -2485,49 +2348,13 @@ h3.chat-heading {
 .settings-actions button:not(.link-btn) { width: auto !important; padding: 10px 20px; margin-top: 0; }
 
 /* ============================================================
-   Admin panel
+   Admin panel (classes exclusivas do painel ficam em pages/admin/style.css -
+   admin-hint/admin-badge continuam aqui por serem reaproveitadas em varios outros lugares)
    ============================================================ */
-.admin-screen { height: 100%; overflow-y: auto; background: var(--bg-app); }
-.admin-topbar {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 18px 28px; border-bottom: 1px solid var(--border-soft); background: var(--bg-panel);
-}
-.admin-topbar strong { font-family: var(--font-display); font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
-.admin-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
-  padding: 28px; max-width: 960px; margin: 0 auto;
-}
-.admin-card {
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.admin-card-wide { grid-column: 1 / -1; }
-.admin-card h2 { margin: 0; font-size: 15px; font-weight: 700; }
 .admin-hint { color: var(--text-muted); font-size: 12.5px; margin: -6px 0 4px; line-height: 1.5; }
-.admin-success { color: var(--success); background: var(--success-soft); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 13px; margin: 0; }
-.admin-card button[type="submit"] { background: var(--accent); color: #fff; margin-top: 4px; box-shadow: var(--glow-accent); }
-.admin-card button[type="submit"]:hover { background: var(--accent-hover); }
 .admin-badge {
   background: var(--accent-soft); color: var(--accent-text); font-size: 10.5px; font-weight: 700;
   padding: 2px 7px; border-radius: 999px; margin-left: 8px; text-transform: uppercase; letter-spacing: 0.04em;
-}
-.admin-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-.admin-table th {
-  text-align: left; color: var(--text-muted); font-weight: 600; font-size: 11.5px;
-  text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 10px; border-bottom: 1px solid var(--border-soft);
-}
-.admin-table td { padding: 10px; border-bottom: 1px solid var(--border-soft); }
-.admin-table td:first-child { width: 1%; padding-right: 4px; }
-.admin-table tr:last-child td { border-bottom: none; }
-.admin-table-actions { display: flex; gap: 4px; width: 1%; white-space: nowrap; }
-
-@media (max-width: 720px) {
-  .admin-grid { grid-template-columns: 1fr; }
 }
 
 /* ============================================================
