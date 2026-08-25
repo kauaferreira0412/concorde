@@ -2,6 +2,7 @@ import { AccessToken, TrackSource as GrantTrackSource } from "livekit-server-sdk
 import { AudioSource, LocalAudioTrack, Room, TrackPublishOptions, TrackSource } from "@livekit/rtc-node";
 import { CHANNELS, IDLE_DISCONNECT_MS, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_WS_URL, SAMPLE_RATE } from "./config.js";
 import { broadcastQueue, notifyBackendPresence } from "./backendClient.js";
+import { createMixer } from "./mixer.js";
 
 export const sessions = new Map();
 
@@ -31,7 +32,7 @@ async function connectToRoom(channelId) {
 }
 
 function createSessionState(channelId, connection) {
-  return {
+  const session = {
     channelId,
     room: connection.room,
     source: connection.source,
@@ -47,10 +48,14 @@ function createSessionState(channelId, connection) {
     queueOpen: false,
     queueName: null,
     queueId: null,
-    soundboardSource: null,
-    soundboardTrack: null,
     soundboardQueue: null,
   };
+  // Musica e soundboard se somam AQUI antes de sair pro LiveKit - ver mixer.js pro motivo
+  // (bug de nao conseguir mutar/ensurdecer o bot quando musica e soundboard tocavam cada
+  // um na sua propria faixa). Referencia o proprio "session" (nao "connection.source"
+  // direto), entao sobrevive normalmente a troca de canal em moveSession() abaixo.
+  session.mixer = createMixer(session);
+  return session;
 }
 
 function clearIdleTimer(session) {
@@ -101,6 +106,7 @@ export async function disconnectSession(channelId) {
   sessions.delete(channelId);
   clearIdleTimer(session);
   stopPlayback(session);
+  session.mixer.stop();
   session.nowPlaying = null;
   session.queue = [];
   session.queueOpen = false;
@@ -109,7 +115,6 @@ export async function disconnectSession(channelId) {
 
   try {
     await session.track.close();
-    if (session.soundboardTrack) await session.soundboardTrack.close();
     await session.room.disconnect();
   } catch (err) {
     console.warn(`[${channelId}] erro ao desconectar:`, err.message);
@@ -128,20 +133,16 @@ export async function moveSession(fromChannelId, toChannelId) {
   const newConnection = await connectToRoom(toChannelId);
   const oldRoom = session.room;
   const oldTrack = session.track;
-  const oldSoundboardTrack = session.soundboardTrack;
 
   sessions.delete(fromChannelId);
   session.channelId = toChannelId;
   session.room = newConnection.room;
   session.source = newConnection.source;
   session.track = newConnection.track;
-  session.soundboardSource = null;
-  session.soundboardTrack = null;
   sessions.set(toChannelId, session);
 
   try {
     await oldTrack.close();
-    if (oldSoundboardTrack) await oldSoundboardTrack.close();
     await oldRoom.disconnect();
   } catch (err) {
     console.warn(`[${fromChannelId}] erro desconectando da sala antiga após mover:`, err.message);

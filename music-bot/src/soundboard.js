@@ -1,21 +1,6 @@
 import { spawn } from "node:child_process";
-import { AudioFrame, AudioSource, LocalAudioTrack, TrackPublishOptions, TrackSource } from "@livekit/rtc-node";
 import { CHANNELS, PACE_AHEAD_MS, SAMPLE_RATE, SOUNDBOARD_MAX_DURATION_SEC } from "./config.js";
 import { getSession, scheduleIdleDisconnect } from "./session.js";
-
-async function ensureSoundboardTrack(session) {
-  if (session.soundboardSource) return session.soundboardSource;
-
-  const source = new AudioSource(SAMPLE_RATE, CHANNELS);
-  const track = LocalAudioTrack.createAudioTrack("soundboard", source);
-  const publishOptions = new TrackPublishOptions();
-  publishOptions.source = TrackSource.SOURCE_MICROPHONE;
-  await session.room.localParticipant.publishTrack(track, publishOptions);
-
-  session.soundboardSource = source;
-  session.soundboardTrack = track;
-  return source;
-}
 
 function spawnFfmpegDecoder(url) {
   return spawn("ffmpeg", [
@@ -36,20 +21,14 @@ function spawnFfmpegDecoder(url) {
   ]);
 }
 
-function buildFrame(data) {
-  const sampleCount = data.length / 2;
-  const int16 = new Int16Array(data.buffer, data.byteOffset, sampleCount);
-  return new AudioFrame(int16, SAMPLE_RATE, CHANNELS, int16.length);
-}
-
-async function paceIfAhead(source) {
-  const queued = source.queuedDuration;
+async function paceIfAhead(session) {
+  const queued = session.mixer.soundboardBufferedMs();
   if (queued > PACE_AHEAD_MS) {
     await new Promise((resolve) => setTimeout(resolve, queued - PACE_AHEAD_MS));
   }
 }
 
-async function pumpClip(channelId, source, url) {
+async function pumpClip(channelId, session, url) {
   const ffmpeg = spawnFfmpegDecoder(url);
   let stderr = "";
   ffmpeg.stderr.on("data", (d) => (stderr += d.toString()));
@@ -63,8 +42,8 @@ async function pumpClip(channelId, source, url) {
       const usableLength = data.length - (data.length % 2);
       leftover = Buffer.from(data.subarray(usableLength));
       if (usableLength === 0) continue;
-      await source.captureFrame(buildFrame(data.subarray(0, usableLength)));
-      await paceIfAhead(source);
+      session.mixer.pushSoundboard(data.subarray(0, usableLength));
+      await paceIfAhead(session);
     }
   } catch (err) {
     console.error(`[soundboard ${channelId}] erro lendo áudio do ffmpeg:`, err.message);
@@ -75,16 +54,16 @@ async function pumpClip(channelId, source, url) {
 }
 
 // Fila serializada POR CANAL - se duas pessoas tocarem um som quase ao mesmo tempo, o segundo
-// espera o primeiro acabar em vez de misturar os dois frames na mesma AudioSource (o que
-// corromperia o audio dos dois).
+// espera o primeiro acabar em vez de misturar os dois clipes um em cima do outro no MESMO
+// canal do soundboard (o mixer ja' soma soundboard + musica normalmente - isso aqui e' so'
+// pra nao embolar dois cliques de soundboard ao mesmo tempo).
 export async function playSoundboardClip(channelId, url) {
   const session = await getSession(channelId);
-  const source = await ensureSoundboardTrack(session);
 
   const previous = session.soundboardQueue || Promise.resolve();
   const run = previous
     .catch(() => {})
-    .then(() => pumpClip(channelId, source, url))
+    .then(() => pumpClip(channelId, session, url))
     .finally(() => {
       if (session.soundboardQueue === run) {
         session.soundboardQueue = null;
