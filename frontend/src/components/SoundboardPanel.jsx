@@ -68,7 +68,14 @@ export default function SoundboardPanel({ channelId, stompClient, stompConnected
       formData.append("file", file);
       formData.append("name", file.name.replace(/\.[^/.]+$/, ""));
       const { data } = await api.post("/api/soundboard", formData);
-      setClips((prev) => [data, ...(prev || [])]);
+      // A atualizacao ao vivo por WebSocket (ver subscribeToSoundboard abaixo) pode chegar
+      // ANTES dessa resposta do proprio upload resolver (e' outro caminho, sem ordem
+      // garantida) - sem essa checagem, o som acabava entrando duas vezes na lista: uma
+      // pelo push, outra por aqui.
+      setClips((prev) => {
+        const list = prev || [];
+        return list.some((c) => c.id === data.id) ? list : [data, ...list];
+      });
       setShowUpload(false);
     } catch (err) {
       showAlert(err.response?.data?.error || "Não foi possível enviar esse áudio");
