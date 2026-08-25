@@ -2,13 +2,16 @@ package com.codagis.concorde.domain;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "music_bot_settings")
+@Table(name = "music_bot_settings", indexes = {
+        @Index(name = "idx_music_bot_settings_avatar_url", columnList = "avatarUrl")
+})
 @Getter
 @Setter
 @NoArgsConstructor

@@ -6,7 +6,13 @@ import lombok.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "servers")
+@Table(name = "servers", indexes = {
+        @Index(name = "idx_servers_name", columnList = "name"),
+        @Index(name = "idx_servers_owner_id", columnList = "ownerId"),
+        @Index(name = "idx_servers_icon_url", columnList = "iconUrl"),
+        @Index(name = "idx_servers_description", columnList = "description"),
+        @Index(name = "idx_servers_created_at", columnList = "createdAt")
+})
 @Getter
 @Setter
 @NoArgsConstructor

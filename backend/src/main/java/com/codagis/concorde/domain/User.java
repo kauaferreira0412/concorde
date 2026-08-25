@@ -10,6 +10,14 @@ import java.time.Instant;
 @Table(name = "users", uniqueConstraints = {
         @UniqueConstraint(columnNames = "username"),
         @UniqueConstraint(columnNames = "email")
+}, indexes = {
+        @Index(name = "idx_users_password_hash", columnList = "passwordHash"),
+        @Index(name = "idx_users_avatar_url", columnList = "avatarUrl"),
+        @Index(name = "idx_users_nickname", columnList = "nickname"),
+        @Index(name = "idx_users_bio", columnList = "bio"),
+        @Index(name = "idx_users_role", columnList = "role"),
+        @Index(name = "idx_users_status", columnList = "status"),
+        @Index(name = "idx_users_created_at", columnList = "createdAt")
 })
 @Getter
 @Setter

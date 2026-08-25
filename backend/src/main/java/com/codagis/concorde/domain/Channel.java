@@ -7,7 +7,13 @@ import org.hibernate.annotations.ColumnDefault;
 import java.time.Instant;
 
 @Entity
-@Table(name = "channels")
+@Table(name = "channels", indexes = {
+        @Index(name = "idx_channels_server_id", columnList = "serverId"),
+        @Index(name = "idx_channels_name", columnList = "name"),
+        @Index(name = "idx_channels_type", columnList = "type"),
+        @Index(name = "idx_channels_admin_only", columnList = "adminOnly"),
+        @Index(name = "idx_channels_created_at", columnList = "createdAt")
+})
 @Getter
 @Setter
 @NoArgsConstructor
