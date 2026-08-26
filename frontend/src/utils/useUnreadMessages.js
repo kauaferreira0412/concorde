@@ -3,6 +3,7 @@ import api from "../api/client";
 import { subscribeToChannel } from "../ws/chatSocket";
 import { getDesktopNotificationsEnabled } from "./notificationSettings";
 import { mentionsUser } from "./mentions";
+import { playMessageSound } from "./soundEffects";
 
 const LAST_READ_PREFIX = "chatLastRead_";
 
@@ -124,6 +125,9 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
 
   function notifyDesktop(channelId, message) {
     if (!getDesktopNotificationsEnabled()) return;
+    // O som toca mesmo sem permissao de notificacao do navegador concedida (o popup visual
+    // precisa dela, o audio nao) - senao quem nunca autorizou o popup tambem nunca ouve nada.
+    playMessageSound();
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     const channelName = channelNameById.current.get(channelId) || "canal";
     // Linha 1 = de ONDE vem (canal + servidor), linha 2 = a mensagem resumida - igual

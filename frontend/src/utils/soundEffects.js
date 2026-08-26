@@ -62,6 +62,18 @@ function playTone(freq, startOffset, duration, gainPeak = 0.16) {
   osc.stop(startTime + duration + 0.02);
 }
 
+/** Toca ao chegar mensagem nova em canal que voce nao esta olhando - mesmo gatilho da
+ *  notificacao do desktop (ver notifyDesktop em useUnreadMessages.js), so' que sem precisar de
+ *  permissao nenhuma do navegador (a notificacao visual precisa; o som nao). Arquivo escolhido
+ *  pelo proprio usuario (ver public/sounds/message.mp3). */
+export function playMessageSound() {
+  try {
+    playFile("message.mp3");
+  } catch {
+    // idem
+  }
+}
+
 export function playJoinSound() {
   if (!getSoundEffectsEnabled()) return;
   try {
