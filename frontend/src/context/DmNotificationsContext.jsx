@@ -36,6 +36,12 @@ export function DmNotificationsProvider({ children }) {
   const [stompConnected, setStompConnected] = useState(false);
   const [channels, setChannels] = useState([]);
   const [unreadIds, setUnreadIds] = useState(new Set());
+  // Ultima mensagem de CADA conversa, atualizada ao vivo (channelId -> DmMessage) - e' o que
+  // faz o texto embaixo do nome na lista de "Conversas diretas" acompanhar mensagem nova sem
+  // precisar de F5 (ver pages/home/index.jsx, que mescla isso por cima do que veio da API).
+  // Comeca a partir do "ultima mensagem" que /api/dm/channels ja traz (ver reloadChannels
+  // abaixo) e so' anda pra frente com mensagem NOVA de verdade.
+  const [latestMessages, setLatestMessages] = useState({});
   // Qual conversa esta' sendo VISTA agora (setado pela Home ao abrir uma DM) - mensagem nova
   // dessa conversa nao conta como nao lida, mesmo chegando por aqui.
   const activeChannelIdRef = useRef(null);
@@ -71,6 +77,24 @@ export function DmNotificationsProvider({ children }) {
     return () => sub.unsubscribe();
   }, [stompClient, stompConnected, reloadChannels]);
 
+  // Sincroniza latestMessages com o que a API devolveu - so' avanca (nunca sobrescreve uma
+  // mensagem mais nova que ja' foi capturada ao vivo por uma resposta de API atrasada/velha).
+  useEffect(() => {
+    setLatestMessages((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      channels.forEach((c) => {
+        if (!c.lastMessage) return;
+        const existing = next[c.channelId];
+        if (!existing || c.lastMessage.id > existing.id) {
+          next[c.channelId] = c.lastMessage;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [channels]);
+
   // Nao-lido inicial: compara a ultima mensagem de cada conversa (ja vem no /api/dm/channels)
   // com o "ultimo lido" salvo - cobre mensagem que chegou enquanto o app estava fechado.
   useEffect(() => {
@@ -100,6 +124,11 @@ export function DmNotificationsProvider({ children }) {
       const sub = subscribeToDm(stompClient, c.channelId, (event) => {
         if (event.type !== "CREATED") return;
         const msg = event.message;
+        setLatestMessages((prev) => {
+          const existing = prev[c.channelId];
+          if (existing && existing.id >= msg.id) return prev;
+          return { ...prev, [c.channelId]: msg };
+        });
         const isMine = msg.authorId === user?.id;
         const isViewingNow = c.channelId === activeChannelIdRef.current && document.visibilityState === "visible";
         if (isMine || isViewingNow) {
@@ -178,6 +207,7 @@ export function DmNotificationsProvider({ children }) {
       value={{
         unreadDmIds: unreadIds,
         hasUnreadDm: unreadIds.size > 0,
+        latestDmMessages: latestMessages,
         markDmRead,
         setActiveDmChannel,
       }}
@@ -187,7 +217,13 @@ export function DmNotificationsProvider({ children }) {
   );
 }
 
-const FALLBACK = { unreadDmIds: new Set(), hasUnreadDm: false, markDmRead: () => {}, setActiveDmChannel: () => {} };
+const FALLBACK = {
+  unreadDmIds: new Set(),
+  hasUnreadDm: false,
+  latestDmMessages: {},
+  markDmRead: () => {},
+  setActiveDmChannel: () => {},
+};
 
 export function useDmNotifications() {
   return useContext(DmNotificationsContext) || FALLBACK;

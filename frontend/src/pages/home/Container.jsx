@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import api from "../../api/client";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -16,7 +16,7 @@ export function useHomeContainer() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, token, logout } = useAuth();
-  const { unreadDmIds, markDmRead, setActiveDmChannel } = useDmNotifications();
+  const { unreadDmIds, latestDmMessages, markDmRead, setActiveDmChannel } = useDmNotifications();
 
   // Ao SAIR da Home (fechar a aba, trocar de servidor) a conversa que estava aberta deixa de
   // estar "sendo vista" - senao mensagem nova nela nunca mais contaria como nao lida, mesmo
@@ -207,6 +207,20 @@ export function useHomeContainer() {
     setActiveDmChannel(null);
   }
 
+  // Mescla a ultima mensagem AO VIVO (ver DmNotificationsContext.jsx) por cima do que veio da
+  // API - sem isso, o texto embaixo do nome na lista de conversas so' atualizava dando F5
+  // (reportado pelo usuario). Reordena pra' conversa com mensagem nova sempre subir, igual
+  // Discord faz.
+  const displayedDmChannels = useMemo(() => {
+    return dmChannels
+      .map((c) => (latestDmMessages[c.channelId] ? { ...c, lastMessage: latestDmMessages[c.channelId] } : c))
+      .sort((a, b) => {
+        const ta = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : 0;
+        const tb = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : 0;
+        return tb - ta;
+      });
+  }, [dmChannels, latestDmMessages]);
+
   return {
     user,
     logout,
@@ -218,7 +232,7 @@ export function useHomeContainer() {
     view,
     friends,
     requests,
-    dmChannels,
+    dmChannels: displayedDmChannels,
     unreadDmIds,
     blocked,
     activeDm,
