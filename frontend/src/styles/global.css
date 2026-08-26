@@ -324,6 +324,9 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   pointer-events: none;
 }
 .server-icon-pill.active { height: 22px; }
+/* Logo do Concorde (botao de Home) - maior que um icone de servidor comum (46px), pra ter mais
+   presenca como marca do app (pedido explicito do usuario: "aumente a largura do quadrado"). */
+.server-icon.home { width: 54px; height: 54px; }
 /* Separa o botao de Home (logo do Concorde) da lista de servidores - mesma largura do icone
    de servidor, uma linha fina no meio (igual Discord). */
 .server-sidebar-divider {
@@ -2979,6 +2982,38 @@ h3.chat-heading {
 .friends-add-form label { font-size: 11.5px; font-weight: 700; letter-spacing: 0.03em; color: var(--text-secondary); }
 .friends-add-row { display: flex; gap: 8px; }
 .friends-add-row input { flex: 1; }
+/* Aviso de erro/sucesso ao adicionar amigo (ver FriendsPanel.jsx) - antes era so' um
+   <p class="auth-error"> generico, ficava colado no input e fininho demais (reportado pelo
+   usuario, com print). Card de verdade agora: icone, mais respiro, borda sutil. */
+.friends-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+.friends-alert-icon { flex-shrink: 0; }
+.friends-alert.error { background: var(--danger-soft); color: var(--danger); }
+.friends-alert.success { background: var(--success-soft); color: var(--success); }
+/* Card de previa de quem sera adicionado (ver preview em FriendsPanel.jsx) - aparece ao
+   digitar um nome de usuario que existe, com foto+nome e um botao pra confirmar o pedido. */
+.friends-preview-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+}
+.friends-preview-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.friends-preview-info strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.friends-preview-info span { font-size: 12px; color: var(--text-muted); }
 
 .friend-row {
   display: flex;

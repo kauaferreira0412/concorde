@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import api from "../api/client";
 import { useAlert } from "../context/AlertContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
-import { CheckIcon, MessageSquareIcon, TrashIcon, UserIcon, XIcon } from "./icons.jsx";
+import { AlertTriangleIcon, CheckIcon, MessageSquareIcon, TrashIcon, UserIcon, XIcon } from "./icons.jsx";
 
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", OFFLINE: "Offline" };
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
@@ -30,18 +31,45 @@ export default function FriendsPanel({ friends, requests, onSendRequest, onAccep
   const [sendOk, setSendOk] = useState("");
   const [removeTarget, setRemoveTarget] = useState(null);
 
+  // Previa de "quem eu vou adicionar" ANTES de mandar o pedido de verdade - pedido explicito do
+  // usuario: ao digitar, aparece um card com a foto/nome de quem foi encontrado. undefined =
+  // ainda nao buscou (campo vazio), null = buscou e nao achou ninguem, objeto = achou.
+  const [preview, setPreview] = useState(undefined);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
   const onlineFriends = friends.filter((f) => f.status !== "OFFLINE");
   const pendingCount = requests.incoming.length;
 
-  async function handleSendRequest(e) {
-    e.preventDefault();
-    if (!username.trim() || sending) return;
+  // Busca o usuario pelo nome digitado com um pequeno atraso (nao dispara uma chamada por
+  // tecla) - GET /api/users/by-username/<nome> (ver UserProfileController no backend).
+  useEffect(() => {
+    setSendError("");
+    setSendOk("");
+    const trimmed = username.trim();
+    if (!trimmed) {
+      setPreview(undefined);
+      setPreviewLoading(false);
+      return;
+    }
+    setPreviewLoading(true);
+    const handle = setTimeout(() => {
+      api
+        .get(`/api/users/by-username/${encodeURIComponent(trimmed)}`)
+        .then(({ data }) => setPreview(data))
+        .catch(() => setPreview(null))
+        .finally(() => setPreviewLoading(false));
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [username]);
+
+  async function handleSendRequest(targetUsername) {
+    if (sending) return;
     setSendError("");
     setSendOk("");
     setSending(true);
     try {
-      await onSendRequest(username.trim());
-      setSendOk(`Pedido enviado para ${username.trim()}.`);
+      await onSendRequest(targetUsername);
+      setSendOk(`Pedido enviado para ${targetUsername}.`);
       setUsername("");
     } catch (err) {
       setSendError(err.response?.data?.error || "Não foi possível enviar o pedido");
@@ -96,7 +124,7 @@ export default function FriendsPanel({ friends, requests, onSendRequest, onAccep
 
       <div className="friends-panel-body">
         {tab === "add" && (
-          <form className="friends-add-form" onSubmit={handleSendRequest}>
+          <div className="friends-add-form">
             <label htmlFor="friend-username">ADICIONAR AMIGO</label>
             <p className="admin-hint" style={{ margin: "0 0 10px" }}>
               Você pode adicionar amigos pelo nome de usuário do Concorde.
@@ -108,13 +136,43 @@ export default function FriendsPanel({ friends, requests, onSendRequest, onAccep
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
               />
-              <button type="submit" disabled={!username.trim() || sending}>
-                Enviar pedido
-              </button>
             </div>
-            {sendError && <p className="auth-error">{sendError}</p>}
-            {sendOk && <p className="admin-success">{sendOk}</p>}
-          </form>
+
+            {previewLoading ? (
+              <p className="friends-panel-empty" style={{ margin: "12px 0 0" }}>
+                Procurando...
+              </p>
+            ) : preview === null ? (
+              <div className="friends-alert error">
+                <AlertTriangleIcon size={16} className="friends-alert-icon" />
+                <span>Não existe usuário com esse nome.</span>
+              </div>
+            ) : preview ? (
+              <div className="friends-preview-card">
+                <Avatar name={preview.username} url={preview.avatarUrl} className="voice-avatar" />
+                <span className="friends-preview-info">
+                  <strong>{preview.nickname || preview.username}</strong>
+                  {preview.nickname && <span>@{preview.username}</span>}
+                </span>
+                <button type="button" onClick={() => handleSendRequest(preview.username)} disabled={sending}>
+                  {sending ? "Enviando..." : "Adicionar"}
+                </button>
+              </div>
+            ) : null}
+
+            {sendError && (
+              <div className="friends-alert error">
+                <AlertTriangleIcon size={16} className="friends-alert-icon" />
+                <span>{sendError}</span>
+              </div>
+            )}
+            {sendOk && (
+              <div className="friends-alert success">
+                <CheckIcon size={16} className="friends-alert-icon" />
+                <span>{sendOk}</span>
+              </div>
+            )}
+          </div>
         )}
 
         {tab === "pending" && (
