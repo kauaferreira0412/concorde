@@ -94,6 +94,18 @@ export function useHomeContainer() {
     return () => sub.unsubscribe();
   }, [stompClient, stompConnected, reloadFriends, reloadDmChannels, reloadBlocked]);
 
+  // Rede de seguranca alem do WebSocket acima - se por qualquer motivo esse evento nao chegar
+  // (rede instavel, reconexao no meio, etc), a lista de qualquer forma se atualiza sozinha em
+  // no maximo 15s, sem precisar de F5 (reportado pelo usuario: "so' atualiza se der F5").
+  useEffect(() => {
+    const interval = setInterval(() => {
+      reloadFriends();
+      reloadDmChannels();
+      reloadBlocked();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [reloadFriends, reloadDmChannels, reloadBlocked]);
+
   useEffect(() => {
     function handleOpenSettings() {
       setShowSettings(true);
