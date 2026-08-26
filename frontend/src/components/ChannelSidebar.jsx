@@ -473,7 +473,8 @@ export default function ChannelSidebar({
             "channel-item" +
             (c.id === selectedChannelId ? " active" : "") +
             (activeChannel?.id === c.id ? " connected-active" : "") +
-            (dragOverChannelId === c.id ? " drop-target" : "")
+            (dragOverChannelId === c.id ? " drop-target" : "") +
+            (draggingChannelId === c.id ? " dragging" : "")
           }
           onClick={() => onSelectChannel(c)}
           onContextMenu={(e) => {
@@ -481,6 +482,13 @@ export default function ChannelSidebar({
             e.preventDefault();
             setChannelMenu({ id: c.id, name: c.name, x: e.clientX, y: e.clientY });
           }}
+          draggable={canManageChannels}
+          onDragStart={() => setDraggingChannelId(c.id)}
+          onDragEnd={() => {
+            setDraggingChannelId(null);
+            setDragOverCategoryId(null);
+          }}
+          title={canManageChannels ? "Arraste pra uma categoria pra mover" : undefined}
           onDragOver={(e) => {
             if (!canMove || !draggingParticipant || draggingParticipant.channelId === c.id) return;
             e.preventDefault();
@@ -710,7 +718,23 @@ export default function ChannelSidebar({
               </>
             )}
 
-            <button className="channel-category-header" onClick={() => setVoiceExpanded((v) => !v)}>
+            <button
+              className={"channel-category-header" + (dragOverCategoryId === "voice-none" ? " drop-target" : "")}
+              onClick={() => setVoiceExpanded((v) => !v)}
+              onDragOver={(e) => {
+                if (!canManageChannels || !draggingChannelId) return;
+                e.preventDefault();
+                setDragOverCategoryId("voice-none");
+              }}
+              onDragLeave={() => setDragOverCategoryId((prev) => (prev === "voice-none" ? null : prev))}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOverCategoryId(null);
+                if (!canManageChannels || !draggingChannelId) return;
+                onMoveChannelCategory(draggingChannelId, null);
+              }}
+              title={canManageChannels ? "Arraste um canal aqui pra tirar da categoria" : undefined}
+            >
               <span className={"connected-chevron" + (voiceExpanded ? " open" : "")}>▸</span>
               <span className="channel-group-title">CANAIS DE VOZ</span>
             </button>
