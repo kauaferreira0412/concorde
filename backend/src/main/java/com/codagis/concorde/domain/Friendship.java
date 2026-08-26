@@ -22,6 +22,7 @@ import java.time.Instant;
         @Index(name = "idx_friendships_status", columnList = "status"),
         @Index(name = "idx_friendships_requested_by", columnList = "requestedBy"),
         @Index(name = "idx_friendships_blocked_by", columnList = "blockedBy"),
+        @Index(name = "idx_friendships_previous_status", columnList = "previousStatus"),
         @Index(name = "idx_friendships_created_at", columnList = "createdAt"),
         @Index(name = "idx_friendships_responded_at", columnList = "respondedAt")
 })
@@ -52,6 +53,15 @@ public class Friendship {
     // So' preenchido quando status = BLOCKED - quem dos dois foi que bloqueou (o unico que pode
     // desbloquear depois, ver FriendshipService.unblock).
     private Long blockedBy;
+
+    // So' preenchido quando status = BLOCKED - qual era o status ANTES de bloquear (ACCEPTED se
+    // ja' eram amigos, PENDING se so' tinha pedido no ar, null se eram estranhos). Desbloquear
+    // volta pra esse status automaticamente quando era ACCEPTED - sem isso, bloquear um amigo
+    // por engano e desbloquear em seguida desfazia a amizade de vez, sem jeito facil de voltar
+    // (reportado pelo usuario).
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private FriendshipStatus previousStatus;
 
     @Builder.Default
     private Instant createdAt = Instant.now();

@@ -145,7 +145,10 @@ public class FriendshipService {
     /** Bloquear substitui qualquer amizade/pedido que existisse entre os dois (some da lista de
      *  amigos e de pedidos pendentes dos dois lados na hora) - so' quem bloqueou consegue
      *  desbloquear depois (ver unblock). Enquanto bloqueado, nenhum dos dois consegue mandar
-     *  pedido de amizade nem mensagem novo pro outro (ver DirectMessageService). */
+     *  pedido de amizade nem mensagem novo pro outro (ver DirectMessageService). Guarda o status
+     *  de ANTES (ver Friendship.previousStatus) - se ja' eram amigos, desbloquear restaura a
+     *  amizade sozinho (pedido explicito do usuario: bloquear/desbloquear nao devia "perder" uma
+     *  amizade de verdade). */
     @Transactional
     public void block(Long requesterId, Long targetUserId) {
         if (targetUserId == null || targetUserId.equals(requesterId)) {
@@ -154,10 +157,12 @@ public class FriendshipService {
         long a = Math.min(requesterId, targetUserId);
         long b = Math.max(requesterId, targetUserId);
         Friendship f = friendshipRepository.findByUserAIdAndUserBId(a, b).orElse(null);
+        FriendshipStatus previous = f != null ? f.getStatus() : null;
         if (f == null) {
             f = Friendship.builder().userAId(a).userBId(b).requestedBy(requesterId).build();
         }
         f.setStatus(FriendshipStatus.BLOCKED);
+        f.setPreviousStatus(previous);
         f.setBlockedBy(requesterId);
         f.setRespondedAt(Instant.now());
         friendshipRepository.save(f);
@@ -172,7 +177,17 @@ public class FriendshipService {
         Friendship f = friendshipRepository.findByUserAIdAndUserBId(a, b)
                 .filter(x -> x.getStatus() == FriendshipStatus.BLOCKED && requesterId.equals(x.getBlockedBy()))
                 .orElseThrow(() -> new IllegalArgumentException("Você não bloqueou esse usuário"));
-        friendshipRepository.delete(f);
+        if (f.getPreviousStatus() == FriendshipStatus.ACCEPTED) {
+            // Eram amigos antes de bloquear - volta a ser amigo direto, sem precisar de pedido
+            // novo (o DirectChannel entre os dois nunca foi apagado, so' ficou "pausado").
+            f.setStatus(FriendshipStatus.ACCEPTED);
+            f.setPreviousStatus(null);
+            f.setBlockedBy(null);
+            f.setRespondedAt(Instant.now());
+            friendshipRepository.save(f);
+        } else {
+            friendshipRepository.delete(f);
+        }
         notify(a);
         notify(b);
     }
