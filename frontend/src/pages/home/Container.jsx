@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/client";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useDmNotifications } from "../../context/DmNotificationsContext.jsx";
 import { createChatClient, subscribeToFriends } from "../../ws/chatSocket";
 
 /**
@@ -14,6 +15,14 @@ import { createChatClient, subscribeToFriends } from "../../ws/chatSocket";
 export function useHomeContainer() {
   const navigate = useNavigate();
   const { user, token, logout } = useAuth();
+  const { unreadDmIds, markDmRead, setActiveDmChannel } = useDmNotifications();
+
+  // Ao SAIR da Home (fechar a aba, trocar de servidor) a conversa que estava aberta deixa de
+  // estar "sendo vista" - senao mensagem nova nela nunca mais contaria como nao lida, mesmo
+  // com o usuario navegando pra outro lugar (ver DmNotificationsContext.jsx, provider GLOBAL
+  // que sobrevive a troca de pagina).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => () => setActiveDmChannel(null), []);
 
   const [servers, setServers] = useState([]);
   const [stompClient, setStompClient] = useState(null);
@@ -146,6 +155,8 @@ export function useHomeContainer() {
       if (prev.some((c) => c.channelId === channel.channelId)) return prev;
       return [{ ...channel, lastMessage: null }, ...prev];
     });
+    setActiveDmChannel(channel.channelId);
+    markDmRead(channel.channelId);
   }
 
   function openDmChannel(dmChannelInfo) {
@@ -158,10 +169,13 @@ export function useHomeContainer() {
       otherStatus: dmChannelInfo.otherStatus,
     });
     setView("dm");
+    setActiveDmChannel(dmChannelInfo.channelId);
+    markDmRead(dmChannelInfo.channelId, dmChannelInfo.lastMessage?.id);
   }
 
   function openFriendsView() {
     setView("friends");
+    setActiveDmChannel(null);
   }
 
   return {
@@ -176,6 +190,7 @@ export function useHomeContainer() {
     friends,
     requests,
     dmChannels,
+    unreadDmIds,
     blocked,
     activeDm,
     showSettings,

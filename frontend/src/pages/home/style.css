@@ -68,6 +68,18 @@
 }
 .home-dm-item:hover { background: var(--bg-hover); color: var(--text-primary); }
 .home-dm-item.active { background: var(--bg-hover); color: var(--text-primary); }
-.home-dm-item-info { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.home-dm-item-info { display: flex; flex-direction: column; min-width: 0; gap: 2px; flex: 1; }
 .home-dm-item-info strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-dm-item-preview { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Conversa com mensagem nao lida - nome fica branco/em destaque (igual Discord: conversa lida
+   fica cinza-fosco, nao-lida "acende"), mais o pontinho vermelho do lado - ver
+   DmNotificationsContext.jsx pra' quando isso liga/desliga. */
+.home-dm-item.unread .home-dm-item-info strong { color: var(--text-primary); }
+.home-dm-item-unread-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+  flex-shrink: 0;
+  margin-left: auto;
+}

@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useDmNotifications } from "../context/DmNotificationsContext.jsx";
 import api from "../api/client";
 import Avatar from "./Avatar.jsx";
 import { HeadphonesIcon } from "./icons.jsx";
@@ -9,6 +10,7 @@ const MAX_AVATARS = 8; // depois disso so mostra "+N", senao a fileira fica giga
 
 export default function ServerSidebar({ servers, selectedServerId, homeActive, onSelect, onHome, onCreateServer }) {
   const { isAdmin } = useAuth();
+  const { hasUnreadDm } = useDmNotifications();
   // Tooltip customizado ao passar o mouse num servidor - pedido explicito do usuario: mostrar
   // os avatares de quem esta numa call de voz AGORA nesse servidor, sem precisar entrar nele
   // primeiro (ver GET /api/servers/{id}/voice-presence, junta a presenca de TODOS os canais de
@@ -60,6 +62,10 @@ export default function ServerSidebar({ servers, selectedServerId, homeActive, o
         >
           <img src={`${import.meta.env.BASE_URL}icon-192.png`} alt="" className="server-icon-img" />
         </button>
+        {/* Pontinho de "tem mensagem privada nao lida" - some sozinho ao abrir a conversa (ver
+            DmNotificationsContext.jsx), fica visivel mesmo com o usuario dentro de um servidor
+            (pedido explicito do usuario). */}
+        {hasUnreadDm && <span className="server-icon-unread-dot" title="Você tem mensagens privadas não lidas" />}
       </div>
       <div className="server-sidebar-divider" />
       {servers.map((s) => {

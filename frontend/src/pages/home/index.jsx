@@ -35,6 +35,7 @@ export default function HomePage() {
     friends,
     requests,
     dmChannels,
+    unreadDmIds,
     blocked,
     activeDm,
     showSettings,
@@ -79,27 +80,37 @@ export default function HomePage() {
               Adicione um amigo pra começar a conversar.
             </p>
           ) : (
-            dmChannels.map((c) => (
-              <button
-                type="button"
-                key={c.channelId}
-                className={"home-dm-item" + (view === "dm" && activeDm?.channelId === c.channelId ? " active" : "")}
-                onClick={() => openDmChannel(c)}
-              >
-                <span className="member-avatar-wrap">
-                  <Avatar name={c.otherUsername} url={c.otherAvatarUrl} className="voice-avatar" />
-                  <span className={"status-dot " + (STATUS_DOT_CLASS[c.otherStatus] || "offline")} />
-                </span>
-                <span className="home-dm-item-info">
-                  <strong>{c.otherNickname || c.otherUsername}</strong>
-                  {c.lastMessage && (
-                    <span className="home-dm-item-preview">
-                      {c.lastMessage.content || (c.lastMessage.imageUrl ? "🖼️ Imagem" : "")}
-                    </span>
-                  )}
-                </span>
-              </button>
-            ))
+            dmChannels.map((c) => {
+              const isUnread = unreadDmIds.has(c.channelId);
+              return (
+                <button
+                  type="button"
+                  key={c.channelId}
+                  className={
+                    "home-dm-item" +
+                    (view === "dm" && activeDm?.channelId === c.channelId ? " active" : "") +
+                    (isUnread ? " unread" : "")
+                  }
+                  onClick={() => openDmChannel(c)}
+                >
+                  <span className="member-avatar-wrap">
+                    <Avatar name={c.otherUsername} url={c.otherAvatarUrl} className="voice-avatar" />
+                    <span className={"status-dot " + (STATUS_DOT_CLASS[c.otherStatus] || "offline")} />
+                  </span>
+                  <span className="home-dm-item-info">
+                    <strong>{c.otherNickname || c.otherUsername}</strong>
+                    {c.lastMessage && (
+                      <span className="home-dm-item-preview">
+                        {c.lastMessage.content || (c.lastMessage.imageUrl ? "🖼️ Imagem" : "")}
+                      </span>
+                    )}
+                  </span>
+                  {/* Pontinho de mensagem nao lida - some ao abrir a conversa (ver
+                      DmNotificationsContext.jsx). */}
+                  {isUnread && <span className="home-dm-item-unread-dot" />}
+                </button>
+              );
+            })
           )}
         </div>
 
