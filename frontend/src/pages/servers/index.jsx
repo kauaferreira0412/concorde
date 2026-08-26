@@ -51,6 +51,7 @@ export default function ServerPage() {
     handleCreateChannel,
     handleDeleteChannel,
     handleMoveChannelCategory,
+    handleCategoryDeleted,
   } = useServersContainer();
 
   return (
@@ -77,6 +78,7 @@ export default function ServerPage() {
           onOpenAuditLog={setAuditLogServer}
           onOpenEmojis={setEmojiServer}
           onMoveChannelCategory={handleMoveChannelCategory}
+          onCategoryDeleted={handleCategoryDeleted}
           stompClient={stompClient}
           stompConnected={stompConnected}
           user={user}

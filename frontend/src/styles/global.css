@@ -617,6 +617,15 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .channel-category-header:hover { background: var(--bg-hover); }
 .channel-category-header .channel-group-title { margin: 0; }
 .channel-category-header:first-child { margin-top: 0; }
+/* "CANAIS DE TEXTO" recebendo o arraste de um canal que ja' esta' numa categoria - soltar
+   ali tira o canal da categoria (ver onDrop em ChannelSidebar.jsx, mesmo visual de
+   .channel-category-subheader.drop-target acima). */
+.channel-category-header.drop-target {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  border-radius: var(--radius-sm);
+}
 
 /* Subcabecalho de uma CATEGORIA (pasta) dentro de "CANAIS DE TEXTO"/"CANAIS DE VOZ" - mais
    discreto que o cabecalho principal acima, so' um pouco recuado (ver ChannelSidebar.jsx

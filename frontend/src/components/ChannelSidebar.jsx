@@ -54,6 +54,7 @@ export default function ChannelSidebar({
   onOpenAuditLog,
   onOpenEmojis,
   onMoveChannelCategory,
+  onCategoryDeleted,
   stompClient,
   stompConnected,
   user,
@@ -254,6 +255,11 @@ export default function ChannelSidebar({
     try {
       await api.delete(`/api/servers/${server.id}/categories/${category.id}`);
       setCategories((prev) => prev.filter((c) => c.id !== category.id));
+      // O backend so' solta os canais dessa categoria (categoryId vira null), nunca apaga eles -
+      // mas o "channels" de fora (pages/servers/Container.jsx) continuava com o categoryId
+      // velho ate' um F5, entao esses canais sumiam da tela sozinhos (reportado pelo usuario
+      // como "os chats foram deletados junto"). Espelha aqui o que ja' aconteceu de verdade.
+      onCategoryDeleted?.(category.id);
     } catch (err) {
       showAlert(err.response?.data?.error || "Não foi possível excluir essa categoria");
     }
@@ -261,8 +267,13 @@ export default function ChannelSidebar({
 
   /** Agrupa uma lista de canais (so' texto OU so' voz) por categoria - "sem categoria" vem
    *  primeiro (e so' aparece se tiver algum canal ali, pra nao mudar nada visualmente nos
-   *  servidores que ainda nao usam categoria nenhuma), o resto na ordem das categorias. */
-  function groupByCategory(list) {
+   *  servidores que ainda nao usam categoria nenhuma), o resto na ordem das categorias.
+   *  As categorias aparecem nas DUAS secoes (texto e voz), entao uma categoria vazia numa
+   *  das secoes (ex: acabou de ser criada, sem nenhum canal ainda) mostraria o cabecalho
+   *  duas vezes na tela - com hideEmpty, essa secao pula as que estao vazias (a outra secao
+   *  continua mostrando, garantindo que sempre tenha pelo menos um lugar pra gerenciar/soltar
+   *  um canal nela). */
+  function groupByCategory(list, { hideEmpty = false } = {}) {
     const byCategory = new Map();
     const uncategorized = [];
     list.forEach((c) => {
@@ -278,7 +289,9 @@ export default function ChannelSidebar({
       groups.push({ category: null, channels: uncategorized.sort((a, b) => a.position - b.position) });
     }
     categories.forEach((cat) => {
-      groups.push({ category: cat, channels: (byCategory.get(cat.id) || []).sort((a, b) => a.position - b.position) });
+      const channels = (byCategory.get(cat.id) || []).sort((a, b) => a.position - b.position);
+      if (hideEmpty && channels.length === 0) return;
+      groups.push({ category: cat, channels });
     });
     return groups;
   }
@@ -661,7 +674,23 @@ export default function ChannelSidebar({
               </button>
             )}
 
-            <button className="channel-category-header" onClick={() => setTextExpanded((v) => !v)}>
+            <button
+              className={"channel-category-header" + (dragOverCategoryId === "text-none" ? " drop-target" : "")}
+              onClick={() => setTextExpanded((v) => !v)}
+              onDragOver={(e) => {
+                if (!canManageChannels || !draggingChannelId) return;
+                e.preventDefault();
+                setDragOverCategoryId("text-none");
+              }}
+              onDragLeave={() => setDragOverCategoryId((prev) => (prev === "text-none" ? null : prev))}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOverCategoryId(null);
+                if (!canManageChannels || !draggingChannelId) return;
+                onMoveChannelCategory(draggingChannelId, null);
+              }}
+              title={canManageChannels ? "Arraste um canal aqui pra tirar da categoria" : undefined}
+            >
               <span className={"connected-chevron" + (textExpanded ? " open" : "")}>▸</span>
               <span className="channel-group-title">CANAIS DE TEXTO</span>
             </button>
@@ -687,7 +716,7 @@ export default function ChannelSidebar({
             </button>
             {voiceExpanded && (
               <>
-                {groupByCategory(voiceChannels).map((group) => (
+                {groupByCategory(voiceChannels, { hideEmpty: true }).map((group) => (
                   <div key={group.category?.id ?? "none"}>
                     {group.category && renderCategoryHeader(group.category)}
                     {!collapsedCategories.has(group.category?.id) && group.channels.map(renderVoiceChannel)}

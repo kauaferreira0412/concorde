@@ -121,6 +121,15 @@ export function useServersContainer() {
     setChannels((prev) => prev.map((c) => (c.id === channelId ? data : c)));
   }
 
+  /** Categoria excluida (ver ChannelSidebar.jsx) - o backend ja' solta os canais que estavam
+   *  dentro dela (so' zera categoryId, nao apaga ninguem, ver ServerService.deleteCategory), mas
+   *  o "channels" daqui continuava com o categoryId VELHO ate' o proximo F5 - os canais somem
+   *  da tela sozinhos (nenhum grupo mais os renderiza), parecendo que foram apagados junto com a
+   *  categoria (reportado pelo usuario). So' espelha aqui o que o backend ja' fez de verdade. */
+  function handleCategoryDeleted(categoryId) {
+    setChannels((prev) => prev.map((c) => (c.categoryId === categoryId ? { ...c, categoryId: null } : c)));
+  }
+
   return {
     user,
     logout,
@@ -156,5 +165,6 @@ export function useServersContainer() {
     handleCreateChannel,
     handleDeleteChannel,
     handleMoveChannelCategory,
+    handleCategoryDeleted,
   };
 }
