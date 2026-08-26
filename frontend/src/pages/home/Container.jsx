@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import api from "../../api/client";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useDmNotifications } from "../../context/DmNotificationsContext.jsx";
@@ -14,6 +14,7 @@ import { createChatClient, subscribeToFriends } from "../../ws/chatSocket";
  */
 export function useHomeContainer() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, token, logout } = useAuth();
   const { unreadDmIds, markDmRead, setActiveDmChannel } = useDmNotifications();
 
@@ -36,6 +37,22 @@ export function useHomeContainer() {
   const [blocked, setBlocked] = useState([]);
   const [activeDm, setActiveDm] = useState(null); // { channelId, otherUserId, otherUsername, ... }
   const [showSettings, setShowSettings] = useState(false);
+
+  // Chegou aqui vindo do botao "Enviar mensagem" no perfil de um membro (ver ProfileModal.jsx,
+  // "goToDm") - ja abre a conversa direto, sem precisar clicar de novo na lista depois de
+  // navegar. Limpa o state logo em seguida (replace) pra nao reabrir sozinho de novo se o
+  // usuario der F5 ou voltar por aqui de outro jeito.
+  useEffect(() => {
+    const openDm = location.state?.openDm;
+    if (!openDm) return;
+    setActiveDm(openDm);
+    setView("dm");
+    setActiveDmChannel(openDm.channelId);
+    markDmRead(openDm.channelId);
+    setDmChannels((prev) => (prev.some((c) => c.channelId === openDm.channelId) ? prev : [{ ...openDm, lastMessage: null }, ...prev]));
+    navigate(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!token) return;

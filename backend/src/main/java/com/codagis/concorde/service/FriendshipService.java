@@ -7,6 +7,7 @@ import com.codagis.concorde.dto.FriendDtos.FriendEvent;
 import com.codagis.concorde.dto.FriendDtos.FriendInfo;
 import com.codagis.concorde.dto.FriendDtos.FriendRequestInfo;
 import com.codagis.concorde.dto.FriendDtos.FriendRequestsResponse;
+import com.codagis.concorde.dto.FriendDtos.FriendStatusResponse;
 import com.codagis.concorde.enums.FriendshipStatus;
 import com.codagis.concorde.repository.DirectChannelRepository;
 import com.codagis.concorde.repository.FriendshipRepository;
@@ -124,6 +125,27 @@ public class FriendshipService {
         return friendshipRepository.findByUserAIdAndUserBId(a, b)
                 .filter(x -> x.getStatus() == FriendshipStatus.PENDING)
                 .orElseThrow(() -> new IllegalArgumentException("Não tem nenhum pedido pendente com esse usuário"));
+    }
+
+    /** Estado da relacao entre "eu" e "esse outro usuario" - usado no perfil de um membro (ver
+     *  ProfileModal.jsx) pra decidir se mostra "Adicionar amigo", "Pedido enviado", "Aceitar
+     *  pedido" ou "Enviar mensagem". */
+    @Transactional
+    public FriendStatusResponse status(Long userId, Long otherUserId) {
+        if (userId.equals(otherUserId)) {
+            return new FriendStatusResponse("SELF", null);
+        }
+        long a = Math.min(userId, otherUserId);
+        long b = Math.max(userId, otherUserId);
+        Friendship f = friendshipRepository.findByUserAIdAndUserBId(a, b).orElse(null);
+        if (f == null) {
+            return new FriendStatusResponse("NONE", null);
+        }
+        return switch (f.getStatus()) {
+            case ACCEPTED -> new FriendStatusResponse("FRIENDS", getOrCreateChannel(a, b).getId());
+            case PENDING -> new FriendStatusResponse(f.getRequestedBy().equals(userId) ? "OUTGOING" : "INCOMING", null);
+            case BLOCKED -> new FriendStatusResponse(userId.equals(f.getBlockedBy()) ? "BLOCKED_BY_ME" : "BLOCKED_BY_THEM", null);
+        };
     }
 
     public boolean areFriends(Long userIdA, Long userIdB) {

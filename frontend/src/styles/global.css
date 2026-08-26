@@ -2936,6 +2936,16 @@ h3.chat-heading {
   margin-bottom: 14px;
 }
 .profile-status-pill .status-dot { position: static; width: 8px; height: 8px; border: none; }
+/* Acao de amizade no perfil de um membro (ver ProfileModal.jsx) - "Adicionar amigo"/"Pedido
+   enviado"/"Aceitar pedido"/"Enviar mensagem", pedido explicito do usuario: dava pra fazer isso
+   direto no perfil de quem tem acesso ao servidor, nao so' pela tela de Amigos. */
+.profile-friend-action { margin-bottom: 14px; }
+.profile-friend-action button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
 .profile-section { padding: 12px 0; border-top: 1px solid var(--border-soft); }
 .profile-section:first-of-type { border-top: none; padding-top: 0; }
 .profile-section-title {

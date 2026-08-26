@@ -16,6 +16,12 @@ public class FriendDtos {
 
     public record SendFriendRequestBody(String username) {}
 
+    // "SELF" (e' voce mesmo), "NONE" (estranhos), "OUTGOING" (voce mandou pedido, esperando),
+    // "INCOMING" (ele mandou pedido pra voce), "FRIENDS" (amigos - dmChannelId preenchido),
+    // "BLOCKED_BY_ME"/"BLOCKED_BY_THEM". Usado no perfil de um membro (ver ProfileModal.jsx)
+    // pra decidir se mostra "Adicionar amigo" ou "Enviar mensagem".
+    public record FriendStatusResponse(String status, Long dmChannelId) {}
+
     // Evento generico via /user/queue/friends - o frontend so' reage recarregando a lista de
     // amigos/pedidos (ver FriendsPage), sem tentar aplicar patch incremental no estado.
     public record FriendEvent(String type) {}

@@ -3,6 +3,7 @@ package com.codagis.concorde.controller;
 import com.codagis.concorde.dto.FriendDtos.FriendInfo;
 import com.codagis.concorde.dto.FriendDtos.FriendRequestInfo;
 import com.codagis.concorde.dto.FriendDtos.FriendRequestsResponse;
+import com.codagis.concorde.dto.FriendDtos.FriendStatusResponse;
 import com.codagis.concorde.dto.FriendDtos.SendFriendRequestBody;
 import com.codagis.concorde.security.CurrentUser;
 import com.codagis.concorde.service.FriendshipService;
@@ -30,6 +31,13 @@ public class FriendController {
     @GetMapping("/requests")
     public FriendRequestsResponse requests() {
         return friendshipService.listRequests(currentUser.id());
+    }
+
+    // Estado da amizade com esse usuario (ver ProfileModal.jsx - decide entre "Adicionar
+    // amigo"/"Pedido enviado"/"Aceitar pedido"/"Enviar mensagem").
+    @GetMapping("/status/{userId}")
+    public FriendStatusResponse status(@PathVariable Long userId) {
+        return friendshipService.status(currentUser.id(), userId);
     }
 
     @PostMapping("/requests")

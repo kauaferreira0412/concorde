@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useAlert } from "../context/AlertContext.jsx";
 import Avatar from "./Avatar.jsx";
-import { ShieldIcon } from "./icons.jsx";
+import { CheckIcon, MessageSquareIcon, ShieldIcon } from "./icons.jsx";
 
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", OFFLINE: "Offline" };
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
@@ -19,23 +21,83 @@ const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: 
  */
 export default function ProfileModal({ userId, onClose }) {
   const { user: me } = useAuth();
+  const { showAlert } = useAlert();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [loadError, setLoadError] = useState("");
+  // Relacao de amizade com essa pessoa (ver GET /api/friends/status/{userId} no backend) - so'
+  // busca quando NAO e' o proprio perfil, decide se mostra "Adicionar amigo"/"Pedido enviado"/
+  // "Aceitar pedido"/"Enviar mensagem" (pedido explicito do usuario: essas acoes direto no
+  // perfil de um membro do servidor, nao so' pela tela de Amigos).
+  const [friendStatus, setFriendStatus] = useState(null);
+  const [friendActionBusy, setFriendActionBusy] = useState(false);
 
   const isMe = me?.id === userId;
 
   useEffect(() => {
     setProfile(null);
     setLoadError("");
+    setFriendStatus(null);
     api
       .get(`/api/users/${userId}/profile`)
       .then(({ data }) => setProfile(data))
       .catch((err) => setLoadError(err.response?.data?.error || "Não foi possível carregar esse perfil"));
+    if (me?.id !== userId) {
+      api.get(`/api/friends/status/${userId}`).then(({ data }) => setFriendStatus(data));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   function openSettingsInstead() {
     onClose();
     window.dispatchEvent(new CustomEvent("concorde:open-settings"));
+  }
+
+  async function handleSendFriendRequest() {
+    if (!profile || friendActionBusy) return;
+    setFriendActionBusy(true);
+    try {
+      await api.post("/api/friends/requests", { username: profile.username });
+      setFriendStatus({ status: "OUTGOING", dmChannelId: null });
+    } catch (err) {
+      showAlert(err.response?.data?.error || "Não foi possível enviar o pedido de amizade");
+    } finally {
+      setFriendActionBusy(false);
+    }
+  }
+
+  async function handleAcceptFriendRequest() {
+    if (friendActionBusy) return;
+    setFriendActionBusy(true);
+    try {
+      await api.post(`/api/friends/requests/${userId}/accept`);
+      const { data } = await api.get(`/api/friends/status/${userId}`);
+      setFriendStatus(data);
+    } catch (err) {
+      showAlert(err.response?.data?.error || "Não foi possível aceitar o pedido");
+    } finally {
+      setFriendActionBusy(false);
+    }
+  }
+
+  /** Manda pra Home ja' abrindo a conversa com essa pessoa - a Home busca a lista de amigos
+   *  sozinha, mas passar tudo pronto no state evita esperar esse round-trip pra ver a
+   *  conversa abrir (ver pages/home/Container.jsx, le' location.state uma vez ao montar). */
+  function goToDm() {
+    if (!profile || !friendStatus?.dmChannelId) return;
+    onClose();
+    navigate("/channels/@me", {
+      state: {
+        openDm: {
+          channelId: friendStatus.dmChannelId,
+          otherUserId: profile.id,
+          otherUsername: profile.username,
+          otherNickname: profile.nickname,
+          otherAvatarUrl: profile.avatarUrl,
+          otherStatus: profile.status,
+        },
+      },
+    });
   }
 
   return (
@@ -68,6 +130,31 @@ export default function ProfileModal({ userId, onClose }) {
                 <span className={"status-dot " + STATUS_DOT_CLASS[profile.status]} />
                 {STATUS_LABEL[profile.status]}
               </span>
+
+              {!isMe && friendStatus && (
+                <div className="profile-friend-action">
+                  {friendStatus.status === "NONE" && (
+                    <button type="button" onClick={handleSendFriendRequest} disabled={friendActionBusy}>
+                      Adicionar amigo
+                    </button>
+                  )}
+                  {friendStatus.status === "OUTGOING" && (
+                    <button type="button" className="link-btn" disabled>
+                      Pedido de amizade enviado
+                    </button>
+                  )}
+                  {friendStatus.status === "INCOMING" && (
+                    <button type="button" onClick={handleAcceptFriendRequest} disabled={friendActionBusy}>
+                      <CheckIcon size={14} /> Aceitar pedido de amizade
+                    </button>
+                  )}
+                  {friendStatus.status === "FRIENDS" && (
+                    <button type="button" onClick={goToDm}>
+                      <MessageSquareIcon size={14} /> Enviar mensagem
+                    </button>
+                  )}
+                </div>
+              )}
 
               <div className="profile-section">
                 <p className="profile-section-title">Sobre mim</p>
