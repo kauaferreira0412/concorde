@@ -24,6 +24,7 @@ import { CheckIcon, PencilIcon, PinIcon, PlusIcon, ReplyIcon, SearchIcon, SmileI
 
 const ROLL_COMMAND_RE = /^\/(?:roll|r)\s+(.+)$/i;
 const ROLL_NOTATION_RE = /^(\d{0,2})d(\d{1,3})\s*([+-]\s*\d{1,3})?$/i;
+const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
 
 /**
  * Chat PRIVADO (DM) - mesmo "esqueleto"/classes CSS do ChatWindow.jsx (chat de servidor), com o
@@ -331,7 +332,10 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
     <div className="chat-window">
       <div className="chat-header">
         <button type="button" className="chat-header-dm-user" onClick={() => openProfile(channel.otherUserId)}>
-          <Avatar name={channel.otherUsername} url={channel.otherAvatarUrl} className="chat-header-dm-avatar" />
+          <span className="member-avatar-wrap">
+            <Avatar name={channel.otherUsername} url={channel.otherAvatarUrl} className="voice-avatar" />
+            <span className={"status-dot " + (STATUS_DOT_CLASS[channel.otherStatus] || "offline")} />
+          </span>
           <span className="chat-header-name">{channel.otherNickname || channel.otherUsername}</span>
         </button>
         <div className="chat-header-actions">

@@ -832,11 +832,12 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
 .chat-header-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 /* Cabecalho do chat PRIVADO (ver DmChatWindow.jsx) - mesmo .chat-header de fora, so' que em vez
    de "# nome-do-canal" mostra avatar + nome de quem voce esta conversando (clicavel, abre o
-   perfil dele) - equivalente ao MegaphoneIcon/nome usado no chat de servidor. */
+   perfil dele) - MESMO tamanho de avatar/dot/gap da lista de conversas diretas (ver
+   .home-dm-item em pages/home/style.css), pedido explicito do usuario pra ficar consistente. */
 .chat-header-dm-user {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
   background: transparent;
   border: none;
@@ -847,7 +848,6 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
   margin: -6px -8px;
   cursor: pointer;
 }
-.chat-header-dm-avatar { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; }
 
 /* Painel deslizante de mensagens fixadas/busca (ver botoes no chat-header) - lista simples de
    resultados clicaveis, cada um pula pra mensagem correspondente se ela estiver carregada. */
