@@ -102,8 +102,6 @@ export default function ChannelSidebar({
     server?.name
   );
   const [connectedExpanded, setConnectedExpanded] = useState(true);
-  const [textExpanded, setTextExpanded] = useState(true);
-  const [voiceExpanded, setVoiceExpanded] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   // Popover em cima do avatar de alguem na lista de "quem esta na call" (aninhada sob o
   // canal de voz) - volume (so' se voce estiver na MESMA call, e' o LiveKit que controla
@@ -265,18 +263,16 @@ export default function ChannelSidebar({
     }
   }
 
-  /** Agrupa uma lista de canais (so' texto OU so' voz) por categoria - "sem categoria" vem
-   *  primeiro (e so' aparece se tiver algum canal ali, pra nao mudar nada visualmente nos
-   *  servidores que ainda nao usam categoria nenhuma), o resto na ordem das categorias.
-   *  As categorias aparecem nas DUAS secoes (texto e voz), entao uma categoria vazia numa
-   *  das secoes (ex: acabou de ser criada, sem nenhum canal ainda) mostraria o cabecalho
-   *  duas vezes na tela - com hideEmpty, essa secao pula as que estao vazias (a outra secao
-   *  continua mostrando, garantindo que sempre tenha pelo menos um lugar pra gerenciar/soltar
-   *  um canal nela). */
-  function groupByCategory(list, { hideEmpty = false } = {}) {
+  /** Agrupa TODOS os canais (texto e voz misturados, igual Discord) por categoria - cada
+   *  categoria vira UM bloco so' com seus canais de texto e voz juntos (por "position", que ja'
+   *  e' compartilhado entre os dois tipos dentro de uma mesma categoria - ver
+   *  ServerService.createChannel no backend), em vez das antigas secoes fixas "CANAIS DE
+   *  TEXTO"/"CANAIS DE VOZ" que duplicavam o cabecalho de cada categoria (uma vez em cada
+   *  secao). Canais sem categoria ficam soltos, sem cabecalho nenhum, no topo da lista. */
+  function groupByCategory() {
     const byCategory = new Map();
     const uncategorized = [];
-    list.forEach((c) => {
+    channels.forEach((c) => {
       if (c.categoryId == null) {
         uncategorized.push(c);
       } else {
@@ -284,16 +280,16 @@ export default function ChannelSidebar({
         byCategory.get(c.categoryId).push(c);
       }
     });
-    const groups = [];
-    if (uncategorized.length > 0) {
-      groups.push({ category: null, channels: uncategorized.sort((a, b) => a.position - b.position) });
-    }
-    categories.forEach((cat) => {
-      const channels = (byCategory.get(cat.id) || []).sort((a, b) => a.position - b.position);
-      if (hideEmpty && channels.length === 0) return;
-      groups.push({ category: cat, channels });
-    });
-    return groups;
+    uncategorized.sort((a, b) => a.position - b.position);
+    const groups = categories.map((cat) => ({
+      category: cat,
+      channels: (byCategory.get(cat.id) || []).sort((a, b) => a.position - b.position),
+    }));
+    return { uncategorized, groups };
+  }
+
+  function renderChannel(c) {
+    return c.type === "VOICE" ? renderVoiceChannel(c) : renderTextChannel(c);
   }
 
   useEffect(() => {
@@ -602,6 +598,8 @@ export default function ChannelSidebar({
     );
   }
 
+  const groupedChannels = groupByCategory();
+
   return (
     <div className={"channel-sidebar" + (collapsed ? " collapsed" : "")}>
       <div className="channel-sidebar-header">
@@ -682,77 +680,45 @@ export default function ChannelSidebar({
               </button>
             )}
 
-            <button
-              className={"channel-category-header" + (dragOverCategoryId === "text-none" ? " drop-target" : "")}
-              onClick={() => setTextExpanded((v) => !v)}
-              onDragOver={(e) => {
-                if (!canManageChannels || !draggingChannelId) return;
-                e.preventDefault();
-                setDragOverCategoryId("text-none");
-              }}
-              onDragLeave={() => setDragOverCategoryId((prev) => (prev === "text-none" ? null : prev))}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOverCategoryId(null);
-                if (!canManageChannels || !draggingChannelId) return;
-                onMoveChannelCategory(draggingChannelId, null);
-              }}
-              title={canManageChannels ? "Arraste um canal aqui pra tirar da categoria" : undefined}
-            >
-              <span className={"connected-chevron" + (textExpanded ? " open" : "")}>▸</span>
-              <span className="channel-group-title">CANAIS DE TEXTO</span>
-            </button>
-            {textExpanded && (
+            {groupedChannels.uncategorized.map(renderChannel)}
+
+            {canManageChannels && groupedChannels.groups.length > 0 && (
+              <div
+                className={"channel-uncategorized-drop" + (dragOverCategoryId === "none" ? " drop-target" : "")}
+                onDragOver={(e) => {
+                  if (!draggingChannelId) return;
+                  e.preventDefault();
+                  setDragOverCategoryId("none");
+                }}
+                onDragLeave={() => setDragOverCategoryId((prev) => (prev === "none" ? null : prev))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverCategoryId(null);
+                  if (!draggingChannelId) return;
+                  onMoveChannelCategory(draggingChannelId, null);
+                }}
+              >
+                Arraste um canal aqui pra tirar da categoria
+              </div>
+            )}
+
+            {canManageChannels && (
               <>
-                {groupByCategory(textChannels).map((group) => (
-                  <div key={group.category?.id ?? "none"}>
-                    {group.category && renderCategoryHeader(group.category)}
-                    {!collapsedCategories.has(group.category?.id) && group.channels.map(renderTextChannel)}
-                  </div>
-                ))}
-                {canManageChannels && (
-                  <button className="channel-item add" onClick={() => onCreateChannel("TEXT")}>
-                    + canal de texto
-                  </button>
-                )}
+                <button className="channel-item add" onClick={() => onCreateChannel("TEXT")}>
+                  + canal de texto
+                </button>
+                <button className="channel-item add" onClick={() => onCreateChannel("VOICE")}>
+                  + canal de voz
+                </button>
               </>
             )}
 
-            <button
-              className={"channel-category-header" + (dragOverCategoryId === "voice-none" ? " drop-target" : "")}
-              onClick={() => setVoiceExpanded((v) => !v)}
-              onDragOver={(e) => {
-                if (!canManageChannels || !draggingChannelId) return;
-                e.preventDefault();
-                setDragOverCategoryId("voice-none");
-              }}
-              onDragLeave={() => setDragOverCategoryId((prev) => (prev === "voice-none" ? null : prev))}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOverCategoryId(null);
-                if (!canManageChannels || !draggingChannelId) return;
-                onMoveChannelCategory(draggingChannelId, null);
-              }}
-              title={canManageChannels ? "Arraste um canal aqui pra tirar da categoria" : undefined}
-            >
-              <span className={"connected-chevron" + (voiceExpanded ? " open" : "")}>▸</span>
-              <span className="channel-group-title">CANAIS DE VOZ</span>
-            </button>
-            {voiceExpanded && (
-              <>
-                {groupByCategory(voiceChannels, { hideEmpty: true }).map((group) => (
-                  <div key={group.category?.id ?? "none"}>
-                    {group.category && renderCategoryHeader(group.category)}
-                    {!collapsedCategories.has(group.category?.id) && group.channels.map(renderVoiceChannel)}
-                  </div>
-                ))}
-                {canManageChannels && (
-                  <button className="channel-item add" onClick={() => onCreateChannel("VOICE")}>
-                    + canal de voz
-                  </button>
-                )}
-              </>
-            )}
+            {groupedChannels.groups.map((group) => (
+              <div key={group.category.id}>
+                {renderCategoryHeader(group.category)}
+                {!collapsedCategories.has(group.category.id) && group.channels.map(renderChannel)}
+              </div>
+            ))}
           </>
         )}
       </div>
