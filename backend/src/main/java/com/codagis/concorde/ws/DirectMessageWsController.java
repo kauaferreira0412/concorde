@@ -28,15 +28,20 @@ import java.security.Principal;
  * StompAuthChannelInterceptor - aqui cada acao tambem confere participante de novo do lado do
  * DirectMessageService (defesa em profundidade).
  */
+// Nome de classe DIFERENTE de controller.DirectMessageController (REST) de proposito - os dois
+// "DirectMessageController" (um aqui, um em controller/) geravam o MESMO nome de bean padrao
+// do Spring ("directMessageController"), batendo um no outro e derrubando o backend inteiro no
+// boot (ConflictingBeanDefinitionException) - erro so' aparece rodando de verdade, nao da pra
+// pegar so' lendo o codigo.
 @Controller
-public class DirectMessageController {
+public class DirectMessageWsController {
 
     private final DirectMessageService directMessageService;
     private final DiceService diceService;
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
-    public DirectMessageController(DirectMessageService directMessageService, DiceService diceService,
+    public DirectMessageWsController(DirectMessageService directMessageService, DiceService diceService,
                                     UserRepository userRepository, SimpMessagingTemplate messagingTemplate) {
         this.directMessageService = directMessageService;
         this.diceService = diceService;
