@@ -635,6 +635,19 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .channel-category-subheader:hover { background: var(--bg-hover); color: var(--text-secondary); }
 .channel-category-subheader .channel-group-title { margin: 0; font-size: 10.5px; }
 .channel-category-subheader svg { flex-shrink: 0; }
+/* Categoria recebendo o arraste de um canal de TEXTO (ver draggable/onDrop em
+   ChannelSidebar.jsx) - destaca pra indicar que soltar ali move o canal pra essa categoria.
+   box-shadow em vez de border (o cabecalho nao tem borda nenhuma por padrao, evita mudar o
+   tamanho da caixa so' por causa do hover de arraste). */
+.channel-category-subheader.drop-target {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  border-radius: var(--radius-sm);
+}
+/* Canal de texto sendo arrastado - fica meio apagado enquanto arrasta, igual o padrao de
+   drag-and-drop do resto do app. */
+.channel-item.dragging { opacity: 0.45; }
 
 /* Botao "+ categoria" no topo da lista de canais - mesmo estilo tracejado do "+ canal", mais
    compacto (fica sozinho numa linha, nao um por tipo de canal). */

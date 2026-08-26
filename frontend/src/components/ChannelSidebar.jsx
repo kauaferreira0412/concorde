@@ -153,6 +153,11 @@ export default function ChannelSidebar({
   // draggable/onDrop abaixo) - so' existe enquanto o arraste esta rolando.
   const [draggingParticipant, setDraggingParticipant] = useState(null); // { channelId, userId }
   const [dragOverChannelId, setDragOverChannelId] = useState(null);
+  // Arrastar um canal de TEXTO pra dentro de uma categoria (pedido explicito do usuario) -
+  // draggingChannelId e' o canal sendo arrastado, dragOverCategoryId e' o cabecalho de
+  // categoria com o mouse em cima agora (so' pra destacar visualmente onde vai cair).
+  const [draggingChannelId, setDraggingChannelId] = useState(null);
+  const [dragOverCategoryId, setDragOverCategoryId] = useState(null);
 
   useEffect(() => {
     if (!server?.id) {
@@ -408,13 +413,20 @@ export default function ChannelSidebar({
     return (
       <button
         key={c.id}
-        className={"channel-item" + (c.id === selectedChannelId ? " active" : "")}
+        className={"channel-item" + (c.id === selectedChannelId ? " active" : "") + (draggingChannelId === c.id ? " dragging" : "")}
         onClick={() => onSelectChannel(c)}
         onContextMenu={(e) => {
           if (!canManageChannels) return;
           e.preventDefault();
           setChannelMenu({ id: c.id, name: c.name, x: e.clientX, y: e.clientY });
         }}
+        draggable={canManageChannels}
+        onDragStart={() => setDraggingChannelId(c.id)}
+        onDragEnd={() => {
+          setDraggingChannelId(null);
+          setDragOverCategoryId(null);
+        }}
+        title={canManageChannels ? "Arraste pra uma categoria pra mover" : undefined}
       >
         {c.adminOnly ? (
           <MegaphoneIcon size={16} className="channel-item-icon" />
@@ -541,12 +553,25 @@ export default function ChannelSidebar({
     return (
       <button
         key={`cat-${category.id}`}
-        className="channel-category-subheader"
+        className={"channel-category-subheader" + (dragOverCategoryId === category.id ? " drop-target" : "")}
         onClick={() => toggleCategoryCollapsed(category.id)}
         onContextMenu={(e) => {
           if (!canManageChannels) return;
           e.preventDefault();
           setCategoryMenu({ id: category.id, name: category.name, x: e.clientX, y: e.clientY });
+        }}
+        onDragOver={(e) => {
+          if (!canManageChannels || !draggingChannelId) return;
+          e.preventDefault();
+          setDragOverCategoryId(category.id);
+        }}
+        onDragLeave={() => setDragOverCategoryId((prev) => (prev === category.id ? null : prev))}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOverCategoryId(null);
+          if (!canManageChannels || !draggingChannelId) return;
+          onMoveChannelCategory(draggingChannelId, category.id);
+          setDraggingChannelId(null);
         }}
       >
         <span className={"connected-chevron" + (!isCollapsed ? " open" : "")}>▸</span>
