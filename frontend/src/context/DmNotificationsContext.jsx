@@ -165,11 +165,11 @@ export function DmNotificationsProvider({ children }) {
   );
 
   /** Notificacao de mensagem privada nova - mesmo padrao de useUnreadMessages.js (mensagem de
-   *  canal de servidor): som (se "Tocar som..."/notificar estiver ligado) + popup do SO (se a
-   *  permissao do navegador tiver sido concedida). */
+   *  canal de servidor): som toca SEMPRE, popup do SO so' se o toggle estiver ligado E o
+   *  navegador tiver dado permissao. */
   function notifyDesktop(message) {
-    if (!getDesktopNotificationsEnabled()) return;
     playMessageSound();
+    if (!getDesktopNotificationsEnabled()) return;
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     try {
       const notification = new Notification(message.authorUsername, {

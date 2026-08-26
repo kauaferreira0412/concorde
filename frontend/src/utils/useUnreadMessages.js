@@ -125,10 +125,12 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
   }
 
   function notifyDesktop(channelId, message) {
-    if (!getDesktopNotificationsEnabled()) return;
-    // O som toca mesmo sem permissao de notificacao do navegador concedida (o popup visual
-    // precisa dela, o audio nao) - senao quem nunca autorizou o popup tambem nunca ouve nada.
+    // O som toca SEMPRE que chega mensagem nova (nao depende do toggle "notificar sobre
+    // mensagens" nem de permissao do navegador) - esse toggle so' controla o POPUP visual do SO;
+    // exigir os dois pro som tambem tocar deixava o som mudo pra quem nunca ligou o popup, que
+    // e' desligado por padrao (bug reportado: "mandei o audio mas nao ouço nada").
     playMessageSound();
+    if (!getDesktopNotificationsEnabled()) return;
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     const channelName = channelNameById.current.get(channelId) || "canal";
     // Linha 1 = de ONDE vem (canal + servidor), linha 2 = a mensagem resumida - igual
