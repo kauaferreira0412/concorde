@@ -7,6 +7,7 @@ import ConfirmModal from "../../components/ConfirmModal.jsx";
 import SettingsModal from "../../components/SettingsModal.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useProfile } from "../../context/ProfileContext.jsx";
+import { VoiceCallProvider } from "../../context/VoiceCallContext.jsx";
 import { LogOutIcon, MessageSquareIcon, SettingsIcon, UsersIcon } from "../../components/icons.jsx";
 import { useHomeContainer } from "./Container.jsx";
 import "./style.css";
@@ -34,6 +35,7 @@ export default function HomePage() {
     friends,
     requests,
     dmChannels,
+    blocked,
     activeDm,
     showSettings,
     setShowSettings,
@@ -41,12 +43,15 @@ export default function HomePage() {
     acceptFriendRequest,
     declineFriendRequest,
     removeFriend,
+    blockUser,
+    unblockUser,
     openDmWithFriend,
     openDmChannel,
     openFriendsView,
   } = useHomeContainer();
 
   return (
+    <VoiceCallProvider stompClient={stompClient} stompConnected={stompConnected}>
     <div className="app-shell">
       <ServerSidebar
         servers={servers}
@@ -124,10 +129,13 @@ export default function HomePage() {
         <FriendsPanel
           friends={friends}
           requests={requests}
+          blocked={blocked}
           onSendRequest={sendFriendRequest}
           onAccept={acceptFriendRequest}
           onDecline={declineFriendRequest}
           onRemove={removeFriend}
+          onBlock={blockUser}
+          onUnblock={unblockUser}
           onOpenDm={openDmWithFriend}
         />
       ) : activeDm ? (
@@ -151,5 +159,6 @@ export default function HomePage() {
         />
       )}
     </div>
+    </VoiceCallProvider>
   );
 }

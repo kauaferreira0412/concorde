@@ -40,21 +40,24 @@ public class DirectMessageService {
     private final DirectChannelRepository directChannelRepository;
     private final UserRepository userRepository;
     private final OnlinePresenceService presenceService;
+    private final FriendshipService friendshipService;
 
     public DirectMessageService(DirectMessageRepository directMessageRepository,
                                  DirectMessageReactionRepository reactionRepository,
                                  DirectChannelRepository directChannelRepository, UserRepository userRepository,
-                                 OnlinePresenceService presenceService) {
+                                 OnlinePresenceService presenceService, FriendshipService friendshipService) {
         this.directMessageRepository = directMessageRepository;
         this.reactionRepository = reactionRepository;
         this.directChannelRepository = directChannelRepository;
         this.userRepository = userRepository;
         this.presenceService = presenceService;
+        this.friendshipService = friendshipService;
     }
 
     @Transactional
     public DmMessage save(Long channelId, Long authorId, String content, String imageUrl, Long replyToId) {
-        assertParticipant(channelId, authorId);
+        DirectChannel channel = requireParticipant(channelId, authorId);
+        assertNotBlocked(channel);
         boolean hasText = content != null && !content.isBlank();
         boolean hasImage = imageUrl != null && !imageUrl.isBlank();
         if (!hasText && !hasImage) {
@@ -79,7 +82,8 @@ public class DirectMessageService {
 
     @Transactional
     public DmMessage saveRoll(Long channelId, Long authorId, DiceService.RollResult roll) {
-        assertParticipant(channelId, authorId);
+        DirectChannel channel = requireParticipant(channelId, authorId);
+        assertNotBlocked(channel);
         StringBuilder resultsCsv = new StringBuilder();
         StringBuilder resultsReadable = new StringBuilder();
         for (int i = 0; i < roll.results().length; i++) {
@@ -204,10 +208,23 @@ public class DirectMessageService {
     }
 
     public void assertParticipant(Long channelId, Long userId) {
+        requireParticipant(channelId, userId);
+    }
+
+    private DirectChannel requireParticipant(Long channelId, Long userId) {
         DirectChannel channel = directChannelRepository.findById(channelId)
                 .orElseThrow(() -> new IllegalArgumentException("Conversa não existe"));
         if (!channel.getUserAId().equals(userId) && !channel.getUserBId().equals(userId)) {
             throw new IllegalStateException("Você não participa dessa conversa");
+        }
+        return channel;
+    }
+
+    // So' barra MENSAGEM NOVA (texto/imagem/dado) - historico continua legivel pros dois, so'
+    // nao da mais pra mandar nada enquanto um bloqueou o outro (ver FriendshipService.block).
+    private void assertNotBlocked(DirectChannel channel) {
+        if (friendshipService.isBlocked(channel.getUserAId(), channel.getUserBId())) {
+            throw new IllegalStateException("Não é possível enviar mensagem - conversa bloqueada");
         }
     }
 

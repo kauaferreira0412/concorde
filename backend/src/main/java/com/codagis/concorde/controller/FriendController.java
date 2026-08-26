@@ -1,6 +1,7 @@
 package com.codagis.concorde.controller;
 
 import com.codagis.concorde.dto.FriendDtos.FriendInfo;
+import com.codagis.concorde.dto.FriendDtos.FriendRequestInfo;
 import com.codagis.concorde.dto.FriendDtos.FriendRequestsResponse;
 import com.codagis.concorde.dto.FriendDtos.SendFriendRequestBody;
 import com.codagis.concorde.security.CurrentUser;
@@ -49,5 +50,20 @@ public class FriendController {
     @DeleteMapping("/{friendUserId}")
     public void remove(@PathVariable Long friendUserId) {
         friendshipService.remove(currentUser.id(), friendUserId);
+    }
+
+    @GetMapping("/blocked")
+    public List<FriendRequestInfo> blocked() {
+        return friendshipService.listBlocked(currentUser.id());
+    }
+
+    @PostMapping("/{userId}/block")
+    public void block(@PathVariable Long userId) {
+        friendshipService.block(currentUser.id(), userId);
+    }
+
+    @PostMapping("/{userId}/unblock")
+    public void unblock(@PathVariable Long userId) {
+        friendshipService.unblock(currentUser.id(), userId);
     }
 }

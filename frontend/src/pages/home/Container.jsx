@@ -24,6 +24,7 @@ export function useHomeContainer() {
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState({ incoming: [], outgoing: [] });
   const [dmChannels, setDmChannels] = useState([]);
+  const [blocked, setBlocked] = useState([]);
   const [activeDm, setActiveDm] = useState(null); // { channelId, otherUserId, otherUsername, ... }
   const [showSettings, setShowSettings] = useState(false);
 
@@ -61,12 +62,17 @@ export function useHomeContainer() {
     api.get("/api/dm/channels").then(({ data }) => setDmChannels(data));
   }, []);
 
+  const reloadBlocked = useCallback(() => {
+    api.get("/api/friends/blocked").then(({ data }) => setBlocked(data));
+  }, []);
+
   useEffect(() => {
     reloadFriends();
     reloadDmChannels();
-  }, [reloadFriends, reloadDmChannels]);
+    reloadBlocked();
+  }, [reloadFriends, reloadDmChannels, reloadBlocked]);
 
-  // Pedido/aceite/recusa de amizade em QUALQUER uma das minhas sessoes (ver
+  // Pedido/aceite/recusa/bloqueio de amizade em QUALQUER uma das minhas sessoes (ver
   // FriendshipService.notify no backend) - recarrega tudo de novo, mais simples e sem risco de
   // o estado local dessincronizar do banco.
   useEffect(() => {
@@ -74,9 +80,10 @@ export function useHomeContainer() {
     const sub = subscribeToFriends(stompClient, () => {
       reloadFriends();
       reloadDmChannels();
+      reloadBlocked();
     });
     return () => sub.unsubscribe();
-  }, [stompClient, stompConnected, reloadFriends, reloadDmChannels]);
+  }, [stompClient, stompConnected, reloadFriends, reloadDmChannels, reloadBlocked]);
 
   useEffect(() => {
     function handleOpenSettings() {
@@ -106,6 +113,18 @@ export function useHomeContainer() {
     await api.delete(`/api/friends/${friendUserId}`);
     reloadFriends();
     setActiveDm((prev) => (prev?.otherUserId === friendUserId ? null : prev));
+  }
+
+  async function blockUser(userId) {
+    await api.post(`/api/friends/${userId}/block`);
+    reloadFriends();
+    reloadBlocked();
+    setActiveDm((prev) => (prev?.otherUserId === userId ? null : prev));
+  }
+
+  async function unblockUser(userId) {
+    await api.post(`/api/friends/${userId}/unblock`);
+    reloadBlocked();
   }
 
   /** Abre a conversa com esse amigo - o backend ja' garante que o DirectChannel existe desde
@@ -157,6 +176,7 @@ export function useHomeContainer() {
     friends,
     requests,
     dmChannels,
+    blocked,
     activeDm,
     showSettings,
     setShowSettings,
@@ -164,6 +184,8 @@ export function useHomeContainer() {
     acceptFriendRequest,
     declineFriendRequest,
     removeFriend,
+    blockUser,
+    unblockUser,
     openDmWithFriend,
     openDmChannel,
     openFriendsView,

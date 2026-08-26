@@ -59,6 +59,9 @@ public class FriendshipService {
         long b = Math.max(requesterId, target.getId());
         Friendship existing = friendshipRepository.findByUserAIdAndUserBId(a, b).orElse(null);
         if (existing != null) {
+            if (existing.getStatus() == FriendshipStatus.BLOCKED) {
+                throw new IllegalArgumentException("Não é possível enviar um pedido pra esse usuário");
+            }
             if (existing.getStatus() == FriendshipStatus.ACCEPTED) {
                 throw new IllegalArgumentException("Vocês já são amigos");
             }
@@ -129,6 +132,69 @@ public class FriendshipService {
         return friendshipRepository.findByUserAIdAndUserBId(a, b)
                 .map(f -> f.getStatus() == FriendshipStatus.ACCEPTED)
                 .orElse(false);
+    }
+
+    public boolean isBlocked(Long userIdA, Long userIdB) {
+        long a = Math.min(userIdA, userIdB);
+        long b = Math.max(userIdA, userIdB);
+        return friendshipRepository.findByUserAIdAndUserBId(a, b)
+                .map(f -> f.getStatus() == FriendshipStatus.BLOCKED)
+                .orElse(false);
+    }
+
+    /** Bloquear substitui qualquer amizade/pedido que existisse entre os dois (some da lista de
+     *  amigos e de pedidos pendentes dos dois lados na hora) - so' quem bloqueou consegue
+     *  desbloquear depois (ver unblock). Enquanto bloqueado, nenhum dos dois consegue mandar
+     *  pedido de amizade nem mensagem novo pro outro (ver DirectMessageService). */
+    @Transactional
+    public void block(Long requesterId, Long targetUserId) {
+        if (targetUserId == null || targetUserId.equals(requesterId)) {
+            throw new IllegalArgumentException("Você não pode bloquear a si mesmo");
+        }
+        long a = Math.min(requesterId, targetUserId);
+        long b = Math.max(requesterId, targetUserId);
+        Friendship f = friendshipRepository.findByUserAIdAndUserBId(a, b).orElse(null);
+        if (f == null) {
+            f = Friendship.builder().userAId(a).userBId(b).requestedBy(requesterId).build();
+        }
+        f.setStatus(FriendshipStatus.BLOCKED);
+        f.setBlockedBy(requesterId);
+        f.setRespondedAt(Instant.now());
+        friendshipRepository.save(f);
+        notify(a);
+        notify(b);
+    }
+
+    @Transactional
+    public void unblock(Long requesterId, Long targetUserId) {
+        long a = Math.min(requesterId, targetUserId);
+        long b = Math.max(requesterId, targetUserId);
+        Friendship f = friendshipRepository.findByUserAIdAndUserBId(a, b)
+                .filter(x -> x.getStatus() == FriendshipStatus.BLOCKED && requesterId.equals(x.getBlockedBy()))
+                .orElseThrow(() -> new IllegalArgumentException("Você não bloqueou esse usuário"));
+        friendshipRepository.delete(f);
+        notify(a);
+        notify(b);
+    }
+
+    /** So' quem EU bloqueei (nao quem me bloqueou - isso o outro lado nem fica sabendo por
+     *  aqui). */
+    public List<FriendRequestInfo> listBlocked(Long userId) {
+        List<Friendship> rows = friendshipRepository.findAllForUserWithStatus(userId, FriendshipStatus.BLOCKED);
+        List<FriendRequestInfo> result = new ArrayList<>();
+        for (Friendship f : rows) {
+            if (!userId.equals(f.getBlockedBy())) {
+                continue;
+            }
+            Long otherId = f.getUserAId().equals(userId) ? f.getUserBId() : f.getUserAId();
+            User other = userRepository.findById(otherId).orElse(null);
+            if (other == null) {
+                continue;
+            }
+            result.add(new FriendRequestInfo(other.getId(), other.getUsername(), other.getNickname(),
+                    other.getAvatarUrl(), f.getCreatedAt()));
+        }
+        return result;
     }
 
     @Transactional

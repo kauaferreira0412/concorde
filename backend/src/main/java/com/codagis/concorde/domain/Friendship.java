@@ -9,8 +9,10 @@ import java.time.Instant;
 // Amizade entre dois usuarios - sem FK (mesmo padrao do resto do projeto), so' os ids. Sempre
 // gravado com userAId < userBId (normalizado no FriendshipService), pra nunca existir duas
 // linhas pro mesmo par (A,B) e (B,A) ao mesmo tempo. PENDING = pedido enviado, ainda nao
-// respondido; ACCEPTED = amigos de verdade (e' o que libera o chat privado, ver DirectChannel).
-// Recusar/desfazer amizade so' APAGA a linha - nao existe um status "DECLINED" separado.
+// respondido; ACCEPTED = amigos de verdade (e' o que libera o chat privado, ver DirectChannel);
+// BLOCKED = um dos dois bloqueou o outro (ver "blockedBy" - so' quem bloqueou pode desbloquear,
+// impede pedido novo e mensagem nova nos dois sentidos, ver DirectMessageService). Recusar/
+// desfazer amizade/desbloquear so' APAGA a linha - nao existe um status "DECLINED" separado.
 @Entity
 @Table(name = "friendships", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"userAId", "userBId"})
@@ -19,6 +21,7 @@ import java.time.Instant;
         @Index(name = "idx_friendships_user_b_id", columnList = "userBId"),
         @Index(name = "idx_friendships_status", columnList = "status"),
         @Index(name = "idx_friendships_requested_by", columnList = "requestedBy"),
+        @Index(name = "idx_friendships_blocked_by", columnList = "blockedBy"),
         @Index(name = "idx_friendships_created_at", columnList = "createdAt"),
         @Index(name = "idx_friendships_responded_at", columnList = "respondedAt")
 })
@@ -45,6 +48,10 @@ public class Friendship {
 
     @Column(nullable = false)
     private Long requestedBy;
+
+    // So' preenchido quando status = BLOCKED - quem dos dois foi que bloqueou (o unico que pode
+    // desbloquear depois, ver FriendshipService.unblock).
+    private Long blockedBy;
 
     @Builder.Default
     private Instant createdAt = Instant.now();

@@ -524,3 +524,14 @@ export function MessageSquareIcon(props) {
     </svg>
   );
 }
+
+// Circulo com uma barra na diagonal ("proibido") - usado pra bloquear/desbloquear usuario (ver
+// FriendsPanel.jsx).
+export function BlockIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <circle cx="12" cy="12" r="9" />
+      <line x1="5.5" y1="18.5" x2="18.5" y2="5.5" />
+    </svg>
+  );
+}

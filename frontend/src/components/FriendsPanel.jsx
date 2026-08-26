@@ -4,7 +4,7 @@ import { useAlert } from "../context/AlertContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
-import { AlertTriangleIcon, CheckIcon, MessageSquareIcon, TrashIcon, UserIcon, XIcon } from "./icons.jsx";
+import { AlertTriangleIcon, BlockIcon, CheckIcon, MessageSquareIcon, TrashIcon, UserIcon, XIcon } from "./icons.jsx";
 
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", OFFLINE: "Offline" };
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
@@ -13,15 +13,18 @@ const TABS = [
   { key: "online", label: "Online" },
   { key: "all", label: "Todos" },
   { key: "pending", label: "Pendentes" },
+  { key: "blocked", label: "Bloqueados" },
   { key: "add", label: "Adicionar amigo" },
 ];
 
 /**
- * Tela de "Amigos" da Home (ver pages/home) - mesmas 4 abas do Discord: quem esta online agora,
- * todo mundo, pedidos pendentes (recebidos + enviados) e o formulario pra mandar um pedido novo
- * por nome de usuario. Clicar num amigo abre o chat privado com ele (ver onOpenDm).
+ * Tela de "Amigos" da Home (ver pages/home) - mesmas abas do Discord: quem esta online agora,
+ * todo mundo, pedidos pendentes (recebidos + enviados), quem voce bloqueou e o formulario pra
+ * mandar um pedido novo por nome de usuario. Clicar num amigo abre o chat privado com ele (ver
+ * onOpenDm). Bloquear alguem some com a amizade/pedido pendente dos dois lados na hora (ver
+ * FriendshipService.block no backend) - so' quem bloqueou consegue desbloquear depois.
  */
-export default function FriendsPanel({ friends, requests, onSendRequest, onAccept, onDecline, onRemove, onOpenDm }) {
+export default function FriendsPanel({ friends, requests, blocked, onSendRequest, onAccept, onDecline, onRemove, onBlock, onUnblock, onOpenDm }) {
   const { showAlert } = useAlert();
   const { openProfile } = useProfile();
   const [tab, setTab] = useState("online");
@@ -30,6 +33,7 @@ export default function FriendsPanel({ friends, requests, onSendRequest, onAccep
   const [sendError, setSendError] = useState("");
   const [sendOk, setSendOk] = useState("");
   const [removeTarget, setRemoveTarget] = useState(null);
+  const [blockTarget, setBlockTarget] = useState(null);
 
   // Previa de "quem eu vou adicionar" ANTES de mandar o pedido de verdade - pedido explicito do
   // usuario: ao digitar, aparece um card com a foto/nome de quem foi encontrado. undefined =
@@ -98,7 +102,10 @@ export default function FriendsPanel({ friends, requests, onSendRequest, onAccep
           <button type="button" className="icon-btn" title="Mandar mensagem" onClick={() => onOpenDm(f)}>
             <MessageSquareIcon size={16} />
           </button>
-          <button type="button" className="icon-btn icon-btn-danger" title="Remover amigo" onClick={() => setRemoveTarget(f)}>
+          <button type="button" className="icon-btn icon-btn-danger" title="Bloquear usuário" onClick={() => setBlockTarget(f)}>
+            <BlockIcon size={16} />
+          </button>
+          <button type="button" className="icon-btn icon-btn-danger" title="Desfazer amizade" onClick={() => setRemoveTarget(f)}>
             <TrashIcon size={16} />
           </button>
         </div>
@@ -231,6 +238,31 @@ export default function FriendsPanel({ friends, requests, onSendRequest, onAccep
           </>
         )}
 
+        {tab === "blocked" &&
+          (blocked.length === 0 ? (
+            <p className="friends-panel-empty">Você não bloqueou ninguém.</p>
+          ) : (
+            <>
+              <p className="friends-panel-section-title">BLOQUEADOS — {blocked.length}</p>
+              {blocked.map((b) => (
+                <div key={b.userId} className="friend-row">
+                  <div className="friend-row-main" style={{ cursor: "default" }}>
+                    <Avatar name={b.username} url={b.avatarUrl} className="voice-avatar" />
+                    <span className="friend-row-info">
+                      <strong>{b.nickname || b.username}</strong>
+                      <span className="friend-row-status">Bloqueado</span>
+                    </span>
+                  </div>
+                  <div className="friend-row-actions">
+                    <button type="button" className="icon-btn" title="Desbloquear" onClick={() => onUnblock(b.userId)}>
+                      <BlockIcon size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
+          ))}
+
         {tab === "online" &&
           (onlineFriends.length === 0 ? (
             <p className="friends-panel-empty">Ninguém online agora.</p>
@@ -256,12 +288,22 @@ export default function FriendsPanel({ friends, requests, onSendRequest, onAccep
 
       {removeTarget && (
         <ConfirmModal
-          title="Remover amigo"
+          title="Desfazer amizade"
           message={`Tem certeza que quer remover ${removeTarget.nickname || removeTarget.username} da sua lista de amigos?`}
           confirmLabel="Remover"
           danger
           onClose={() => setRemoveTarget(null)}
           onConfirm={() => onRemove(removeTarget.userId).catch((err) => showAlert(err.response?.data?.error || "Falha ao remover"))}
+        />
+      )}
+      {blockTarget && (
+        <ConfirmModal
+          title="Bloquear usuário"
+          message={`Bloquear ${blockTarget.nickname || blockTarget.username} desfaz a amizade e impede pedido/mensagem novos dos dois lados. Você pode desbloquear depois na aba "Bloqueados".`}
+          confirmLabel="Bloquear"
+          danger
+          onClose={() => setBlockTarget(null)}
+          onConfirm={() => onBlock(blockTarget.userId).catch((err) => showAlert(err.response?.data?.error || "Falha ao bloquear"))}
         />
       )}
     </div>
