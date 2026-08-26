@@ -2940,11 +2940,17 @@ h3.chat-heading {
    enviado"/"Aceitar pedido"/"Enviar mensagem", pedido explicito do usuario: dava pra fazer isso
    direto no perfil de quem tem acesso ao servidor, nao so' pela tela de Amigos. */
 .profile-friend-action { margin-bottom: 14px; }
+/* !important pelo mesmo motivo de .settings-inline-save button acima - ".modal button:not(...)"
+   e' mais especifico e força width:100%/padding grande sem isso (reportado pelo usuario com
+   print: botao esticado a largura toda, feio). */
 .profile-friend-action button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  width: auto !important;
+  padding: 7px 14px !important;
+  margin-top: 0 !important;
+  font-size: 12.5px;
 }
 .profile-section { padding: 12px 0; border-top: 1px solid var(--border-soft); }
 .profile-section:first-of-type { border-top: none; padding-top: 0; }

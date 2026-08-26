@@ -4,7 +4,7 @@ import api from "../api/client";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useAlert } from "../context/AlertContext.jsx";
 import Avatar from "./Avatar.jsx";
-import { CheckIcon, MessageSquareIcon, ShieldIcon } from "./icons.jsx";
+import { CheckIcon, MessageSquareIcon, PlusIcon, ShieldIcon } from "./icons.jsx";
 
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", OFFLINE: "Offline" };
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
@@ -135,7 +135,7 @@ export default function ProfileModal({ userId, onClose }) {
                 <div className="profile-friend-action">
                   {friendStatus.status === "NONE" && (
                     <button type="button" onClick={handleSendFriendRequest} disabled={friendActionBusy}>
-                      Adicionar amigo
+                      <PlusIcon size={14} /> Adicionar amigo
                     </button>
                   )}
                   {friendStatus.status === "OUTGOING" && (
