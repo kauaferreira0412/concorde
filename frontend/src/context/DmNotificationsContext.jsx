@@ -177,6 +177,9 @@ export function DmNotificationsProvider({ children }) {
         icon: message.authorAvatarUrl || `${import.meta.env.BASE_URL}icon-192.png`,
         badge: `${import.meta.env.BASE_URL}icon-192.png`,
         tag: `dm-${message.channelId}`,
+        // Mesmo motivo de useUnreadMessages.js - sem isso o SO toca o bip padrao dele por cima
+        // do nosso som (playMessageSound acima).
+        silent: true,
       });
       notification.onclick = () => {
         window.focus();

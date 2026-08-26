@@ -148,6 +148,10 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
         icon: message.authorAvatarUrl || `${import.meta.env.BASE_URL}icon-192.png`,
         badge: `${import.meta.env.BASE_URL}icon-192.png`,
         tag: `chat-${channelId}`, // agrupa notificacoes do mesmo canal em vez de empilhar
+        // Sem isso, o SO toca o BIP PADRAO dele em cima do nosso som (playMessageSound acima) -
+        // "silent" pede pro navegador nao tocar o som proprio dele nessa notificacao especifica
+        // (respeitado no Chrome/Edge/Electron - reportado pelo usuario: "tocam os dois juntos").
+        silent: true,
       });
       notification.onclick = () => {
         window.focus();
