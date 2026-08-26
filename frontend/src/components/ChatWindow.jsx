@@ -157,6 +157,9 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
   const [slashIndex, setSlashIndex] = useState(0);
   const [slashDismissed, setSlashDismissed] = useState(false); // true = usuario fechou com Esc
   const [reactionPickerFor, setReactionPickerFor] = useState(null); // id da mensagem com o picker de emoji aberto
+  // Picker de emoji do PROPRIO campo de digitar (insere no texto, manda como mensagem normal -
+  // diferente do reactionPickerFor acima, que so' reage numa mensagem ja enviada).
+  const [showDraftEmojiPicker, setShowDraftEmojiPicker] = useState(false);
   const [myServerPermissions, setMyServerPermissions] = useState(new Set());
   const [customEmojis, setCustomEmojis] = useState({}); // name -> imageUrl (ver CustomEmojiModal.jsx)
   const [customEmojiList, setCustomEmojiList] = useState([]);
@@ -426,6 +429,22 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     const { text, caret: newCaret } = applyMention(draft, caret, username);
     setDraft(text);
     setMentionQuery(null);
+    requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(newCaret, newCaret);
+    });
+  }
+
+  /** Insere o emoji escolhido no ponto do cursor (nao manda a mensagem sozinho - so' entra no
+   *  texto, igual :nome: digitado a mao, pra mandar como mensagem normal e nao so' como reacao,
+   *  pedido explicito do usuario). */
+  function insertEmojiIntoDraft(emoji) {
+    const input = draftInputRef.current;
+    const caret = input?.selectionStart ?? draft.length;
+    const text = draft.slice(0, caret) + emoji + draft.slice(caret);
+    setDraft(text);
+    setShowDraftEmojiPicker(false);
+    const newCaret = caret + emoji.length;
     requestAnimationFrame(() => {
       input?.focus();
       input?.setSelectionRange(newCaret, newCaret);
@@ -1101,6 +1120,22 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
           >
             <MicIcon size={16} />
           </button>
+          <div className="chat-emoji-btn-wrap">
+            <button
+              type="button"
+              className={"icon-btn chat-emoji-draft-btn" + (showDraftEmojiPicker ? " icon-btn-active" : "")}
+              onClick={() => setShowDraftEmojiPicker((prev) => !prev)}
+              disabled={!stompConnected || sending || recorder.recording}
+              title="Inserir emoji na mensagem"
+            >
+              <SmileIcon size={16} />
+            </button>
+            {showDraftEmojiPicker && (
+              <div className="emoji-picker-composer-wrap">
+                <EmojiPicker customEmojis={customEmojiList} onPick={insertEmojiIntoDraft} />
+              </div>
+            )}
+          </div>
           {recorder.recording && (
             <div className="chat-recording-indicator">
               <span className="chat-recording-dot" />

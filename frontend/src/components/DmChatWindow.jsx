@@ -58,6 +58,7 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
   const [lightboxImage, setLightboxImage] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
   const [reactionPickerFor, setReactionPickerFor] = useState(null);
+  const [showDraftEmojiPicker, setShowDraftEmojiPicker] = useState(false);
   const [typingUsers, setTypingUsers] = useState(new Map());
   const [showPinned, setShowPinned] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState([]);
@@ -242,6 +243,21 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
       e.preventDefault();
       handleSend(e);
     }
+  }
+
+  /** Insere o emoji escolhido no ponto do cursor - mesma logica de ChatWindow.jsx (chat de
+   *  servidor), manda como mensagem normal em vez de so' reagir numa mensagem ja existente. */
+  function insertEmojiIntoDraft(emoji) {
+    const input = draftInputRef.current;
+    const caret = input?.selectionStart ?? draft.length;
+    const text = draft.slice(0, caret) + emoji + draft.slice(caret);
+    setDraft(text);
+    setShowDraftEmojiPicker(false);
+    const newCaret = caret + emoji.length;
+    requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(newCaret, newCaret);
+    });
   }
 
   async function handleSend(e) {
@@ -669,6 +685,22 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
         >
           <MicIcon size={16} />
         </button>
+        <div className="chat-emoji-btn-wrap">
+          <button
+            type="button"
+            className={"icon-btn chat-emoji-draft-btn" + (showDraftEmojiPicker ? " icon-btn-active" : "")}
+            onClick={() => setShowDraftEmojiPicker((prev) => !prev)}
+            disabled={!stompConnected || sending || recorder.recording}
+            title="Inserir emoji na mensagem"
+          >
+            <SmileIcon size={16} />
+          </button>
+          {showDraftEmojiPicker && (
+            <div className="emoji-picker-composer-wrap">
+              <EmojiPicker customEmojis={emptyCustomEmojis} onPick={insertEmojiIntoDraft} />
+            </div>
+          )}
+        </div>
         {recorder.recording && (
           <div className="chat-recording-indicator">
             <span className="chat-recording-dot" />

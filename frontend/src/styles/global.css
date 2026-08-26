@@ -1490,13 +1490,15 @@ h3.chat-heading {
    - antes era uma lista fixa de 32 emojis numa gradinha so' (QUICK_REACTIONS); agora e'
    dividido em categorias com abas em cima, igual o Discord (pedido explicito do usuario, com
    print comparando os dois - "o Concorde tem muito pouco"). */
+/* Aumentado (pedido explicito do usuario: "deixe a secao de escolha dos emojis maior, pra ver
+   os emojis") - largura, altura da grade e tamanho de cada emoji, tudo maior que antes. */
 .emoji-picker {
   margin-top: 6px;
-  padding: 8px;
+  padding: 10px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  width: 288px;
+  width: 380px;
 }
 .emoji-picker-tabs {
   display: flex;
@@ -1510,8 +1512,8 @@ h3.chat-heading {
   flex: 0 0 auto;
   background: transparent;
   border: none;
-  padding: 4px 6px;
-  font-size: 16px;
+  padding: 5px 7px;
+  font-size: 19px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   line-height: 1;
@@ -1519,10 +1521,10 @@ h3.chat-heading {
 }
 .emoji-picker-tab:hover { background: var(--bg-hover); opacity: 0.85; }
 .emoji-picker-tab.active { background: var(--bg-hover); opacity: 1; }
-.emoji-picker-tab-custom { width: 16px; height: 16px; border-radius: 4px; object-fit: cover; display: block; }
+.emoji-picker-tab-custom { width: 19px; height: 19px; border-radius: 4px; object-fit: cover; display: block; }
 .emoji-picker-category-label {
-  margin: 0 0 4px 2px;
-  font-size: 10.5px;
+  margin: 0 0 6px 2px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -1532,14 +1534,14 @@ h3.chat-heading {
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
-  max-height: 180px;
+  max-height: 320px;
   overflow-y: auto;
 }
 .emoji-picker-grid button {
   background: transparent;
   border: none;
-  padding: 4px 6px;
-  font-size: 17px;
+  padding: 6px 8px;
+  font-size: 22px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   line-height: 1;
@@ -1598,6 +1600,11 @@ h3.chat-heading {
 
 .chat-input { display: flex; align-items: center; gap: 8px; padding: 16px 20px 20px; }
 .chat-attach-btn { flex-shrink: 0; }
+/* Botao de emoji do PROPRIO campo de digitar (insere no texto, ver insertEmojiIntoDraft em
+   ChatWindow.jsx/DmChatWindow.jsx) - abre PRA CIMA (a barra de digitar fica no fim da tela,
+   embaixo nao tem espaco nenhum), diferente do picker de reacao que abre pra baixo. */
+.chat-emoji-btn-wrap { position: relative; flex-shrink: 0; }
+.emoji-picker-composer-wrap { position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 30; }
 .chat-input-field { position: relative; flex: 1; min-width: 0; }
 .chat-input-field textarea {
   display: block;
