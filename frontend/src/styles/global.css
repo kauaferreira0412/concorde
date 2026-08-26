@@ -443,7 +443,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   transition: opacity 0.08s ease;
 }
 .collapse-toggle { flex-shrink: 0; }
-.channel-sidebar-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.channel-sidebar-title { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 /* Nome do servidor - maior que antes (pedido explicito do usuario, ficava pequeno e
    espremido pelos varios botoes de acao que existiam aqui, ver channel-sidebar-name-btn
    abaixo pra onde eles foram). */
@@ -456,12 +456,12 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   align-items: center;
   gap: 4px;
   min-width: 0;
-  max-width: calc(100% + 12px);
-  margin: -4px -6px;
+  max-width: calc(100% + 16px);
+  margin: -6px -8px;
   background: transparent;
   border: none;
-  border-radius: var(--radius-sm);
-  padding: 4px 6px;
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
   text-align: left;
   color: inherit;
 }
@@ -752,7 +752,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 }
 .user-bar-info {
   display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;
-  background: transparent; border: none; padding: 4px; margin: -4px; border-radius: var(--radius-sm);
+  background: transparent; border: none; padding: 6px; margin: -6px; border-radius: var(--radius-md);
   text-align: left; font-size: inherit; font-weight: inherit;
 }
 .user-bar-info:hover { background: var(--bg-hover); }
