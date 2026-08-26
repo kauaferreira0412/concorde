@@ -235,21 +235,32 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       return;
     }
     let cancelled = false;
-    api
-      .get(`/api/servers/${channel.serverId}/emojis`)
-      .then(({ data }) => {
-        if (cancelled) return;
-        setCustomEmojiList(data);
-        setCustomEmojis(Object.fromEntries(data.map((e) => [e.name, e.imageUrl])));
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setCustomEmojiList([]);
-          setCustomEmojis({});
-        }
-      });
+    function fetchEmojis() {
+      api
+        .get(`/api/servers/${channel.serverId}/emojis`)
+        .then(({ data }) => {
+          if (cancelled) return;
+          setCustomEmojiList(data);
+          setCustomEmojis(Object.fromEntries(data.map((e) => [e.name, e.imageUrl])));
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setCustomEmojiList([]);
+            setCustomEmojis({});
+          }
+        });
+    }
+    fetchEmojis();
+    // Sem isso, um emoji criado/apagado no CustomEmojiModal.jsx (modal separado, aberto pela
+    // sidebar) so' aparecia/sumia do picker e do :nome: depois de um F5 - esse efeito so' busca
+    // a lista uma vez, ao trocar de canal, e o modal nao tinha como avisar ele diretamente.
+    function handleUpdated(e) {
+      if (e.detail?.serverId === channel.serverId) fetchEmojis();
+    }
+    window.addEventListener("concorde:custom-emojis-updated", handleUpdated);
     return () => {
       cancelled = true;
+      window.removeEventListener("concorde:custom-emojis-updated", handleUpdated);
     };
   }, [channel?.serverId]);
 
