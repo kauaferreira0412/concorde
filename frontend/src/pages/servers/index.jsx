@@ -11,7 +11,6 @@ import AuditLogModal from "../../components/AuditLogModal.jsx";
 import CustomEmojiModal from "../../components/CustomEmojiModal.jsx";
 import SettingsModal from "../../components/SettingsModal.jsx";
 import PartyConfetti from "../../components/PartyConfetti.jsx";
-import { VoiceCallProvider } from "../../context/VoiceCallContext.jsx";
 import { useServersContainer } from "./Container.jsx";
 import "./style.css";
 
@@ -55,7 +54,7 @@ export default function ServerPage() {
   } = useServersContainer();
 
   return (
-    <VoiceCallProvider stompClient={stompClient} stompConnected={stompConnected}>
+    <>
       {isPotatoMafiaServer && <PartyConfetti intervalMs={600000} />}
       <div className="app-shell">
         <ServerSidebar
@@ -138,6 +137,6 @@ export default function ServerPage() {
         {auditLogServer && <AuditLogModal server={auditLogServer} onClose={() => setAuditLogServer(null)} />}
         {emojiServer && <CustomEmojiModal server={emojiServer} onClose={() => setEmojiServer(null)} />}
       </div>
-    </VoiceCallProvider>
+    </>
   );
 }

@@ -8,7 +8,6 @@ import SettingsModal from "../../components/SettingsModal.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useProfile } from "../../context/ProfileContext.jsx";
 import { attachmentSummary } from "../../utils/attachmentSummary";
-import { VoiceCallProvider } from "../../context/VoiceCallContext.jsx";
 import { LogOutIcon, MessageSquareIcon, SettingsIcon, UsersIcon } from "../../components/icons.jsx";
 import { useHomeContainer } from "./Container.jsx";
 import "./style.css";
@@ -53,7 +52,6 @@ export default function HomePage() {
   } = useHomeContainer();
 
   return (
-    <VoiceCallProvider stompClient={stompClient} stompConnected={stompConnected}>
     <div className="app-shell">
       <ServerSidebar
         servers={servers}
@@ -171,6 +169,5 @@ export default function HomePage() {
         />
       )}
     </div>
-    </VoiceCallProvider>
   );
 }

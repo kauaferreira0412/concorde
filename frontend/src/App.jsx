@@ -3,6 +3,7 @@ import { useAuth } from "./context/AuthContext.jsx";
 import { AlertProvider } from "./context/AlertContext.jsx";
 import { ProfileProvider } from "./context/ProfileContext.jsx";
 import { DmNotificationsProvider } from "./context/DmNotificationsContext.jsx";
+import { GlobalVoiceCallProvider } from "./context/GlobalVoiceCallProvider.jsx";
 import LoginPage from "./pages/login";
 import ServerPage from "./pages/servers";
 import HomePage from "./pages/home";
@@ -29,6 +30,7 @@ export default function App() {
       <AlertProvider>
         <ProfileProvider>
         <DmNotificationsProvider>
+        <GlobalVoiceCallProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             {/* Janela SEPARADA das cameras, so' no app desktop (ver CameraPipPage.jsx pro
@@ -62,6 +64,7 @@ export default function App() {
             />
             <Route path="*" element={<Navigate to="/servers" replace />} />
           </Routes>
+        </GlobalVoiceCallProvider>
         </DmNotificationsProvider>
         </ProfileProvider>
       </AlertProvider>
