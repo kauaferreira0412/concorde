@@ -1018,9 +1018,14 @@ img.chat-header-avatar { object-fit: cover; }
    tamanho da linha de texto, um pouco maior que uma letra normal (como no Discord/Slack). */
 .chat-custom-emoji { height: 1.375em; width: auto; vertical-align: -0.4em; object-fit: contain; }
 
-/* Linha de upload no CustomEmojiModal.jsx - nome + botao de escolher imagem lado a lado. */
+/* Linha de upload no CustomEmojiModal.jsx - nome + botao de escolher imagem lado a lado. O
+   botao (dentro de ".modal") tinha "width:100%" forçado por ".modal button:not(...)" (ver
+   comentario em .settings-inline-save button) - isso fazia ELE tomar quase toda a largura da
+   linha, sobrando so' um fiapo pro input (reportado pelo usuario: campo de nome minusculo,
+   ilegivel, e o botao de escolher imagem virando uma barra enorme). !important nos dois. */
 .emoji-upload-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.emoji-upload-row input:not([type]) { flex: 1; min-width: 0; }
+.emoji-upload-row .emoji-name-input { flex: 1; min-width: 0; height: 40px; box-sizing: border-box; }
+.emoji-upload-row button { flex-shrink: 0; width: auto !important; margin-top: 0 !important; white-space: nowrap; }
 .chat-code-block {
   margin: 6px 0 0;
   background: var(--bg-elevated);
@@ -2173,21 +2178,27 @@ h3.chat-heading {
 }
 .soundboard-clip.playing .soundboard-clip-icon { background: var(--accent); color: #fff; }
 .soundboard-clip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+/* !important pelo mesmo motivo de .settings-inline-save button (ver comentario la') - usado
+   tambem dentro do modal de emojis do servidor (ver CustomEmojiModal.jsx), onde ".modal
+   button:not(...)" forçava width:100%/padding grande/fundo azul sem isso (reportado pelo
+   usuario com print: virava uma pilula azul gigante cobrindo a linha inteira). */
 .soundboard-clip-remove {
-  display: flex;
+  display: flex !important;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
+  width: 22px !important;
+  height: 22px !important;
+  padding: 0 !important;
+  margin-top: 0 !important;
   flex-shrink: 0;
-  border-radius: 50%;
-  background: transparent;
+  border-radius: 50% !important;
+  background: transparent !important;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
+  box-shadow: none !important;
 }
-.soundboard-clip-remove:hover { background: var(--danger-soft); color: var(--danger); }
+.soundboard-clip-remove:hover { background: var(--danger-soft) !important; color: var(--danger); }
 
 /* Quadrado "escolher assistir" (ver ScreenShareTile em VoiceChannel.jsx) - tamanho proprio,
    fixo e pequeno (nao usa o zoom de camera nem o de tela cheia - e' so' um "escolher"), mostra

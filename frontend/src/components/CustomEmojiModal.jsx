@@ -81,6 +81,8 @@ export default function CustomEmojiModal({ server, onClose }) {
 
           <div className="emoji-upload-row">
             <input
+              type="text"
+              className="emoji-name-input"
               placeholder="nome_do_emoji"
               value={name}
               onChange={(e) => setName(e.target.value.toLowerCase())}
