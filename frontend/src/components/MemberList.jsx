@@ -188,7 +188,12 @@ export function MemberRow({ member, serverId, canManage }) {
       </button>
 
       {menu && (
-        <div className="volume-popover" ref={menuRef} style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
+        <div
+          className="volume-popover"
+          ref={menuRef}
+          style={{ left: Math.min(menu.x, window.innerWidth - 232), top: Math.min(menu.y, window.innerHeight - 100) }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <p className="volume-popover-title">{displayNickname || member.username}</p>
           <div className="participant-mod-actions" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
             <button
