@@ -1348,22 +1348,56 @@ h3.chat-heading {
 .chat-reaction-count { color: var(--text-muted); font-weight: 600; }
 .chat-reaction.mine .chat-reaction-count { color: var(--accent-text); }
 
-/* Picker rapido de emoji (botao de carinha nas acoes da mensagem) - lista curada mas generosa
-   (ver QUICK_REACTIONS em ChatWindow.jsx), quebra em varias linhas em vez de esticar a largura
-   toda - nao e' um picker de emoji completo (sem busca/categorias) de proposito. */
-.chat-reaction-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
+/* Picker de emoji com categorias (botao de carinha nas acoes da mensagem, ver EmojiPicker.jsx)
+   - antes era uma lista fixa de 32 emojis numa gradinha so' (QUICK_REACTIONS); agora e'
+   dividido em categorias com abas em cima, igual o Discord (pedido explicito do usuario, com
+   print comparando os dois - "o Concorde tem muito pouco"). */
+.emoji-picker {
   margin-top: 6px;
-  padding: 5px;
+  padding: 8px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  width: fit-content;
-  max-width: 272px;
+  width: 288px;
 }
-.chat-reaction-picker button {
+.emoji-picker-tabs {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.emoji-picker-tab {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  font-size: 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0.55;
+}
+.emoji-picker-tab:hover { background: var(--bg-hover); opacity: 0.85; }
+.emoji-picker-tab.active { background: var(--bg-hover); opacity: 1; }
+.emoji-picker-tab-custom { width: 16px; height: 16px; border-radius: 4px; object-fit: cover; display: block; }
+.emoji-picker-category-label {
+  margin: 0 0 4px 2px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+.emoji-picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.emoji-picker-grid button {
   background: transparent;
   border: none;
   padding: 4px 6px;
@@ -1372,7 +1406,7 @@ h3.chat-heading {
   cursor: pointer;
   line-height: 1;
 }
-.chat-reaction-picker button:hover { background: var(--bg-hover); }
+.emoji-picker-grid button:hover { background: var(--bg-hover); }
 
 /* "Fulano esta digitando..." (ver ChatController.typing no backend) - abaixo da ultima
    mensagem, some sozinho quando ninguem mais esta digitando (ver ChatWindow.jsx). */

@@ -23,6 +23,7 @@ import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import ImageLightbox from "./ImageLightbox.jsx";
 import DiceRollCard from "./DiceRollCard.jsx";
+import EmojiPicker from "./EmojiPicker.jsx";
 import MusicQueueCard from "./MusicQueueCard.jsx";
 import PollCard from "./PollCard.jsx";
 import {
@@ -37,15 +38,6 @@ import {
   TrashIcon,
   XIcon,
 } from "./icons.jsx";
-
-// Emojis curados pra reacao rapida (ver toggleReaction) - lista pequena de proposito, cobre o
-// basico sem precisar de um picker de emoji completo.
-const QUICK_REACTIONS = [
-  "👍", "👎", "❤️", "😂", "😅", "😍", "😮", "😢",
-  "😭", "😡", "🥳", "🎉", "🔥", "👀", "💯", "🙏",
-  "👏", "🤔", "😴", "💀", "🤡", "💔", "⭐", "✅",
-  "❌", "🚀", "🏆", "👌", "😱", "🤝", "🍕", "☕",
-];
 
 // /roll ou /r seguido de uma notacao de dado (ex: "/roll 2d20+5") - mesma notacao aceita pelo
 // backend (ver DiceService), checada aqui tambem so' pra dar um erro na hora em vez de a
@@ -970,23 +962,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
               )}
 
               {editingId !== m.id && reactionPickerFor === m.id && (
-                <div className="chat-reaction-picker">
-                  {QUICK_REACTIONS.map((emoji) => (
-                    <button type="button" key={emoji} onClick={() => handleToggleReaction(m.id, emoji)}>
-                      {emoji}
-                    </button>
-                  ))}
-                  {customEmojiList.map((e) => (
-                    <button
-                      type="button"
-                      key={e.id}
-                      title={`:${e.name}:`}
-                      onClick={() => handleToggleReaction(m.id, `:${e.name}:`)}
-                    >
-                      <img src={e.imageUrl} alt={e.name} className="chat-custom-emoji" />
-                    </button>
-                  ))}
-                </div>
+                <EmojiPicker customEmojis={customEmojiList} onPick={(emoji) => handleToggleReaction(m.id, emoji)} />
               )}
             </div>
 
