@@ -3,6 +3,7 @@ package com.codagis.concorde.controller;
 import com.codagis.concorde.dto.DirectMessageDtos.DmChannelInfo;
 import com.codagis.concorde.dto.DirectMessageDtos.DmMessage;
 import com.codagis.concorde.dto.MessageDtos.AttachmentResponse;
+import com.codagis.concorde.dto.MessageDtos.FileAttachmentResponse;
 import com.codagis.concorde.security.CurrentUser;
 import com.codagis.concorde.service.DirectMessageService;
 import com.codagis.concorde.service.GcsService;
@@ -50,5 +51,14 @@ public class DirectMessageController {
         directMessageService.assertParticipant(channelId, currentUser.id());
         String url = gcsService.upload(file, "dm/" + channelId);
         return new AttachmentResponse(url);
+    }
+
+    // Anexo generico (video, documento, audio - inclusive mensagem de voz gravada) - mesmo par
+    // com AttachmentController (chat de servidor), ver GcsService.uploadAttachment.
+    @PostMapping(value = "/channels/{channelId}/files", consumes = "multipart/form-data")
+    public FileAttachmentResponse uploadFile(@PathVariable Long channelId, @RequestParam("file") MultipartFile file) {
+        directMessageService.assertParticipant(channelId, currentUser.id());
+        GcsService.FileUploadResult result = gcsService.uploadAttachment(file, "dm/" + channelId);
+        return new FileAttachmentResponse(result.url(), result.name(), result.contentType(), result.size());
     }
 }

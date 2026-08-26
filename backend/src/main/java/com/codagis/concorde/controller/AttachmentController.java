@@ -2,6 +2,7 @@ package com.codagis.concorde.controller;
 
 import com.codagis.concorde.domain.Channel;
 import com.codagis.concorde.dto.MessageDtos.AttachmentResponse;
+import com.codagis.concorde.dto.MessageDtos.FileAttachmentResponse;
 import com.codagis.concorde.repository.ChannelRepository;
 import com.codagis.concorde.security.CurrentUser;
 import com.codagis.concorde.service.GcsService;
@@ -34,5 +35,18 @@ public class AttachmentController {
 
         String url = gcsService.upload(file, "chat/" + channelId);
         return new AttachmentResponse(url);
+    }
+
+    // Anexo generico (video, documento, audio - inclusive mensagem de voz gravada) - endpoint
+    // NOVO e SEPARADO do de imagem acima, pra nao arriscar mexer no fluxo de imagem que ja'
+    // funciona (ver GcsService.uploadAttachment pro porque de nao ter lista fechada de tipos).
+    @PostMapping(value = "/{channelId}/files", consumes = "multipart/form-data")
+    public FileAttachmentResponse uploadFile(@PathVariable Long channelId, @RequestParam("file") MultipartFile file) {
+        Channel channel = channelRepository.findById(channelId)
+                .orElseThrow(() -> new IllegalArgumentException("Canal nao existe"));
+        serverService.assertMember(channel.getServerId(), currentUser.id());
+
+        GcsService.FileUploadResult result = gcsService.uploadAttachment(file, "chat/" + channelId);
+        return new FileAttachmentResponse(result.url(), result.name(), result.contentType(), result.size());
     }
 }

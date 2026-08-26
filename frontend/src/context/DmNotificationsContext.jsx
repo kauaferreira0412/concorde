@@ -4,6 +4,7 @@ import { useAuth } from "./AuthContext.jsx";
 import { createChatClient, subscribeToDm, subscribeToFriends } from "../ws/chatSocket";
 import { getDesktopNotificationsEnabled } from "../utils/notificationSettings";
 import { playMessageSound } from "../utils/soundEffects";
+import { attachmentSummary } from "../utils/attachmentSummary";
 
 const DmNotificationsContext = createContext(null);
 
@@ -143,7 +144,7 @@ export function DmNotificationsProvider({ children }) {
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     try {
       const notification = new Notification(message.authorUsername, {
-        body: `Mensagem direta\n${(message.content || (message.imageUrl ? "🖼️ Imagem" : "")).slice(0, 120)}`,
+        body: `Mensagem direta\n${attachmentSummary(message).slice(0, 120)}`,
         icon: message.authorAvatarUrl || `${import.meta.env.BASE_URL}icon-192.png`,
         badge: `${import.meta.env.BASE_URL}icon-192.png`,
         tag: `dm-${message.channelId}`,

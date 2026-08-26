@@ -18,8 +18,11 @@ import { useProfile } from "../context/ProfileContext.jsx";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useServerMembers } from "../utils/useServerMembers";
 import { applyMention, getMentionQuery, mentionsUser } from "../utils/mentions";
+import { useAudioRecorder } from "../utils/useAudioRecorder";
+import { attachmentSummary } from "../utils/attachmentSummary";
 import Avatar from "./Avatar.jsx";
 import MessageText from "./MessageText.jsx";
+import AttachmentMessage from "./AttachmentMessage.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import ImageLightbox from "./ImageLightbox.jsx";
 import DiceRollCard from "./DiceRollCard.jsx";
@@ -29,6 +32,7 @@ import PollCard from "./PollCard.jsx";
 import {
   CheckIcon,
   MegaphoneIcon,
+  MicIcon,
   PencilIcon,
   PinIcon,
   PlusIcon,
@@ -137,6 +141,10 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [pendingImage, setPendingImage] = useState(null); // { file, previewUrl } - aguardando confirmacao de envio
+  // Video/audio/documento/qualquer anexo que nao seja imagem (inclusive mensagem de voz
+  // gravada, ver useAudioRecorder) - { file, name, type, size, previewUrl, isVoiceMessage? }
+  const [pendingFile, setPendingFile] = useState(null);
+  const recorder = useAudioRecorder();
   const [sending, setSending] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -189,6 +197,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     setSearchResults([]);
     setTypingUsers(new Map());
     clearPendingImage();
+    clearPendingFile();
     api.get(`/api/channels/${channel.id}/messages`).then(({ data }) => setMessages(data));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel]);
@@ -319,6 +328,12 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     };
   }, [pendingImage]);
 
+  useEffect(() => {
+    return () => {
+      if (pendingFile) URL.revokeObjectURL(pendingFile.previewUrl);
+    };
+  }, [pendingFile]);
+
   function clearPendingImage() {
     setPendingImage((prev) => {
       if (prev) URL.revokeObjectURL(prev.previewUrl);
@@ -326,10 +341,24 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     });
   }
 
+  function clearPendingFile() {
+    setPendingFile((prev) => {
+      if (prev) URL.revokeObjectURL(prev.previewUrl);
+      return null;
+    });
+  }
+
+  /** Video/audio/documento/qualquer coisa que NAO seja imagem - imagem continua no fluxo de
+   *  sempre (pendingImage), so' pra nao arriscar mexer no que ja' funciona. */
   function pickFile(file) {
-    if (!file || !file.type.startsWith("image/")) return;
-    clearPendingImage();
-    setPendingImage({ file, previewUrl: URL.createObjectURL(file) });
+    if (!file) return;
+    if (file.type.startsWith("image/")) {
+      clearPendingImage();
+      setPendingImage({ file, previewUrl: URL.createObjectURL(file) });
+      return;
+    }
+    clearPendingFile();
+    setPendingFile({ file, name: file.name, type: file.type, size: file.size, previewUrl: URL.createObjectURL(file) });
   }
 
   function handlePickImage(e) {
@@ -346,6 +375,28 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     if (!imageItem) return; // deixa o paste normal (texto) acontecer
     e.preventDefault();
     pickFile(imageItem.getAsFile());
+  }
+
+  async function handleStartRecording() {
+    clearPendingFile();
+    try {
+      await recorder.start();
+    } catch {
+      showAlert("Não foi possível acessar o microfone - verifique a permissão do navegador/SO");
+    }
+  }
+
+  async function handleStopRecording() {
+    const blob = await recorder.stop();
+    if (!blob || blob.size === 0) return;
+    setPendingFile({
+      file: blob,
+      name: "Mensagem de voz.webm",
+      type: "audio/webm",
+      size: blob.size,
+      previewUrl: URL.createObjectURL(blob),
+      isVoiceMessage: true,
+    });
   }
 
   function handleDraftChange(e) {
@@ -451,7 +502,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
   async function handleSend(e) {
     e.preventDefault();
     if (!stompConnected || sending) return;
-    if (!draft.trim() && !pendingImage) return;
+    if (!draft.trim() && !pendingImage && !pendingFile) return;
 
     if (iAmTypingRef.current) {
       iAmTypingRef.current = false;
@@ -610,12 +661,20 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
         const { data } = await api.post(`/api/channels/${channel.id}/attachments`, formData);
         imageUrl = data.url;
       }
-      sendChatMessage(stompClient, channel.id, draft.trim(), imageUrl, replyingTo?.id);
+      let file = null;
+      if (pendingFile) {
+        const formData = new FormData();
+        formData.append("file", pendingFile.file, pendingFile.name);
+        const { data } = await api.post(`/api/channels/${channel.id}/files`, formData);
+        file = { url: data.url, name: data.name, type: data.contentType, size: data.size };
+      }
+      sendChatMessage(stompClient, channel.id, draft.trim(), imageUrl, replyingTo?.id, file);
       setDraft("");
       setReplyingTo(null);
       clearPendingImage();
+      clearPendingFile();
     } catch (err) {
-      setUploadError(err.response?.data?.error || "Falha ao enviar imagem");
+      setUploadError(err.response?.data?.error || "Falha ao enviar anexo");
     } finally {
       setSending(false);
     }
@@ -734,7 +793,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
             pinnedMessages.map((m) => (
               <button type="button" key={m.id} className="chat-side-panel-item" onClick={() => jumpFromPanel(m.id)}>
                 <strong>{m.authorUsername}</strong>
-                <span>{m.content || (m.imageUrl ? "🖼️ Imagem" : "")}</span>
+                <span>{attachmentSummary(m)}</span>
               </button>
             ))
           )}
@@ -758,7 +817,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
             searchResults.map((m) => (
               <button type="button" key={m.id} className="chat-side-panel-item" onClick={() => jumpFromPanel(m.id)}>
                 <strong>{m.authorUsername}</strong>
-                <span>{m.content || (m.imageUrl ? "🖼️ Imagem" : "")}</span>
+                <span>{attachmentSummary(m)}</span>
               </button>
             ))
           )}
@@ -808,7 +867,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                   {m.replyTo ? (
                     <>
                       <strong>{m.replyTo.authorUsername}</strong>
-                      <span>{m.replyTo.content || (m.replyTo.imageUrl ? "🖼️ Imagem" : "")}</span>
+                      <span>{attachmentSummary(m.replyTo)}</span>
                     </>
                   ) : (
                     <span>Mensagem original removida</span>
@@ -875,6 +934,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                       <img src={m.imageUrl} alt="Imagem enviada no chat" className="chat-image" />
                     </button>
                   )}
+                  {m.fileUrl && <AttachmentMessage url={m.fileUrl} name={m.fileName} type={m.fileType} size={m.fileSize} />}
 
                   {m.reactions?.length > 0 && (
                     <div className="chat-reactions">
@@ -973,12 +1033,33 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
         </div>
       )}
 
+      {pendingFile && (
+        <div className="chat-pending-attachment">
+          {pendingFile.type.startsWith("audio/") ? (
+            <audio controls src={pendingFile.previewUrl} className="chat-pending-audio" />
+          ) : pendingFile.type.startsWith("video/") ? (
+            <video controls src={pendingFile.previewUrl} className="chat-pending-video" />
+          ) : (
+            <span className="chat-pending-file-icon">📎</span>
+          )}
+          <div>
+            <strong>{pendingFile.isVoiceMessage ? "Enviar essa mensagem de voz?" : "Enviar esse arquivo?"}</strong>
+            <p className="admin-hint" style={{ margin: "2px 0 0" }}>
+              {pendingFile.name} — pode escrever uma legenda abaixo antes de enviar.
+            </p>
+          </div>
+          <button className="icon-btn icon-btn-danger" onClick={clearPendingFile} title="Cancelar anexo" disabled={sending}>
+            <XIcon />
+          </button>
+        </div>
+      )}
+
       {replyingTo && (
         <div className="chat-replying-bar">
           <ReplyIcon size={13} />
           <span>
             Respondendo a <strong>{replyingTo.authorUsername}</strong>
-            {replyingTo.content ? `: ${truncate(replyingTo.content, 80)}` : replyingTo.imageUrl ? ": 🖼️ Imagem" : ""}
+            {replyingTo.content ? `: ${truncate(replyingTo.content, 80)}` : attachmentSummary(replyingTo) ? `: ${attachmentSummary(replyingTo)}` : ""}
           </span>
           <button type="button" className="icon-btn" onClick={() => setReplyingTo(null)} title="Cancelar resposta">
             <XIcon size={14} />
@@ -997,23 +1078,40 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
         </div>
       ) : (
         <form className="chat-input" onSubmit={handleSend}>
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/gif,image/webp"
-            ref={fileInputRef}
-            onChange={handlePickImage}
-            hidden
-          />
+          {/* Sem "accept" restrito - imagem continua no fluxo de sempre (pendingImage), video/
+              audio/documento/qualquer outra coisa vira anexo generico (pendingFile, ver
+              AttachmentMessage.jsx) - "video, arquivos, documentos, audios... e etcetera",
+              pedido explicito do usuario. */}
+          <input type="file" ref={fileInputRef} onChange={handlePickImage} hidden />
           <button
             type="button"
             className="icon-btn chat-attach-btn"
             onClick={() => fileInputRef.current?.click()}
-            disabled={!stompConnected || sending}
-            title="Enviar imagem"
+            disabled={!stompConnected || sending || recorder.recording}
+            title="Enviar arquivo"
           >
             <PlusIcon />
           </button>
-          <div className="chat-input-field">
+          <button
+            type="button"
+            className={"icon-btn chat-record-btn" + (recorder.recording ? " recording" : "")}
+            onClick={recorder.recording ? handleStopRecording : handleStartRecording}
+            disabled={!stompConnected || sending}
+            title={recorder.recording ? "Parar gravação" : "Gravar mensagem de voz"}
+          >
+            <MicIcon size={16} />
+          </button>
+          {recorder.recording && (
+            <div className="chat-recording-indicator">
+              <span className="chat-recording-dot" />
+              Gravando... {String(Math.floor(recorder.seconds / 60)).padStart(2, "0")}:
+              {String(recorder.seconds % 60).padStart(2, "0")}
+              <button type="button" className="link-btn" onClick={recorder.cancel}>
+                Cancelar
+              </button>
+            </div>
+          )}
+          <div className="chat-input-field" style={recorder.recording ? { display: "none" } : undefined}>
             {slashMenu && (
               <div className="mention-menu slash-menu">
                 {slashMenu.items.map((item, i) => (
@@ -1059,7 +1157,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
               onKeyDown={handleDraftKeyDown}
               onPaste={handlePaste}
               placeholder={
-                pendingImage
+                pendingImage || pendingFile
                   ? "Adicionar legenda (opcional)..."
                   : sending
                   ? "Enviando..."
@@ -1068,7 +1166,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
               disabled={!stompConnected || sending}
             />
           </div>
-          <button type="submit" disabled={!stompConnected || sending || (!draft.trim() && !pendingImage)}>
+          <button type="submit" disabled={!stompConnected || sending || (!draft.trim() && !pendingImage && !pendingFile)}>
             Enviar
           </button>
         </form>

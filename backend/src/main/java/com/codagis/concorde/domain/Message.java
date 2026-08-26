@@ -20,7 +20,11 @@ import java.time.Instant;
         @Index(name = "idx_messages_roll_total", columnList = "rollTotal"),
         @Index(name = "idx_messages_pinned", columnList = "pinned"),
         @Index(name = "idx_messages_pinned_at", columnList = "pinnedAt"),
-        @Index(name = "idx_messages_poll_id", columnList = "pollId")
+        @Index(name = "idx_messages_poll_id", columnList = "pollId"),
+        @Index(name = "idx_messages_file_url", columnList = "fileUrl"),
+        @Index(name = "idx_messages_file_name", columnList = "fileName"),
+        @Index(name = "idx_messages_file_type", columnList = "fileType"),
+        @Index(name = "idx_messages_file_size", columnList = "fileSize")
 })
 @Getter
 @Setter
@@ -44,6 +48,21 @@ public class Message {
 
     @Column(length = 1000)
     private String imageUrl;
+
+    // Anexo generico (video, documento, audio - inclusive mensagem de voz gravada) - separado de
+    // imageUrl de proposito, pra nao mexer no fluxo de imagem que ja' funciona (preview/lightbox).
+    // fileName e' o nome ORIGINAL do arquivo (ver GcsService.uploadAttachment), fileType e' o
+    // mime type (decide se renderiza <video>/<audio>/card de download, ver DmChatWindow.jsx).
+    @Column(length = 1000)
+    private String fileUrl;
+
+    @Column(length = 255)
+    private String fileName;
+
+    @Column(length = 100)
+    private String fileType;
+
+    private Long fileSize;
 
     @Builder.Default
     private Instant createdAt = Instant.now();

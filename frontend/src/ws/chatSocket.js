@@ -25,10 +25,21 @@ export function subscribeToChannel(client, channelId, onEvent) {
   });
 }
 
-export function sendChatMessage(client, channelId, content, imageUrl, replyToId) {
+/** "file" (opcional) e' {url, name, type, size} - anexo GENERICO (video/documento/audio,
+ *  inclusive mensagem de voz gravada, ver useAudioRecorder.js) - separado de imageUrl de
+ *  proposito, o backend guarda cada um na sua propria coluna (ver GcsService.uploadAttachment). */
+export function sendChatMessage(client, channelId, content, imageUrl, replyToId, file) {
   client.publish({
     destination: `/app/channel.${channelId}.send`,
-    body: JSON.stringify({ content: content || "", imageUrl: imageUrl || null, replyToId: replyToId || null }),
+    body: JSON.stringify({
+      content: content || "",
+      imageUrl: imageUrl || null,
+      replyToId: replyToId || null,
+      fileUrl: file?.url || null,
+      fileName: file?.name || null,
+      fileType: file?.type || null,
+      fileSize: file?.size || null,
+    }),
   });
 }
 
@@ -236,10 +247,18 @@ export function subscribeToDm(client, channelId, onEvent) {
   });
 }
 
-export function sendDmMessage(client, channelId, content, imageUrl, replyToId) {
+export function sendDmMessage(client, channelId, content, imageUrl, replyToId, file) {
   client.publish({
     destination: `/app/dm.${channelId}.send`,
-    body: JSON.stringify({ content: content || "", imageUrl: imageUrl || null, replyToId: replyToId || null }),
+    body: JSON.stringify({
+      content: content || "",
+      imageUrl: imageUrl || null,
+      replyToId: replyToId || null,
+      fileUrl: file?.url || null,
+      fileName: file?.name || null,
+      fileType: file?.type || null,
+      fileSize: file?.size || null,
+    }),
   });
 }
 

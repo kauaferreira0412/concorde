@@ -4,6 +4,7 @@ import { subscribeToChannel } from "../ws/chatSocket";
 import { getDesktopNotificationsEnabled } from "./notificationSettings";
 import { mentionsUser } from "./mentions";
 import { playMessageSound } from "./soundEffects";
+import { attachmentSummary } from "./attachmentSummary";
 
 const LAST_READ_PREFIX = "chatLastRead_";
 
@@ -133,7 +134,7 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
     // Linha 1 = de ONDE vem (canal + servidor), linha 2 = a mensagem resumida - igual
     // Discord/Slack/Telegram mostram remetente + canal + preview do texto, nao so' o texto cru.
     const origin = serverName ? `#${channelName} · ${serverName}` : `#${channelName}`;
-    const preview = summarize(message.content || (message.imageUrl ? "🖼️ Imagem" : ""));
+    const preview = summarize(attachmentSummary(message));
     try {
       const notification = new Notification(message.authorUsername, {
         body: `${origin}\n${preview}`,

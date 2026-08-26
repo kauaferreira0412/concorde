@@ -28,6 +28,16 @@ public class GcsService {
 
     private static final long MAX_AUDIO_BYTES = 3L * 1024 * 1024;
 
+    // Anexo generico de mensagem (video/audio/documento/etc, ver uploadAttachment) - deliberadamente
+    // sem lista de permitidos (Discord tambem aceita qualquer tipo), so' um bloqueio de extensoes
+    // executaveis/perigosas, ja' que quem envia precisa estar logado (nao e' upload publico).
+    private static final Set<String> BLOCKED_ATTACHMENT_EXTENSIONS =
+            Set.of("exe", "msi", "bat", "cmd", "com", "scr", "dll", "apk", "jar", "vbs", "vbe", "ps1", "sh", "app", "deb", "rpm");
+
+    private static final long MAX_ATTACHMENT_BYTES = 25L * 1024 * 1024;
+
+    public record FileUploadResult(String url, String name, String contentType, long size) {}
+
     private final String credentialsJson;
     private final String bucketName;
     private final String baseFolder;
@@ -113,6 +123,48 @@ public class GcsService {
         }
 
         return "https://storage.googleapis.com/%s/%s".formatted(bucketName, objectName);
+    }
+
+    /** Anexo generico de chat (video, documento, arquivo qualquer, ou audio - inclusive mensagem
+     *  de voz gravada no proprio app, ver useAudioRecorder.js no frontend) - diferente de upload()
+     *  (so' imagem) e uploadAudio() (so' pro soundboard, com lista fechada de tipos), aqui o nome
+     *  ORIGINAL do arquivo e' preservado no retorno (pra mostrar "relatorio.pdf" no chat, nao um
+     *  uuid ilegivel) - o nome no BUCKET continua sendo um uuid (evita colisao/nome com caracter
+     *  invalido em URL), so' o nome de exibicao que guarda o original. */
+    public FileUploadResult uploadAttachment(MultipartFile file, String subFolder) {
+        if (storage == null) {
+            throw new IllegalStateException(
+                    "Google Cloud Storage nao configurado - defina a variavel GCS_CREDENTIALS_JSON com o JSON da conta de servico");
+        }
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("Arquivo vazio");
+        }
+        if (file.getSize() > MAX_ATTACHMENT_BYTES) {
+            throw new IllegalArgumentException("Arquivo muito grande - o máximo é 25MB");
+        }
+        String originalName = file.getOriginalFilename();
+        String ext = "";
+        if (originalName != null && originalName.contains(".")) {
+            ext = originalName.substring(originalName.lastIndexOf('.') + 1).toLowerCase();
+        }
+        if (BLOCKED_ATTACHMENT_EXTENSIONS.contains(ext)) {
+            throw new IllegalArgumentException("Esse tipo de arquivo não é permitido");
+        }
+        String contentType = file.getContentType() != null ? file.getContentType() : "application/octet-stream";
+        String objectExt = ext.isBlank() ? "" : "." + ext;
+        String objectName = "%s/%s/%s%s".formatted(baseFolder, subFolder, UUID.randomUUID(), objectExt);
+        BlobId blobId = BlobId.of(bucketName, objectName);
+        BlobInfo blobInfo = BlobInfo.newBuilder(blobId).setContentType(contentType).build();
+
+        try {
+            storage.create(blobInfo, file.getBytes());
+        } catch (IOException e) {
+            throw new IllegalStateException("Falha ao ler o arquivo enviado: " + e.getMessage(), e);
+        }
+
+        String url = "https://storage.googleapis.com/%s/%s".formatted(bucketName, objectName);
+        String displayName = (originalName == null || originalName.isBlank()) ? "arquivo" + objectExt : originalName;
+        return new FileUploadResult(url, displayName, contentType, file.getSize());
     }
 
     private String extensionFor(String contentType) {

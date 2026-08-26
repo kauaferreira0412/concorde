@@ -7,6 +7,7 @@ import ConfirmModal from "../../components/ConfirmModal.jsx";
 import SettingsModal from "../../components/SettingsModal.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useProfile } from "../../context/ProfileContext.jsx";
+import { attachmentSummary } from "../../utils/attachmentSummary";
 import { VoiceCallProvider } from "../../context/VoiceCallContext.jsx";
 import { LogOutIcon, MessageSquareIcon, SettingsIcon, UsersIcon } from "../../components/icons.jsx";
 import { useHomeContainer } from "./Container.jsx";
@@ -101,7 +102,7 @@ export default function HomePage() {
                     <strong>{c.otherNickname || c.otherUsername}</strong>
                     {c.lastMessage && (
                       <span className="home-dm-item-preview">
-                        {c.lastMessage.content || (c.lastMessage.imageUrl ? "🖼️ Imagem" : "")}
+                        {attachmentSummary(c.lastMessage)}
                       </span>
                     )}
                   </span>

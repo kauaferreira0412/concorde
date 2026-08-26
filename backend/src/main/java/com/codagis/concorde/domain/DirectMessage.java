@@ -23,7 +23,11 @@ import java.time.Instant;
         @Index(name = "idx_direct_messages_roll_results_csv", columnList = "rollResultsCsv"),
         @Index(name = "idx_direct_messages_roll_total", columnList = "rollTotal"),
         @Index(name = "idx_direct_messages_pinned", columnList = "pinned"),
-        @Index(name = "idx_direct_messages_pinned_at", columnList = "pinnedAt")
+        @Index(name = "idx_direct_messages_pinned_at", columnList = "pinnedAt"),
+        @Index(name = "idx_direct_messages_file_url", columnList = "fileUrl"),
+        @Index(name = "idx_direct_messages_file_name", columnList = "fileName"),
+        @Index(name = "idx_direct_messages_file_type", columnList = "fileType"),
+        @Index(name = "idx_direct_messages_file_size", columnList = "fileSize")
 })
 @Getter
 @Setter
@@ -47,6 +51,20 @@ public class DirectMessage {
 
     @Column(length = 1000)
     private String imageUrl;
+
+    // Anexo generico (video, documento, audio - inclusive mensagem de voz gravada) - mesmo
+    // esquema de Message.java (chat de servidor), ver comentario la' pro motivo de ser separado
+    // de imageUrl.
+    @Column(length = 1000)
+    private String fileUrl;
+
+    @Column(length = 255)
+    private String fileName;
+
+    @Column(length = 100)
+    private String fileType;
+
+    private Long fileSize;
 
     @Builder.Default
     private Instant createdAt = Instant.now();

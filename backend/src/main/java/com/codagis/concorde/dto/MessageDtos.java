@@ -7,13 +7,15 @@ import java.util.List;
 
 public class MessageDtos {
 
-    public record OutgoingChatMessage(String content, String imageUrl, Long replyToId) {}
+    public record OutgoingChatMessage(String content, String imageUrl, Long replyToId,
+                                       String fileUrl, String fileName, String fileType, Long fileSize) {}
 
     public record EditChatMessage(Long messageId, String content) {}
 
     public record DeleteChatMessage(Long messageId) {}
 
-    public record ReplyPreview(Long id, String authorUsername, String authorAvatarUrl, String content, String imageUrl) {}
+    public record ReplyPreview(Long id, String authorUsername, String authorAvatarUrl, String content, String imageUrl,
+                                String fileUrl, String fileName, String fileType) {}
 
     public record ReactionSummary(String emoji, List<Long> userIds) {}
 
@@ -25,7 +27,8 @@ public class MessageDtos {
                                String content, String imageUrl, Instant createdAt, Instant editedAt,
                                Long replyToId, ReplyPreview replyTo,
                                String rollNotation, Integer rollSides, String rollResultsCsv, Integer rollTotal,
-                               List<ReactionSummary> reactions, boolean pinned, PollDto poll) {}
+                               List<ReactionSummary> reactions, boolean pinned, PollDto poll,
+                               String fileUrl, String fileName, String fileType, Long fileSize) {}
 
     public record RollDiceRequest(String notation) {}
 
@@ -42,4 +45,9 @@ public class MessageDtos {
     }
 
     public record AttachmentResponse(String url) {}
+
+    // Anexo generico (video/documento/audio, ver GcsService.uploadAttachment) - resposta do
+    // upload SEPARADA de AttachmentResponse (que continua so' pra imagem, sem mudar nada nela)
+    // pra nao arriscar quebrar o fluxo de imagem que ja' funciona.
+    public record FileAttachmentResponse(String url, String name, String contentType, long size) {}
 }

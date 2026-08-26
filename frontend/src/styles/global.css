@@ -1310,6 +1310,94 @@ h3.chat-heading {
 }
 .chat-edited { font-size: 11px; color: var(--text-muted); margin-left: 6px; font-style: italic; }
 
+/* Anexo GENERICO de mensagem - video toca inline, audio vira um mini player com nome do
+   arquivo do lado, qualquer outra coisa vira um cartao com icone+nome+tamanho (ver
+   AttachmentMessage.jsx). Mesmas medidas maximas da imagem (.chat-image acima), pra
+   nao estourar a largura do balao de mensagem. */
+.chat-video {
+  display: block;
+  max-width: min(100%, 360px);
+  max-height: 320px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  margin-top: 6px;
+  background: #000;
+}
+.chat-audio-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+  max-width: 360px;
+}
+.chat-audio { flex: 1; min-width: 0; height: 32px; }
+.chat-audio-name { font-size: 12px; color: var(--text-muted); flex-shrink: 0; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-file-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+  max-width: 360px;
+  text-decoration: none;
+  color: inherit;
+}
+.chat-file-card:hover { background: var(--bg-hover); border-color: var(--border); }
+.chat-file-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.chat-file-card-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.chat-file-card-info strong { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-file-card-info span { font-size: 11.5px; color: var(--text-muted); }
+.chat-file-card-download { flex-shrink: 0; color: var(--text-muted); }
+.chat-file-card:hover .chat-file-card-download { color: var(--text-primary); }
+
+/* Previa de video/audio pendente (antes de enviar, ver chat-pending-attachment abaixo) e o
+   icone generico de arquivo qualquer, mesmas medidas do preview de imagem. */
+.chat-pending-video, .chat-pending-audio { max-width: 220px; max-height: 120px; border-radius: var(--radius-sm); flex-shrink: 0; }
+.chat-pending-file-icon { font-size: 28px; flex-shrink: 0; }
+
+/* Botao de gravar mensagem de voz (ver useAudioRecorder.js) - "aceso" (vermelho, pulsando)
+   enquanto grava, igual o indicador de "AO VIVO" de qualquer app de mensagem. */
+.chat-record-btn.recording { color: var(--danger); background: var(--danger-soft); }
+.chat-recording-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 0 4px;
+}
+.chat-recording-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: chat-recording-pulse 1.1s ease-in-out infinite;
+}
+.chat-recording-indicator .link-btn { margin-left: auto; font-size: 12.5px; }
+@keyframes chat-recording-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
 /* Mencao (@username) dentro do texto - mais forte quando e' voce mesmo sendo mencionado.
    E' um <button> (clicavel - abre o perfil da pessoa, ver MessageText em ChatWindow.jsx),
    por isso zera border/font/cursor por cima do button{} global - senao herdava padding

@@ -13,7 +13,8 @@ public class DirectMessageDtos {
                              String content, String imageUrl, Instant createdAt, Instant editedAt,
                              Long replyToId, ReplyPreview replyTo,
                              String rollNotation, Integer rollSides, String rollResultsCsv, Integer rollTotal,
-                             List<ReactionSummary> reactions, boolean pinned) {}
+                             List<ReactionSummary> reactions, boolean pinned,
+                             String fileUrl, String fileName, String fileType, Long fileSize) {}
 
     public record DmEvent(String type, DmMessage message, Long messageId) {
         public static DmEvent created(DmMessage message) {

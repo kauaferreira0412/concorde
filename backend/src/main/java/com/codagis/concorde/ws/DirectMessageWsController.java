@@ -53,7 +53,8 @@ public class DirectMessageWsController {
     public void send(@DestinationVariable Long channelId, OutgoingChatMessage payload, Principal principal) {
         Long authorId = userId(principal);
         try {
-            DmMessage saved = directMessageService.save(channelId, authorId, payload.content(), payload.imageUrl(), payload.replyToId());
+            DmMessage saved = directMessageService.save(channelId, authorId, payload.content(), payload.imageUrl(), payload.replyToId(),
+                    payload.fileUrl(), payload.fileName(), payload.fileType(), payload.fileSize());
             broadcast(channelId, DmEvent.created(saved));
         } catch (RuntimeException e) {
             System.err.println("Falha ao enviar DM no canal " + channelId + ": " + e.getMessage());

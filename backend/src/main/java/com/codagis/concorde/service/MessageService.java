@@ -58,11 +58,13 @@ public class MessageService {
     }
 
     @Transactional
-    public ChatMessage save(Long channelId, Long authorId, String content, String imageUrl, Long replyToId) {
+    public ChatMessage save(Long channelId, Long authorId, String content, String imageUrl, Long replyToId,
+                             String fileUrl, String fileName, String fileType, Long fileSize) {
         boolean hasText = content != null && !content.isBlank();
         boolean hasImage = imageUrl != null && !imageUrl.isBlank();
-        if (!hasText && !hasImage) {
-            throw new IllegalArgumentException("Mensagem vazia - escreva algo ou anexe uma imagem");
+        boolean hasFile = fileUrl != null && !fileUrl.isBlank();
+        if (!hasText && !hasImage && !hasFile) {
+            throw new IllegalArgumentException("Mensagem vazia - escreva algo ou anexe um arquivo");
         }
         assertCanPostIn(channelId, authorId);
         Long validReplyToId = null;
@@ -78,6 +80,10 @@ public class MessageService {
                 .content(hasText ? content : "")
                 .imageUrl(hasImage ? imageUrl : null)
                 .replyToId(validReplyToId)
+                .fileUrl(hasFile ? fileUrl : null)
+                .fileName(hasFile ? fileName : null)
+                .fileType(hasFile ? fileType : null)
+                .fileSize(hasFile ? fileSize : null)
                 .build());
         return toDto(saved);
     }
@@ -254,7 +260,8 @@ public class MessageService {
         return new ChatMessage(m.getId(), m.getChannelId(), m.getAuthorId(), username, avatarUrl, m.getContent(),
                 m.getImageUrl(), m.getCreatedAt(), m.getEditedAt(), m.getReplyToId(), replyTo,
                 m.getRollNotation(), m.getRollSides(), m.getRollResultsCsv(), m.getRollTotal(),
-                groupReactions(reactions), m.isPinned(), poll);
+                groupReactions(reactions), m.isPinned(), poll,
+                m.getFileUrl(), m.getFileName(), m.getFileType(), m.getFileSize());
     }
 
     private PollDto buildPollDto(Long pollId) {
@@ -284,7 +291,8 @@ public class MessageService {
             User originalAuthor = userRepository.findById(original.getAuthorId()).orElse(null);
             String originalUsername = originalAuthor != null ? originalAuthor.getUsername() : "desconhecido";
             String originalAvatarUrl = originalAuthor != null ? originalAuthor.getAvatarUrl() : null;
-            return new ReplyPreview(original.getId(), originalUsername, originalAvatarUrl, original.getContent(), original.getImageUrl());
+            return new ReplyPreview(original.getId(), originalUsername, originalAvatarUrl, original.getContent(), original.getImageUrl(),
+                    original.getFileUrl(), original.getFileName(), original.getFileType());
         }).orElse(null);
     }
 }
