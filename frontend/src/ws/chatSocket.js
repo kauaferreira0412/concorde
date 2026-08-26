@@ -225,6 +225,85 @@ export function publishVoiceForceDeafen(client, channelId, targetUserId, deafene
 }
 
 /**
+ * Chat PRIVADO (DM) - mesmo desenho do chat de servidor acima, so' que sob o namespace "dm.*"
+ * em vez de "channel.*" (ver DirectMessageController.java no backend, ws/), nunca confundir um
+ * id de conversa privada com um id de canal de servidor. onEvent recebe um DmEvent: {
+ * type: "CREATED"|"UPDATED"|"DELETED", message?, messageId? } - mesmo formato do ChatEvent.
+ */
+export function subscribeToDm(client, channelId, onEvent) {
+  return client.subscribe(`/topic/dm.${channelId}`, (frame) => {
+    onEvent(JSON.parse(frame.body));
+  });
+}
+
+export function sendDmMessage(client, channelId, content, imageUrl, replyToId) {
+  client.publish({
+    destination: `/app/dm.${channelId}.send`,
+    body: JSON.stringify({ content: content || "", imageUrl: imageUrl || null, replyToId: replyToId || null }),
+  });
+}
+
+export function editDmMessage(client, channelId, messageId, content) {
+  client.publish({
+    destination: `/app/dm.${channelId}.edit`,
+    body: JSON.stringify({ messageId, content }),
+  });
+}
+
+export function deleteDmMessage(client, channelId, messageId) {
+  client.publish({
+    destination: `/app/dm.${channelId}.delete`,
+    body: JSON.stringify({ messageId }),
+  });
+}
+
+export function rollDiceDm(client, channelId, notation) {
+  client.publish({
+    destination: `/app/dm.${channelId}.roll`,
+    body: JSON.stringify({ notation }),
+  });
+}
+
+export function toggleDmReaction(client, channelId, messageId, emoji) {
+  client.publish({
+    destination: `/app/dm.${channelId}.react`,
+    body: JSON.stringify({ messageId, emoji }),
+  });
+}
+
+export function pinDmMessage(client, channelId, messageId, pinned) {
+  client.publish({
+    destination: `/app/dm.${channelId}.pin`,
+    body: JSON.stringify({ messageId, pinned }),
+  });
+}
+
+export function publishDmTyping(client, channelId, typing) {
+  client.publish({
+    destination: `/app/dm.${channelId}.typing`,
+    body: JSON.stringify({ typing }),
+  });
+}
+
+export function subscribeToDmTyping(client, channelId, onEvent) {
+  return client.subscribe(`/topic/dm.${channelId}.typing`, (frame) => {
+    onEvent(JSON.parse(frame.body));
+  });
+}
+
+/**
+ * Fila PESSOAL de eventos de amizade (pedido recebido/aceito/recusado, amigo removido - ver
+ * FriendshipService.notify no backend) - o payload e' so' um "type" generico, o frontend reage
+ * simplesmente recarregando a lista de amigos/pedidos (ver pages/home/Container.jsx), sem tentar
+ * aplicar patch incremental no estado.
+ */
+export function subscribeToFriends(client, onEvent) {
+  return client.subscribe("/user/queue/friends", (frame) => {
+    onEvent(JSON.parse(frame.body));
+  });
+}
+
+/**
  * Fila de musica (ver MusicQueueCard.jsx/MusicBotInternalController.java) - o proprio bot
  * (music-bot/index.js) manda um snapshot completo { nowPlaying, queue } toda vez que ela muda
  * (musica trocou, alguem adicionou/removeu), o backend so' retransmite. channelId aqui e' o

@@ -4,6 +4,7 @@ import { AlertProvider } from "./context/AlertContext.jsx";
 import { ProfileProvider } from "./context/ProfileContext.jsx";
 import LoginPage from "./pages/login";
 import ServerPage from "./pages/servers";
+import HomePage from "./pages/home";
 import AdminPage from "./pages/admin";
 import CameraPipPage from "./pages/camera-pip";
 import UpdateRequiredGate from "./components/UpdateRequiredGate.jsx";
@@ -33,6 +34,14 @@ export default function App() {
                 o token do app vem pela propria URL (janela nova, sem sessionStorage
                 compartilhado), nao do fluxo normal de login. */}
             <Route path="/camera-pip/:channelId" element={<CameraPipPage />} />
+            <Route
+              path="/channels/@me"
+              element={
+                <PrivateRoute>
+                  <HomePage />
+                </PrivateRoute>
+              }
+            />
             <Route
               path="/admin"
               element={

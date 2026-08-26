@@ -1,0 +1,72 @@
+/* Mesmo .app-shell de pages/servers/style.css (duplicado de proposito - CSS por pagina, so' um
+   seletor, ver mesmo padrao la'). */
+.app-shell { display: flex; height: 100%; }
+
+/* Coluna do meio da Home - mesmas medidas do .channel-sidebar (ver global.css), so' que lista
+   conversas diretas em vez de canais. */
+.home-sidebar {
+  width: 252px;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.home-sidebar-header {
+  padding: 17px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+}
+.home-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 8px 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.home-nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.home-nav-item.active { background: var(--accent-soft); color: var(--accent-text); }
+.home-nav-badge {
+  margin-left: auto;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.home-dm-list-title {
+  margin: 16px 12px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.home-dm-list { flex: 1; overflow-y: auto; padding: 0 8px 8px; display: flex; flex-direction: column; gap: 2px; }
+.home-dm-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+.home-dm-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.home-dm-item.active { background: var(--bg-hover); color: var(--text-primary); }
+.home-dm-item-info { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.home-dm-item-info strong { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-dm-item-preview { font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

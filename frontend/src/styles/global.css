@@ -324,6 +324,16 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   pointer-events: none;
 }
 .server-icon-pill.active { height: 22px; }
+/* Separa o botao de Home (logo do Concorde) da lista de servidores - mesma largura do icone
+   de servidor, uma linha fina no meio (igual Discord). */
+.server-sidebar-divider {
+  width: 32px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--border-soft);
+  margin: 2px auto 8px;
+  flex-shrink: 0;
+}
 .server-icon.add {
   background: transparent;
   border: 1px dashed var(--border);
@@ -787,7 +797,7 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
    Chat
    ============================================================ */
 .chat-window, .voice-channel { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-app); }
-.chat-window.empty { align-items: center; justify-content: center; color: var(--text-muted); font-size: 14px; }
+.chat-window.empty { align-items: center; justify-content: center; gap: 10px; color: var(--text-muted); font-size: 14px; }
 .chat-header {
   padding: 15px 20px;
   font-family: var(--font-display);
@@ -803,6 +813,22 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
 }
 .chat-header-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-header-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+/* Cabecalho do chat PRIVADO (ver DmChatWindow.jsx) - mesmo .chat-header de fora, so' que em vez
+   de "# nome-do-canal" mostra avatar + nome de quem voce esta conversando (clicavel, abre o
+   perfil dele) - equivalente ao MegaphoneIcon/nome usado no chat de servidor. */
+.chat-header-dm-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+.chat-header-dm-avatar { width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; }
 
 /* Painel deslizante de mensagens fixadas/busca (ver botoes no chat-header) - lista simples de
    resultados clicaveis, cada um pula pra mensagem correspondente se ela estiver carregada. */
@@ -2904,3 +2930,81 @@ h3.chat-heading {
   0%, 100% { transform: rotate(-8deg); }
   50% { transform: rotate(8deg); }
 }
+
+/* Painel de Amigos da Home (ver FriendsPanel.jsx/pages/home) - abas Online/Todos/Pendentes/
+   Adicionar amigo em cima, lista rolavel embaixo. Mesmos tokens de cor do resto do app. */
+.friends-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-app); }
+.friends-panel-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-panel);
+}
+.friends-panel-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.friends-panel-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
+.friends-panel-tab.active { background: var(--bg-hover); color: var(--text-primary); }
+.friends-panel-tab.add { margin-left: auto; color: var(--success); }
+.friends-panel-tab-badge {
+  background: var(--danger);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.friends-panel-body { flex: 1; overflow-y: auto; padding: 12px 16px 20px; }
+.friends-panel-empty { color: var(--text-muted); font-size: 13.5px; margin: 20px 0; }
+.friends-panel-section-title {
+  margin: 4px 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.friends-add-form label { font-size: 11.5px; font-weight: 700; letter-spacing: 0.03em; color: var(--text-secondary); }
+.friends-add-row { display: flex; gap: 8px; }
+.friends-add-row input { flex: 1; }
+
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border-bottom: 1px solid var(--border-soft);
+}
+.friend-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  padding: 4px;
+  margin: -4px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+.friend-row-main:hover { background: var(--bg-hover); }
+.friend-row-info { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.friend-row-info strong { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.friend-row-status { font-size: 11.5px; color: var(--text-muted); }
+.friend-row-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }

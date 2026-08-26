@@ -7,7 +7,7 @@ import { HeadphonesIcon } from "./icons.jsx";
 
 const MAX_AVATARS = 8; // depois disso so mostra "+N", senao a fileira fica gigante num servidor grande
 
-export default function ServerSidebar({ servers, selectedServerId, onSelect, onCreateServer }) {
+export default function ServerSidebar({ servers, selectedServerId, homeActive, onSelect, onHome, onCreateServer }) {
   const { isAdmin } = useAuth();
   // Tooltip customizado ao passar o mouse num servidor - pedido explicito do usuario: mostrar
   // os avatares de quem esta numa call de voz AGORA nesse servidor, sem precisar entrar nele
@@ -49,6 +49,19 @@ export default function ServerSidebar({ servers, selectedServerId, onSelect, onC
 
   return (
     <div className="server-sidebar">
+      {/* Logo do Concorde = "ir pra Home" (amigos + chats privados), igual o botao do Discord
+          no topo da barra de servidores - pedido explicito do usuario. */}
+      <div className="server-icon-wrap">
+        <span className={"server-icon-pill" + (homeActive ? " active" : "")} />
+        <button
+          className={"server-icon home has-icon" + (homeActive ? " active" : "")}
+          onClick={onHome}
+          title="Página inicial (amigos e mensagens)"
+        >
+          <img src={`${import.meta.env.BASE_URL}icon-192.png`} alt="" className="server-icon-img" />
+        </button>
+      </div>
+      <div className="server-sidebar-divider" />
       {servers.map((s) => {
         const isActive = s.id === selectedServerId;
         return (

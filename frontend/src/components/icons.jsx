@@ -514,3 +514,13 @@ export function BarChartIcon(props) {
     </svg>
   );
 }
+
+// Balaozinho de chat - usado na Home (ver FriendsPanel.jsx) pro botao "mandar mensagem" de um
+// amigo, e na lista de conversas diretas (pages/home).
+export function MessageSquareIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}

@@ -61,6 +61,7 @@ export default function ServerPage() {
           servers={servers}
           selectedServerId={selectedServerId}
           onSelect={(id) => navigate(`/servers/${id}`)}
+          onHome={() => navigate("/channels/@me")}
           onCreateServer={() => setShowCreateServer(true)}
         />
         <ChannelSidebar
