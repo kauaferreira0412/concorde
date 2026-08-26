@@ -1863,6 +1863,11 @@ h3.chat-heading {
   padding: 10px 12px;
   box-shadow: var(--shadow-md);
   width: 220px;
+  /* Reposicionado com a altura real em ChannelSidebar.jsx (ver useLayoutEffect) - esse
+     max-height + scroll e' so' o ultimo recurso, pra quando o conteudo (lista de "mover
+     para") for maior que a propria tela caber. */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
 }
 .volume-popover-title {
   margin: 0 0 8px;

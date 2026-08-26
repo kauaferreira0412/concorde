@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
@@ -307,6 +307,22 @@ export default function ChannelSidebar({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [participantMenu]);
+
+  // O popover de moderacao (mutar/ensurdecer/"mover para"/expulsar) tem altura VARIAVEL - fica
+  // bem mais alto quando tem varios canais de voz pra listar em "mover para" (relatado pelo
+  // usuario, com print mostrando ele cortado embaixo da tela). Como so' da' pra saber a altura
+  // de verdade depois de renderizado, o left/top inicial e' so' o ponto do clique (sem clamp -
+  // ver estilo inline abaixo) e esse efeito reposiciona direto no DOM, ja' clampado pro
+  // tamanho real, ANTES do proximo paint (useLayoutEffect, evita o usuario ver o popover pular).
+  useLayoutEffect(() => {
+    if (!participantMenu || !participantMenuRef.current) return;
+    const el = participantMenuRef.current;
+    const rect = el.getBoundingClientRect();
+    const left = Math.max(8, Math.min(participantMenu.x, window.innerWidth - rect.width - 8));
+    const top = Math.max(8, Math.min(participantMenu.y, window.innerHeight - rect.height - 8));
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }, [participantMenu, myServerPermissions]);
 
   useEffect(() => {
     setMovingChannel(false);
@@ -1022,10 +1038,7 @@ export default function ChannelSidebar({
             <div
               className="volume-popover"
               ref={participantMenuRef}
-              style={{
-                left: Math.min(participantMenu.x, window.innerWidth - 232),
-                top: Math.min(participantMenu.y, window.innerHeight - 70),
-              }}
+              style={{ left: participantMenu.x, top: participantMenu.y }}
             >
               <p className="volume-popover-title">{p?.name || participantMenu.username}</p>
 
