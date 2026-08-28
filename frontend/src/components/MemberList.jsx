@@ -53,15 +53,20 @@ export default function MemberList({ serverId, stompClient, stompConnected, show
     });
   }
 
-  if (!serverId) return null;
-
-  const canManage = myServerPermissions.has("MANAGE_MEMBERS");
   const online = members.filter((m) => m.status !== "OFFLINE");
   const offline = members.filter((m) => m.status === "OFFLINE");
   // "Ouvindo Spotify" de quem conectou a conta (opt-in, ver Configurações > Conexões) - so' os
   // ONLINE entram no poll (quem esta' offline nao teria como estar ouvindo nada mesmo, e' inutil
-  // gastar chamada com eles).
+  // gastar chamada com eles). PRECISA vir antes do "if (!serverId) return null" abaixo - hook
+  // chamado depois de um return condicional quebra a ordem dos hooks entre renders (na primeira
+  // renderizacao, antes dos servidores carregarem, serverId ainda e' null) e derruba o React
+  // inteiro (tela em branco, sem erro nenhum visivel pro usuario - so' no console/DevTools:
+  // "Rendered fewer hooks than expected"). Reportado: "abro no desktop ou web, nada aparece".
   const nowPlayingByUser = useSpotifyNowPlaying(online.map((m) => m.userId));
+
+  if (!serverId) return null;
+
+  const canManage = myServerPermissions.has("MANAGE_MEMBERS");
 
   return (
     <div className={"member-list" + (collapsed ? " collapsed" : "")}>
