@@ -787,24 +787,24 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         // (h1080fps15 = so' 15fps e 2.5Mbps, pensado pra economizar banda no caso comum) - na
         // pratica isso faz QUALQUER transmissao de tela parecer "travando" (15fps e' bem
         // perceptivel, principalmente em jogos/video) mesmo com internet de sobra (reportado:
-        // "as vezes fica boa, as vezes trava"). 1080p 60fps/8Mbps - pedido explicito do usuario
-        // (30fps ja tinha resolvido o "travando", mas ele queria 60 mesmo); nao existe preset
-        // pronto de 60fps na lib (ScreenSharePresets so' vai ate' h1080fps30), entao e' um
-        // objeto literal em vez de ScreenSharePresets.*. Continua sendo so' um TETO (o proprio
-        // WebRTC reduz sozinho se a internet de quem esta transmitindo realmente nao aguentar,
-        // isso nao muda), mas para de limitar artificialmente quem TEM banda de sobra pra
-        // transmitir liso.
+        // "as vezes fica boa, as vezes trava"). 1080p 30fps/6Mbps CRAVADO - pedido explicito do
+        // usuario (chegou a pedir 60fps antes, mas voltou atras: "pra nao ficar pesado pra
+        // ninguem, limite... em ate' somente trinta fps cravado, deve ficar sempre com trinta
+        // fps, para nao travar" - quem assiste, principalmente com PC/internet mais fraca, sente
+        // mais o peso de 60fps constante do que ganha em fluidez). maxFramerate aqui e' o TETO
+        // de codificacao (a captura tambem precisa ser limitada a 30 pra bater com isso, ver
+        // frameRate/maxFrameRate mais abaixo, no navegador e no Electron).
         publishDefaults: {
-          screenShareEncoding: { maxBitrate: 8_000_000, maxFramerate: 60, priority: "high" },
+          screenShareEncoding: { maxBitrate: 6_000_000, maxFramerate: 30, priority: "high" },
           // O PADRAO do proprio livekit-client pra transmissao de tela, quando falta banda, e'
           // "maintain-resolution" (o WebRTC prefere derrubar o FRAMERATE pra manter a imagem
           // nitida - bom pra compartilhar documento/planilha, pessimo pra jogo com movimento
           // rapido: vira uma sequencia de fotos travadas em vez de continuar fluido so' com
           // menos nitidez). "maintain-framerate" inverte essa prioridade - sob a MESMA pressao
-          // de rede, o WebRTC preferer perder um pouco de nitidez a perder fluidez (reportado:
-          // "trava, principalmente em jogos mais freneticos"). So' entra em jogo quando a
-          // internet de quem esta transmitindo realmente aperta - com banda de sobra (a maioria
-          // do tempo) nao muda nada, ja' roda no teto de 60fps/8Mbps acima.
+          // de rede, o WebRTC prefere perder um pouco de nitidez a perder fluidez (reportado:
+          // "trava, principalmente em jogos mais freneticos"). Continua valendo com o teto em
+          // 30fps: garante que, se a rede apertar, os 30fps cravados sao o ULTIMO a cair (a
+          // resolucao cai primeiro).
           degradationPreference: "maintain-framerate",
         },
       });
@@ -1447,10 +1447,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       await room.localParticipant.setScreenShareEnabled(true, {
         video: {
           displaySurface: "browser", // sugere ABA como opcao padrao (audio mais limpo)
-          // Sem isso o navegador captura numa taxa propria (nem sempre 60) - o TETO de
-          // encoding (60fps, ver publishDefaults.screenShareEncoding acima na criacao da Room)
-          // so' ajuda de verdade se a CAPTURA em si tambem entregar 60 quadros por segundo.
-          frameRate: { ideal: 60, max: 60 },
+          // Cravado em 30fps (ver publishDefaults.screenShareEncoding acima, na criacao da
+          // Room) - "max" impede o navegador de capturar mais que isso (pedido explicito do
+          // usuario, pra transmissao nunca ficar pesada pra quem esta assistindo).
+          frameRate: { ideal: 30, max: 30 },
         },
         audio: { echoCancellation: true, noiseSuppression: true },
         systemAudio: "exclude",
@@ -1503,10 +1503,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
             chromeMediaSourceId: source.id,
             maxWidth: 1920,
             maxHeight: 1080,
-            // Bate com o TETO de encoding (60fps, ver publishDefaults.screenShareEncoding na
-            // criacao da Room) - sem isso a captura em si ja vinha limitada a 30, e o teto de
-            // encoding mais alto nao adiantava nada (nao tem quadro extra pra codificar).
-            maxFrameRate: 60,
+            // Bate com o TETO de encoding (30fps cravado, ver publishDefaults.screenShareEncoding
+            // na criacao da Room) - pedido explicito do usuario, pra transmissao nunca ficar
+            // pesada pra quem esta assistindo.
+            maxFrameRate: 30,
           },
         },
       });
