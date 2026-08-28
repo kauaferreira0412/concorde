@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useAlert } from "../context/AlertContext.jsx";
+import { useSpotifyNowPlaying } from "../utils/useSpotifyNowPlaying";
 import Avatar from "./Avatar.jsx";
-import { CheckIcon, MessageSquareIcon, PlusIcon, ShieldIcon } from "./icons.jsx";
+import { CheckIcon, MessageSquareIcon, MusicNoteIcon, PlusIcon, ShieldIcon } from "./icons.jsx";
 
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", OFFLINE: "Offline" };
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
@@ -33,6 +34,10 @@ export default function ProfileModal({ userId, onClose }) {
   const [friendActionBusy, setFriendActionBusy] = useState(false);
 
   const isMe = me?.id === userId;
+  // "Ouvindo Spotify" dessa pessoa agora (ver useSpotifyNowPlaying.js/Configurações >
+  // Conexões) - so' aparece se ela CONECTOU a conta e esta' tocando algo nesse instante.
+  const profileIds = useMemo(() => (profile ? [profile.id] : []), [profile]);
+  const nowPlaying = useSpotifyNowPlaying(profileIds)[profile?.id];
 
   useEffect(() => {
     setProfile(null);
@@ -153,6 +158,22 @@ export default function ProfileModal({ userId, onClose }) {
                       <MessageSquareIcon size={14} /> Enviar mensagem
                     </button>
                   )}
+                </div>
+              )}
+
+              {nowPlaying && (
+                <div className="profile-section">
+                  <p className="profile-section-title profile-section-title-spotify">
+                    <MusicNoteIcon size={11} /> Ouvindo Spotify
+                  </p>
+                  <a href={nowPlaying.trackUrl} target="_blank" rel="noopener noreferrer" className="profile-spotify-card">
+                    {nowPlaying.albumArtUrl && <img src={nowPlaying.albumArtUrl} alt="" className="profile-spotify-art" />}
+                    <div className="profile-spotify-info">
+                      <strong>{nowPlaying.trackName}</strong>
+                      <span>{nowPlaying.artistNames}</span>
+                      {nowPlaying.albumName && <span>{nowPlaying.albumName}</span>}
+                    </div>
+                  </a>
                 </div>
               )}
 

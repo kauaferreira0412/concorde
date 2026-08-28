@@ -80,6 +80,11 @@ const MUSIC_QUEUE_MARKER_RE = /^\[\[MUSIC_QUEUE:(\d+):([^\]]+)\]\]$/;
 // opcao ao mesmo tempo.
 const POLL_COMMAND_RE = /^\/(poll|pollmulti)\s+(.+)$/i;
 
+// /spotify (sozinho, VOCE) ou /spotify @alguem - manda pro chat o que essa pessoa esta'
+// ouvindo AGORA no Spotify (precisa ter conectado a conta em Configurações > Conexões, ver
+// SpotifyController no backend). "@" antes do nome e' opcional (aceita os dois jeitos).
+const SPOTIFY_COMMAND_RE = /^\/spotify(?:\s+@?(\S+))?\s*$/i;
+
 // Autocomplete de "/" (ver getSlashMenuState).
 const SLASH_COMMANDS = [
   { name: "roll", description: "Rolar dados de RPG (ex: 2d20+5)" },
@@ -91,6 +96,7 @@ const SLASH_COMMANDS = [
   { name: "stop", description: "Parar a música da sua call" },
   { name: "poll", description: "Enquete (escolha única) - depois adicione as opções no card" },
   { name: "pollmulti", description: "Enquete (múltipla escolha) - depois adicione as opções no card" },
+  { name: "spotify", description: "Ver o que você (ou @alguém) está ouvindo no Spotify" },
 ];
 const DICE_SIDES = [4, 6, 8, 10, 12, 20, 100];
 
@@ -566,6 +572,51 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       }
       rollDice(stompClient, channel.id, notation);
       setDraft("");
+      return;
+    }
+
+    // /spotify (ou /spotify @alguem) - consulta o que essa pessoa esta' ouvindo AGORA e manda
+    // como mensagem normal pro chat (reaproveita "imageUrl" pra capa do album - e' so' uma URL
+    // do proprio Spotify, sem upload nenhum, mesmo caminho que colar uma imagem ja' usa).
+    const spotifyMatch = SPOTIFY_COMMAND_RE.exec(draft.trim());
+    if (spotifyMatch) {
+      const targetUsername = spotifyMatch[1];
+      let targetUserId = user?.id;
+      let targetLabel = "Você";
+      if (targetUsername) {
+        const target = members.find((m) => m.username.toLowerCase() === targetUsername.toLowerCase());
+        if (!target) {
+          showAlert(`Não encontrei ninguém com o nome "${targetUsername}" nesse servidor`);
+          return;
+        }
+        targetUserId = target.userId;
+        targetLabel = target.nickname || target.username;
+      }
+      setDraft("");
+      setSending(true);
+      try {
+        const { data } = await api.get(`/api/spotify/now-playing/${targetUserId}`);
+        if (!data.connected) {
+          showAlert(
+            targetUsername
+              ? `${targetLabel} não conectou a conta do Spotify`
+              : "Você ainda não conectou sua conta do Spotify (Configurações > Conexões)"
+          );
+          return;
+        }
+        if (!data.playing) {
+          showAlert(`${targetLabel} não está ouvindo nada no Spotify agora`);
+          return;
+        }
+        const text = `🎵 **${targetLabel}** está ouvindo **${data.trackName}** — ${data.artistNames}${
+          data.albumName ? ` (${data.albumName})` : ""
+        }${data.trackUrl ? `\n${data.trackUrl}` : ""}`;
+        sendChatMessage(stompClient, channel.id, text, data.albumArtUrl, null, null);
+      } catch (err) {
+        showAlert(err.response?.data?.error || "Não foi possível consultar o Spotify agora");
+      } finally {
+        setSending(false);
+      }
       return;
     }
 

@@ -45,3 +45,10 @@ app:
     credentials-json: ${GCS_CREDENTIALS_JSON:}
     bucket: ${GCS_BUCKET:venda-lume-storage}
     base-folder: ${GCS_BASE_FOLDER:potato}
+  spotify:
+    client-id: ${SPOTIFY_CLIENT_ID:}
+    client-secret: ${SPOTIFY_CLIENT_SECRET:}
+    # Precisa bater EXATAMENTE com uma das Redirect URIs cadastradas no Spotify Developer
+    # Dashboard (ver SpotifyService/SettingsModal.jsx) - o padrao local usa 127.0.0.1 (nao
+    # "localhost") porque o Spotify so' aceita http:// sem certificado nesse endereco exato.
+    redirect-uri: ${SPOTIFY_REDIRECT_URI:http://127.0.0.1:8080/api/spotify/callback}

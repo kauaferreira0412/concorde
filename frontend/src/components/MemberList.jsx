@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { useServerMembers } from "../utils/useServerMembers";
+import { useSpotifyNowPlaying } from "../utils/useSpotifyNowPlaying";
 import { useProfile } from "../context/ProfileContext.jsx";
 import { useAlert } from "../context/AlertContext.jsx";
-import { ChevronsLeftIcon, ChevronsRightIcon, PencilIcon, TrashIcon, UsersIcon } from "./icons.jsx";
+import { ChevronsLeftIcon, ChevronsRightIcon, MusicNoteIcon, PencilIcon, TrashIcon, UsersIcon } from "./icons.jsx";
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import PotatoMafiaBanner from "./PotatoMafiaBanner.jsx";
@@ -57,6 +58,10 @@ export default function MemberList({ serverId, stompClient, stompConnected, show
   const canManage = myServerPermissions.has("MANAGE_MEMBERS");
   const online = members.filter((m) => m.status !== "OFFLINE");
   const offline = members.filter((m) => m.status === "OFFLINE");
+  // "Ouvindo Spotify" de quem conectou a conta (opt-in, ver Configurações > Conexões) - so' os
+  // ONLINE entram no poll (quem esta' offline nao teria como estar ouvindo nada mesmo, e' inutil
+  // gastar chamada com eles).
+  const nowPlayingByUser = useSpotifyNowPlaying(online.map((m) => m.userId));
 
   return (
     <div className={"member-list" + (collapsed ? " collapsed" : "")}>
@@ -78,7 +83,13 @@ export default function MemberList({ serverId, stompClient, stompConnected, show
             <>
               <p className="channel-group-title member-list-group">ONLINE — {online.length}</p>
               {online.map((m) => (
-                <MemberRow key={m.userId} member={m} serverId={serverId} canManage={canManage} />
+                <MemberRow
+                  key={m.userId}
+                  member={m}
+                  serverId={serverId}
+                  canManage={canManage}
+                  nowPlaying={nowPlayingByUser[m.userId]}
+                />
               ))}
             </>
           )}
@@ -107,7 +118,7 @@ export default function MemberList({ serverId, stompClient, stompConnected, show
  * gerenciar). Em outros lugares que reaproveitam esse componente (ex: VoiceChannel.jsx,
  * "Membros com acesso a esse canal") o clique direito simplesmente nao faz nada.
  */
-export function MemberRow({ member, serverId, canManage }) {
+export function MemberRow({ member, serverId, canManage, nowPlaying }) {
   const { openProfile } = useProfile();
   const { showAlert } = useAlert();
   const [menu, setMenu] = useState(null); // { x, y }
@@ -181,10 +192,23 @@ export function MemberRow({ member, serverId, canManage }) {
           <Avatar name={member.username} url={member.avatarUrl} className="voice-avatar small" />
           <span className={"status-dot " + STATUS_DOT_CLASS[member.status]} title={STATUS_LABEL[member.status]} />
         </div>
-        {/* Apelido DESSE servidor (ver Configurações > Perfil) tem prioridade sobre o username -
-            mesma logica do Discord: e' local aquele servidor, so' quem esta nele ve. */}
-        <span className="member-row-name">{displayNickname || member.username}</span>
-        {member.role === "ADMIN" && <span className="admin-badge">ADMIN</span>}
+        <span className="member-row-info">
+          <span className="member-row-name-line">
+            {/* Apelido DESSE servidor (ver Configurações > Perfil) tem prioridade sobre o
+                username - mesma logica do Discord: e' local aquele servidor, so' quem esta
+                nele ve. */}
+            <span className="member-row-name">{displayNickname || member.username}</span>
+            {member.role === "ADMIN" && <span className="admin-badge">ADMIN</span>}
+          </span>
+          {/* "Ouvindo Spotify" (ver useSpotifyNowPlaying/Configurações > Conexões) - so' aparece
+              se essa pessoa CONECTOU a conta E esta' tocando algo agora mesmo. */}
+          {nowPlaying && (
+            <span className="member-row-spotify" title={`Ouvindo ${nowPlaying.trackName} — ${nowPlaying.artistNames}`}>
+              <MusicNoteIcon size={11} />
+              {nowPlaying.trackName} — {nowPlaying.artistNames}
+            </span>
+          )}
+        </span>
       </button>
 
       {menu && (

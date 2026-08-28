@@ -31,7 +31,7 @@ import api from "../api/client";
 import Avatar from "./Avatar.jsx";
 import StatusDropdown from "./StatusDropdown.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
-import { BellIcon, KeyboardIcon, MicIcon, ShieldIcon, UserIcon, XIcon } from "./icons.jsx";
+import { BellIcon, KeyboardIcon, MicIcon, MusicNoteIcon, ShieldIcon, UserIcon, XIcon } from "./icons.jsx";
 
 /** Abas da tela de configuracoes - cada uma so' renderiza o seu pedaco (ver SettingsModal). */
 const TABS = [
@@ -39,6 +39,7 @@ const TABS = [
   { id: "audio", label: "Áudio e vídeo", Icon: MicIcon },
   { id: "atalhos", label: "Atalhos", Icon: KeyboardIcon },
   { id: "notificacoes", label: "Notificações", Icon: BellIcon },
+  { id: "conexoes", label: "Conexões", Icon: MusicNoteIcon },
 ];
 // So' aparece pra admin (ver isAdmin abaixo) - fica separada das abas normais porque nao
 // renderiza conteudo aqui dentro, so' leva pro /admin (ver handleTabClick).
@@ -142,6 +143,11 @@ export default function SettingsModal({ onClose }) {
   const [muteShortcut, setMuteShortcutState] = useState(getMuteShortcut());
   const [deafenShortcut, setDeafenShortcutState] = useState(getDeafenShortcut());
   const [permissionError, setPermissionError] = useState("");
+  // Integração com Spotify (ver Configurações > Conexões, SpotifyController no backend) - null
+  // enquanto carrega o status pela primeira vez.
+  const [spotifyStatus, setSpotifyStatus] = useState(null); // { configured, connected }
+  const [spotifyConnecting, setSpotifyConnecting] = useState(false);
+  const [spotifyError, setSpotifyError] = useState("");
   const [testing, setTesting] = useState(false);
   const [outputSupported, setOutputSupported] = useState(true);
 
@@ -192,6 +198,62 @@ export default function SettingsModal({ onClose }) {
   useEffect(() => {
     api.get("/api/servers").then(({ data }) => setMyServers(data));
   }, []);
+
+  useEffect(() => {
+    api.get("/api/spotify/status").then(({ data }) => setSpotifyStatus(data)).catch(() => setSpotifyStatus({ configured: false, connected: false }));
+  }, []);
+
+  // Fica de olho enquanto o usuario esta' na aba do Spotify autorizando (aberta numa aba/
+  // navegador separado, ver handleConnectSpotify) - assim que o backend registrar a conexao
+  // (callback do Spotify chegou), atualiza sozinho aqui, sem precisar fechar e reabrir
+  // Configurações. Desiste depois de 2 minutos (usuario pode ter cancelado/fechado a aba sem
+  // avisar - fica preso em "Aguardando..." pra sempre senao).
+  useEffect(() => {
+    if (!spotifyConnecting) return;
+    let cancelled = false;
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts += 1;
+      api
+        .get("/api/spotify/status")
+        .then(({ data }) => {
+          if (cancelled) return;
+          if (data.connected) {
+            setSpotifyStatus(data);
+            setSpotifyConnecting(false);
+          } else if (attempts >= 60) {
+            setSpotifyConnecting(false);
+          }
+        })
+        .catch(() => {});
+    }, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [spotifyConnecting]);
+
+  async function handleConnectSpotify() {
+    setSpotifyError("");
+    try {
+      const { data } = await api.get("/api/spotify/authorize");
+      if (window.concordeDesktop) window.concordeDesktop.openExternal(data.url);
+      else window.open(data.url, "_blank", "noopener,noreferrer");
+      setSpotifyConnecting(true);
+    } catch (err) {
+      setSpotifyError(err.response?.data?.error || "Não foi possível iniciar a conexão com o Spotify");
+    }
+  }
+
+  async function handleDisconnectSpotify() {
+    setSpotifyError("");
+    try {
+      await api.delete("/api/spotify/connection");
+      setSpotifyStatus((prev) => ({ ...prev, connected: false }));
+    } catch (err) {
+      setSpotifyError(err.response?.data?.error || "Não foi possível desconectar sua conta do Spotify");
+    }
+  }
 
   // Ao escolher um servidor no seletor de apelido, busca o apelido que ja existe la' (se
   // existir) pra pre-preencher o campo, em vez de sempre comecar em branco.
@@ -745,6 +807,47 @@ export default function SettingsModal({ onClose }) {
                   </p>
                 )}
                 {notificationError && <p className="auth-error">{notificationError}</p>}
+              </>
+            )}
+
+            {activeTab === "conexoes" && (
+              <>
+                <p className="settings-section-title">Spotify</p>
+                {spotifyStatus === null ? (
+                  <p className="admin-hint">Carregando...</p>
+                ) : !spotifyStatus.configured ? (
+                  <p className="admin-hint">
+                    Integração com Spotify ainda não configurada nesse servidor (falta cadastrar as credenciais no
+                    backend).
+                  </p>
+                ) : (
+                  <div className="spotify-connect-card">
+                    <MusicNoteIcon size={28} />
+                    <div className="spotify-connect-info">
+                      <strong>{spotifyStatus.connected ? "Conta conectada" : "Conecte sua conta do Spotify"}</strong>
+                      <p className="admin-hint" style={{ margin: 0 }}>
+                        {spotifyStatus.connected
+                          ? "O que você estiver ouvindo aparece na lista de membros e no seu perfil, pros outros do servidor."
+                          : "Opcional - mostra pros outros membros (na lista de membros e no seu perfil) a música que você está ouvindo agora, igual o Discord. Só você decide conectar."}
+                      </p>
+                    </div>
+                    {spotifyStatus.connected ? (
+                      <button type="button" className="danger" onClick={handleDisconnectSpotify}>
+                        Desconectar
+                      </button>
+                    ) : (
+                      <button type="button" onClick={handleConnectSpotify} disabled={spotifyConnecting}>
+                        {spotifyConnecting ? "Aguardando..." : "Conectar Spotify"}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {spotifyConnecting && (
+                  <p className="admin-hint" style={{ margin: 0 }}>
+                    Autorize na aba que abriu - assim que terminar, isso aqui atualiza sozinho.
+                  </p>
+                )}
+                {spotifyError && <p className="auth-error">{spotifyError}</p>}
               </>
             )}
           </div>

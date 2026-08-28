@@ -27,6 +27,9 @@ import { CheckIcon, MicIcon, PencilIcon, PinIcon, PlusIcon, ReplyIcon, SearchIco
 
 const ROLL_COMMAND_RE = /^\/(?:roll|r)\s+(.+)$/i;
 const ROLL_NOTATION_RE = /^(\d{0,2})d(\d{1,3})\s*([+-]\s*\d{1,3})?$/i;
+// /spotify (VOCE) ou /spotify @outraPessoa - so' faz sentido essas duas opcoes numa DM (so' tem
+// voce e ela na conversa) - ver mesmo comando no ChatWindow.jsx (chat de servidor).
+const SPOTIFY_COMMAND_RE = /^\/spotify(?:\s+@?(\S+))?\s*$/i;
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
 
 /**
@@ -279,6 +282,49 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
       }
       rollDiceDm(stompClient, channelId, notation);
       setDraft("");
+      return;
+    }
+
+    // /spotify (ou /spotify @outraPessoa) - so' tem voce e ela nessa conversa, ver mesmo
+    // comando/motivo no ChatWindow.jsx.
+    const spotifyMatch = SPOTIFY_COMMAND_RE.exec(draft.trim());
+    if (spotifyMatch) {
+      const targetUsername = spotifyMatch[1];
+      let targetUserId = user?.id;
+      let targetLabel = "Você";
+      if (targetUsername) {
+        if (targetUsername.toLowerCase() !== (channel.otherUsername || "").toLowerCase()) {
+          showAlert(`Não encontrei "${targetUsername}" nessa conversa`);
+          return;
+        }
+        targetUserId = channel.otherUserId;
+        targetLabel = channel.otherNickname || channel.otherUsername;
+      }
+      setDraft("");
+      setSending(true);
+      try {
+        const { data } = await api.get(`/api/spotify/now-playing/${targetUserId}`);
+        if (!data.connected) {
+          showAlert(
+            targetUsername
+              ? `${targetLabel} não conectou a conta do Spotify`
+              : "Você ainda não conectou sua conta do Spotify (Configurações > Conexões)"
+          );
+          return;
+        }
+        if (!data.playing) {
+          showAlert(`${targetLabel} não está ouvindo nada no Spotify agora`);
+          return;
+        }
+        const text = `🎵 **${targetLabel}** está ouvindo **${data.trackName}** — ${data.artistNames}${
+          data.albumName ? ` (${data.albumName})` : ""
+        }${data.trackUrl ? `\n${data.trackUrl}` : ""}`;
+        sendDmMessage(stompClient, channelId, text, data.albumArtUrl, null, null);
+      } catch (err) {
+        showAlert(err.response?.data?.error || "Não foi possível consultar o Spotify agora");
+      } finally {
+        setSending(false);
+      }
       return;
     }
 

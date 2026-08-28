@@ -2033,6 +2033,11 @@ h3.chat-heading {
 }
 .member-row:hover { background: var(--bg-hover); }
 .member-row.offline { opacity: 0.5; }
+/* Coluna (nome+cargo numa linha, "ouvindo Spotify" embaixo) - antes era so' um <span> de nome
+   solto; virou coluna pra caber a linha extra do Spotify sem esticar a altura toda da linha
+   (ver MemberList.jsx). */
+.member-row-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.member-row-name-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .member-row-name {
   font-size: 13.5px;
   font-weight: 500;
@@ -2041,6 +2046,19 @@ h3.chat-heading {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* "Ouvindo Spotify" (ver useSpotifyNowPlaying.js) - verde da marca, igual o badge que o
+   Discord usa pra essa mesma integração. */
+.member-row-spotify {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #1db954;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.member-row-spotify svg { flex-shrink: 0; }
 .member-avatar-wrap { position: relative; flex-shrink: 0; }
 .status-dot {
   position: absolute;
@@ -2820,6 +2838,22 @@ h3.chat-heading {
 /* !important pelo mesmo motivo de .settings-actions button acima - ".modal button:not(...)"
    e' mais especifico e força width:100%/margin-top sem isso. */
 .settings-inline-save button { width: auto !important; margin-top: 0 !important; flex-shrink: 0; padding: 10px 16px; }
+/* Card de "Conectar Spotify" (Configurações > Conexões, ver SettingsModal.jsx) - mesmo layout
+   do .avatar-picker acima (icone + texto + botao numa linha). !important pelo mesmo motivo de
+   .settings-inline-save button acima. */
+.spotify-connect-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.spotify-connect-card svg { flex-shrink: 0; color: #1db954; }
+.spotify-connect-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.spotify-connect-info strong { font-size: 13.5px; }
+.spotify-connect-card button { width: auto !important; margin-top: 0 !important; flex-shrink: 0; white-space: nowrap; }
 /* "Seus servidores" (Configurações > Perfil) - lista simples, so' leitura. */
 .settings-server-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .settings-server-list li {
@@ -3015,6 +3049,26 @@ h3.chat-heading {
 }
 .profile-info-label { font-size: 10.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .profile-info-value { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.profile-section-title-spotify { display: flex; align-items: center; gap: 4px; }
+.profile-section-title-spotify svg { flex-shrink: 0; }
+/* "Ouvindo Spotify" no cartao de perfil (ver ProfileModal.jsx/useSpotifyNowPlaying.js) - capa
+   do album + musica/artista, clicavel (abre a musica no proprio Spotify). */
+.profile-spotify-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 9px 11px;
+  text-decoration: none;
+  color: inherit;
+}
+.profile-spotify-card:hover { border-color: #1db954; }
+.profile-spotify-art { width: 48px; height: 48px; border-radius: var(--radius-sm); flex-shrink: 0; object-fit: cover; }
+.profile-spotify-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.profile-spotify-info strong { font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-spotify-info span { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-modal .settings-actions { padding: 14px 20px 20px; }
 .profile-modal textarea {
   background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm);

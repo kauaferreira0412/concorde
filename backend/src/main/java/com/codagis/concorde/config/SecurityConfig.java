@@ -38,7 +38,7 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/api/auth/**", "/api/desktop/**", "/ws/**", "/h2-console/**", "/internal/**").permitAll()
+                    .requestMatchers("/api/auth/**", "/api/desktop/**", "/ws/**", "/h2-console/**", "/internal/**", "/api/spotify/callback").permitAll()
                     .anyRequest().authenticated()
             )
             .headers(headers -> headers.frameOptions(frame -> frame.disable()))
