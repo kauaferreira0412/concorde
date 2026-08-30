@@ -22,15 +22,23 @@ if (process.platform === "win32") {
 // um modulo pequeno so' pra converter o HWND da janela escolhida (vindo do desktopCapturer)
 // no PID que a biblioteca de audio espera - ver ScreenSharePicker.jsx/VoiceCallContext.jsx.
 let audioCapture = null;
+let AudioCapture = null;
 let getPidForHwnd = null;
 if (process.platform === "win32") {
   try {
-    ({ audioCapture } = require("process-audio-capture"));
+    ({ audioCapture, AudioCapture } = require("process-audio-capture"));
     ({ getPidForHwnd } = require(path.join(__dirname, "native", "hwnd-utils", "build", "Release", "hwnd_utils.node")));
   } catch (err) {
     console.warn("Modulo de audio por janela nao carregou:", err.message);
   }
 }
+
+// Tela Inteira "excluindo o Concorde" (ver concorde:start-system-audio-excluding-self abaixo) -
+// uma instancia PROPRIA de AudioCapture POR PROCESSO capturado (a classe permite varias
+// instancias simultaneas, cada uma com sua propria captura - so' o "audioCapture" importado
+// acima, que e' um singleton, nao suporta mais de uma captura ao mesmo tempo). pid -> AudioCapture.
+const systemAudioCaptures = new Map();
+let systemAudioRefreshInterval = null;
 
 // Esquema custom que serve os arquivos de dist/ (o app empacotado) - em vez de abrir direto
 // via file://. O motivo: uma pagina file:// e' uma "origem opaca" pro navegador, manda
@@ -190,6 +198,89 @@ ipcMain.handle("concorde:start-window-audio", async (event, hwnd) => {
 
 ipcMain.handle("concorde:stop-window-audio", () => {
   if (audioCapture) audioCapture.stopCapture();
+});
+
+// Todos os processos do PROPRIO Concorde (janela principal, renderer, GPU, utilitarios etc -
+// app.getAppMetrics() devolve TODOS os processos filhos desse app Electron, cada um com seu
+// proprio pid) - e' isso que "excluir o Concorde" da captura de Tela Inteira significa na
+// pratica (ver concorde:start-system-audio-excluding-self abaixo).
+function ownProcessPids() {
+  try {
+    return new Set(app.getAppMetrics().map((m) => m.pid));
+  } catch {
+    return new Set([process.pid]);
+  }
+}
+
+/** Comeca (ou atualiza) a captura de UM processo especifico, se ainda nao estiver sendo
+ *  capturado - manda cada pedaco de audio pro renderer marcado com o pid de origem (ver
+ *  systemAudioTrack.js, que mistura TODOS os pids ativos numa unica faixa via Web Audio). */
+function startCaptureForPid(pid) {
+  if (systemAudioCaptures.has(pid)) return;
+  const capture = new AudioCapture();
+  const started = capture.startCapture(pid, (audioData) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("concorde:system-audio-chunk", { pid, ...audioData });
+    }
+  });
+  if (started) systemAudioCaptures.set(pid, capture);
+}
+
+function stopCaptureForPid(pid) {
+  const capture = systemAudioCaptures.get(pid);
+  if (!capture) return;
+  capture.stopCapture();
+  systemAudioCaptures.delete(pid);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("concorde:system-audio-pid-stopped", pid);
+  }
+}
+
+/**
+ * "Tela Inteira, mas sem o audio do proprio Concorde" (pedido explicito do usuario: continuar
+ * ouvindo a call normal enquanto compartilha, nao ter que ficar mudo). Como o Windows/a
+ * biblioteca usada so' sabem capturar POR PROCESSO de forma INCLUSIVA (nao existe um "tudo
+ * menos X" pronto), a solucao e' capturar TODO MUNDO que estiver tocando som, um processo de
+ * cada vez, EXCETO os do proprio Concorde - o renderer junta tudo numa faixa so' (ver
+ * systemAudioTrack.js). Reforca a lista a cada poucos segundos enquanto a transmissao estiver
+ * no ar, pra pegar programas que comecem a tocar som DEPOIS que a transmissao ja comecou (com
+ * um pequeno atraso ate perceber - avisado ao usuario, ver VoiceCallContext.jsx) e parar de
+ * capturar quem fechou.
+ */
+ipcMain.handle("concorde:start-system-audio-excluding-self", async () => {
+  if (!audioCapture || !AudioCapture) return { ok: false, error: "Modulo de audio por processo indisponivel" };
+  try {
+    const permission = await audioCapture.requestPermission();
+    if (permission.status !== "authorized") {
+      return { ok: false, error: "Permissao de captura de audio negada pelo Windows" };
+    }
+    function refresh() {
+      const ownPids = ownProcessPids();
+      const currentPids = new Set();
+      for (const info of audioCapture.getProcessList()) {
+        if (ownPids.has(info.pid)) continue;
+        currentPids.add(info.pid);
+        startCaptureForPid(info.pid);
+      }
+      // Processo fechou (ou parou de tocar som) - a lista nao traz ele mais, para a captura.
+      for (const pid of [...systemAudioCaptures.keys()]) {
+        if (!currentPids.has(pid)) stopCaptureForPid(pid);
+      }
+    }
+    refresh();
+    systemAudioRefreshInterval = setInterval(refresh, 3000);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle("concorde:stop-system-audio-excluding-self", () => {
+  if (systemAudioRefreshInterval) {
+    clearInterval(systemAudioRefreshInterval);
+    systemAudioRefreshInterval = null;
+  }
+  for (const pid of [...systemAudioCaptures.keys()]) stopCaptureForPid(pid);
 });
 
 // Atalhos GLOBAIS (mutar/ensurdecer) - ao contrario de um listener de "keydown" comum no

@@ -43,6 +43,7 @@ import {
 } from "../ws/chatSocket";
 import ScreenSharePicker from "../components/ScreenSharePicker.jsx";
 import { startWindowAudioTrack } from "../utils/windowAudioTrack";
+import { startSystemAudioExcludingSelfTrack } from "../utils/systemAudioTrack";
 
 const VoiceCallContext = createContext(null);
 
@@ -199,20 +200,6 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const forceMutedRef = useRef(false);
   const forceDeafenedRef = useRef(false);
   const pingIntervalRef = useRef(null);
-  // true enquanto estiver compartilhando TELA INTEIRA com audio do sistema (app desktop, ver
-  // startElectronScreenShare) - pedido explicito do usuario: quem compartilha a tela inteira
-  // leva o audio do sistema INTEIRO (jogo, musica, qualquer coisa tocando), MENOS o audio do
-  // proprio Concorde (a voz dos outros na call) - senao vira um eco/loop (quem esta' ouvindo a
-  // transmissao ouviria a PROPRIA voz de volta, capturada pelo loopback do sistema saindo pelas
-  // caixas de som de quem esta' compartilhando). Nao existe um jeito nativo de excluir so' o
-  // processo do Concorde da captura de audio do sistema (a lib usada, process-audio-capture, so'
-  // faz captura POR PROCESSO/inclusiva, nao "tudo menos X") - a solucao e' simplesmente nao
-  // TOCAR o audio recebido da call localmente enquanto isso estiver ligado (se o Concorde nao
-  // esta' emitindo som nenhum na maquina de quem compartilha, o loopback do sistema naturalmente
-  // nao pega nada dele). Mesmo mecanismo de silenciar do ensurdecido (ver applyListenSilence),
-  // so' que sem mutar o MICROFONE nem aparecer como "ensurdecido" pros outros - a pessoa
-  // continua falando normal, so' nao ESCUTA os outros enquanto a tela inteira estiver no ar.
-  const screenShareAudioSilencedRef = useRef(false);
 
   // "Fonte da verdade" pras funcoes assincronas - sempre atualizados junto com o setState
   // correspondente, nunca via useEffect (evita qualquer janela de tempo desatualizada).
@@ -731,7 +718,6 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     presenceDeafenedRef.current = new Map();
     forceMutedRef.current = false;
     forceDeafenedRef.current = false;
-    screenShareAudioSilencedRef.current = false;
     myPermissionsRef.current = new Set();
     setMyPermissions([]);
     clearActiveChannel();
@@ -1164,17 +1150,13 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     });
   }
 
-  /** O que voce OUVE precisa ficar em silencio se QUALQUER UMA das duas coisas estiver
-   *  ativa - ensurdecido (por escolha propria) OU compartilhando tela inteira com audio do
-   *  sistema (ver screenShareAudioSilencedRef acima) - reaplica direto em cima do que ja'
-   *  existe (mic + audio de transmissao de todo mundo), sem duplicar a logica de
-   *  mutar/restaurar em dois lugares diferentes. Chamada tanto pelo toggleDeafen quanto pelo
-   *  inicio/fim do compartilhamento de tela inteira (ver startElectronScreenShare/
-   *  stopElectronScreenShare). */
+  /** O que voce OUVE precisa ficar em silencio enquanto estiver ensurdecido - reaplica direto
+   *  em cima do que ja' existe (mic + audio de transmissao de todo mundo), sem duplicar a
+   *  logica de mutar/restaurar em dois lugares diferentes (toggleDeafen/clearDeafened). */
   function applyListenSilence(room) {
     const activeRoom = room || roomRef.current;
     if (!activeRoom) return;
-    if (deafenedRef.current || screenShareAudioSilencedRef.current) {
+    if (deafenedRef.current) {
       micAudioTracksRef.current.forEach((track) => track.setVolume(0));
       screenAudioTracksRef.current.forEach((track) => track.setVolume(0));
       activeRoom.remoteParticipants.forEach((participant) => {
@@ -1205,7 +1187,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     cameraTracksRef.current.clear();
     micAudioTracksRef.current.clear();
     screenAudioTracksRef.current.clear();
-    const silenced = deafenedRef.current || screenShareAudioSilencedRef.current;
+    const silenced = deafenedRef.current;
     room.remoteParticipants.forEach((participant) => {
       participant.trackPublications.forEach((pub) => {
         if (!pub.isSubscribed || !pub.track) return;
@@ -1277,10 +1259,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     if (activeChannelRef.current && stompClientRef.current && stompConnectedRef.current) {
       publishVoiceDeafenState(stompClientRef.current, activeChannelRef.current.id, false);
     }
-    // applyListenSilence (nao restoreListenVolumes direto) - se a pessoa tambem estiver
-    // compartilhando tela inteira agora (ver screenShareAudioSilencedRef), precisa CONTINUAR
-    // em silencio mesmo depois de tirar o ensurdecido.
-    applyListenSilence(room);
+    restoreListenVolumes(room);
   }
 
   /**
@@ -1393,8 +1372,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     // Ensurdecer zera o volume de TODO audio que voce ouve - voz e audio de transmissao de
     // tela - e, como no Discord, tambem desliga seu proprio microfone; ao reativar, volta
     // pro estado de mic anterior. Ver applyListenSilence (mesma logica usada quando voce
-    // "desmuta enquanto ensurdecido" pelo botao de microfone, ver clearDeafened/toggleMic, e
-    // pelo compartilhamento de tela inteira, ver screenShareAudioSilencedRef).
+    // "desmuta enquanto ensurdecido" pelo botao de microfone, ver clearDeafened/toggleMic).
     applyListenSilence(room);
 
     if (next) {
@@ -1526,9 +1504,12 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     const wantSystemAudio = source.type === "screen";
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: wantSystemAudio
-          ? { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: source.id } }
-          : false,
+        // Audio "cru" do getUserMedia (chromeMediaSource: desktop) NUNCA e' usado mais - ele
+        // pega o loopback do sistema INTEIRO sem excluir nada (nem o proprio Concorde, o que
+        // causava eco pra quem esta' assistindo). O audio de Tela Inteira agora vem separado
+        // (ver startSystemAudioExcludingSelfTrack abaixo), igual o de Janela ja' vinha (ver
+        // startWindowAudioTrack) - so' o VIDEO continua saindo direto daqui.
+        audio: false,
         video: {
           mandatory: {
             chromeMediaSource: "desktop",
@@ -1543,11 +1524,25 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         },
       });
       const videoTrack = stream.getVideoTracks()[0];
-      let audioTrack = stream.getAudioTracks()[0] || null;
+      let audioTrack = null;
 
-      // Janela especifica: pega o audio isolado daquele processo (ver comentario acima).
-      // source.id vem do desktopCapturer no formato "window:<hwnd>:0".
-      if (!wantSystemAudio) {
+      if (wantSystemAudio) {
+        // Tela Inteira leva o audio do SISTEMA INTEIRO (jogo, musica, qualquer coisa tocando),
+        // MENOS o audio do proprio Concorde - pedido explicito do usuario: continuar ouvindo a
+        // call normal enquanto compartilha, sem ficar mudo. Ver systemAudioTrack.js/
+        // main.cjs (concorde:start-system-audio-excluding-self) pro motivo de nao dar pra
+        // simplesmente "excluir" o Concorde de uma captura so' (a lib so' captura POR
+        // PROCESSO/inclusiva) - a solucao e' capturar todo mundo MENOS o Concorde, um processo
+        // de cada vez, e juntar tudo numa faixa so' aqui.
+        audioTrack = await startSystemAudioExcludingSelfTrack();
+        if (audioTrack) {
+          showAlert(
+            "Compartilhando o áudio do sistema (exceto o do Concorde) - programas que você abrir DEPOIS de já estar compartilhando podem levar alguns segundos pra aparecer no áudio."
+          );
+        }
+      } else {
+        // Janela especifica: pega o audio isolado daquele processo (ver comentario acima).
+        // source.id vem do desktopCapturer no formato "window:<hwnd>:0".
         const hwnd = Number(source.id.split(":")[1]);
         if (Number.isFinite(hwnd) && hwnd > 0) {
           audioTrack = await startWindowAudioTrack(hwnd);
@@ -1571,21 +1566,6 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       screenSharingRef.current = true;
       setScreenSharing(true);
       playScreenShareStartSound();
-
-      // Tela Inteira leva o audio do SISTEMA INTEIRO (jogo, musica, qualquer coisa tocando na
-      // maquina) - inclusive o que o proprio Concorde estiver reproduzindo (a voz de todo
-      // mundo na call), o que criaria um eco/loop pra quem esta assistindo. Ver
-      // screenShareAudioSilencedRef no topo do arquivo pro motivo de resolver assim (silenciar
-      // localmente em vez de excluir so' o processo do Concorde da captura, que a lib usada nao
-      // suporta) - o microfone continua ligado normal, so' o que voce OUVE fica mudo enquanto
-      // isso estiver no ar.
-      if (wantSystemAudio) {
-        screenShareAudioSilencedRef.current = true;
-        applyListenSilence(room);
-        showAlert(
-          "Compartilhando o áudio do sistema inteiro - enquanto isso, você não vai ouvir os outros na call (assim quem está assistindo não escuta a própria voz voltando pela sua transmissão). Seu microfone continua funcionando normal, e o áudio volta a tocar assim que você parar de compartilhar."
-        );
-      }
     } catch (err) {
       console.warn("Não foi possível iniciar o compartilhamento de tela:", err);
       showAlert("Não foi possível compartilhar essa tela/janela: " + err.message);
@@ -1601,19 +1581,13 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     }
     if (audio) {
       await room?.localParticipant.unpublishTrack(audio, true);
-      // So' existe pra audio de JANELA (ver startWindowAudioTrack) - desliga a captura
-      // nativa + o AudioContext. Audio de Tela Inteira (getUserMedia puro) nao tem isso.
+      // Existe tanto pra audio de Janela (startWindowAudioTrack) quanto de Tela Inteira
+      // (startSystemAudioExcludingSelfTrack) - os dois pendicam a mesma limpeza (desliga a(s)
+      // captura(s) nativa(s) + o AudioContext) no proprio track (ver _concordeCleanup em
+      // windowAudioTrack.js/systemAudioTrack.js).
       await audio._concordeCleanup?.();
     }
     electronScreenTracksRef.current = { video: null, audio: null };
-    // Desfaz o silencio aplicado ao comecar a compartilhar Tela Inteira (ver
-    // startElectronScreenShare acima) - sem efeito nenhum se era um compartilhamento de
-    // Janela (nunca silenciou nada). Se a pessoa TAMBEM estiver ensurdecida por opcao propria,
-    // applyListenSilence mantem o silencio por causa disso (nao restaura sozinho).
-    if (screenShareAudioSilencedRef.current) {
-      screenShareAudioSilencedRef.current = false;
-      applyListenSilence(room);
-    }
   }
 
   /**

@@ -28,6 +28,27 @@ contextBridge.exposeInMainWorld("concordeDesktop", {
     return () => ipcRenderer.removeListener("concorde:window-audio-chunk", listener);
   },
 
+  /**
+   * Audio de Tela Inteira "sem o proprio Concorde" (so' Windows - ver main.cjs) - captura
+   * TODOS os outros processos que estiverem tocando som (um de cada vez, atualizando sozinho
+   * a cada poucos segundos) e manda cada pedaco marcado com o pid de origem; quem chama junta
+   * tudo numa faixa so' (ver systemAudioTrack.js). Retorna {ok:boolean, error?:string}.
+   */
+  startSystemAudioExcludingSelf: () => ipcRenderer.invoke("concorde:start-system-audio-excluding-self"),
+  stopSystemAudioExcludingSelf: () => ipcRenderer.invoke("concorde:stop-system-audio-excluding-self"),
+  /** cb({pid, buffer: Float32Array, channels, sampleRate}) pra cada pedaco de audio PCM. */
+  onSystemAudioChunk: (cb) => {
+    const listener = (_event, audioData) => cb(audioData);
+    ipcRenderer.on("concorde:system-audio-chunk", listener);
+    return () => ipcRenderer.removeListener("concorde:system-audio-chunk", listener);
+  },
+  /** cb(pid) quando um processo especifico para de ser capturado (fechou/parou de tocar som). */
+  onSystemAudioPidStopped: (cb) => {
+    const listener = (_event, pid) => cb(pid);
+    ipcRenderer.on("concorde:system-audio-pid-stopped", listener);
+    return () => ipcRenderer.removeListener("concorde:system-audio-pid-stopped", listener);
+  },
+
   /** Abre um link no navegador padrao do SO (nao dentro do proprio Concorde). */
   openExternal: (url) => ipcRenderer.invoke("concorde:open-external", url),
   /** Dispara o desinstalador do Windows e fecha o app. {ok:boolean, error?:string} */
