@@ -214,26 +214,57 @@ function ownProcessPids() {
 
 /** Comeca (ou atualiza) a captura de UM processo especifico, se ainda nao estiver sendo
  *  capturado - manda cada pedaco de audio pro renderer marcado com o pid de origem (ver
- *  systemAudioTrack.js, que mistura TODOS os pids ativos numa unica faixa via Web Audio). */
+ *  systemAudioTrack.js, que mistura TODOS os pids ativos numa unica faixa via Web Audio).
+ *  try/catch e log (visivel com --enable-logging ou console do processo principal) - sem isso,
+ *  um pid que falhasse silenciosamente no meio do loop do refresh() podia impedir os PROXIMOS
+ *  pids da mesma rodada de sequer serem tentados (reportado: "nao saiu som nenhum" numa
+ *  segunda tentativa de compartilhar). */
 function startCaptureForPid(pid) {
   if (systemAudioCaptures.has(pid)) return;
-  const capture = new AudioCapture();
-  const started = capture.startCapture(pid, (audioData) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("concorde:system-audio-chunk", { pid, ...audioData });
+  try {
+    const capture = new AudioCapture();
+    const started = capture.startCapture(pid, (audioData) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("concorde:system-audio-chunk", { pid, ...audioData });
+      }
+    });
+    if (started) {
+      systemAudioCaptures.set(pid, capture);
+    } else {
+      console.warn(`[system-audio] startCapture(${pid}) devolveu false (nao capturou)`);
     }
-  });
-  if (started) systemAudioCaptures.set(pid, capture);
+  } catch (err) {
+    console.warn(`[system-audio] falhou ao iniciar captura do pid ${pid}:`, err.message);
+  }
 }
 
 function stopCaptureForPid(pid) {
   const capture = systemAudioCaptures.get(pid);
   if (!capture) return;
-  capture.stopCapture();
-  systemAudioCaptures.delete(pid);
+  systemAudioCaptures.delete(pid); // primeiro, pra nunca ficar preso aqui mesmo se stopCapture() lancar
+  try {
+    capture.stopCapture();
+  } catch (err) {
+    console.warn(`[system-audio] falhou ao parar captura do pid ${pid}:`, err.message);
+  }
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("concorde:system-audio-pid-stopped", pid);
   }
+}
+
+/** Para TUDO (interval + toda captura ativa) - usado tanto pelo IPC de "parar" de verdade
+ *  quanto como BLINDAGEM logo no inicio de um novo "comecar" (ver abaixo), pro caso de ter
+ *  sobrado estado de uma sessao anterior que nao foi limpa direito (app fechou/crashou no meio
+ *  de um compartilhamento, por exemplo) - sem isso, uma segunda tentativa de compartilhar podia
+ *  ficar "presa" achando que ja' esta' capturando um pid que na verdade morreu junto com a
+ *  sessao anterior, e nunca tentar de novo (reportado: funcionou na primeira vez, silencio
+ *  total numa segunda tentativa com a MESMA pessoa). */
+function stopAllSystemAudioCapture() {
+  if (systemAudioRefreshInterval) {
+    clearInterval(systemAudioRefreshInterval);
+    systemAudioRefreshInterval = null;
+  }
+  for (const pid of [...systemAudioCaptures.keys()]) stopCaptureForPid(pid);
 }
 
 /**
@@ -250,6 +281,13 @@ function stopCaptureForPid(pid) {
 ipcMain.handle("concorde:start-system-audio-excluding-self", async () => {
   if (!audioCapture || !AudioCapture) return { ok: false, error: "Modulo de audio por processo indisponivel" };
   try {
+    // Blindagem (ver comentario em stopAllSystemAudioCapture) + uma pausa curta pro Windows
+    // liberar de verdade os recursos nativos (WASAPI) de qualquer captura anterior antes de
+    // abrir novas - iniciar captura nova em cima de uma sessao que acabou de parar pode falhar
+    // silenciosamente (capture.startCapture() devolve false pra TODOS os pids) sem essa pausa.
+    stopAllSystemAudioCapture();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
     const permission = await audioCapture.requestPermission();
     if (permission.status !== "authorized") {
       return { ok: false, error: "Permissao de captura de audio negada pelo Windows" };
@@ -269,6 +307,17 @@ ipcMain.handle("concorde:start-system-audio-excluding-self", async () => {
     }
     refresh();
     systemAudioRefreshInterval = setInterval(refresh, 3000);
+
+    // Avisa quem chamou se JA' TINHA processo tocando som pra capturar e mesmo assim nenhum
+    // deu certo - melhor um aviso claro na hora (ver VoiceCallContext.jsx) do que silencio sem
+    // explicacao nenhuma (era exatamente o que estava sendo reportado).
+    if (systemAudioCaptures.size === 0) {
+      const ownPids = ownProcessPids();
+      const hadCandidates = audioCapture.getProcessList().some((info) => !ownPids.has(info.pid));
+      if (hadCandidates) {
+        return { ok: true, warning: "Não consegui capturar nenhum programa tocando som agora - tente parar e compartilhar de novo." };
+      }
+    }
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err.message };
@@ -276,11 +325,7 @@ ipcMain.handle("concorde:start-system-audio-excluding-self", async () => {
 });
 
 ipcMain.handle("concorde:stop-system-audio-excluding-self", () => {
-  if (systemAudioRefreshInterval) {
-    clearInterval(systemAudioRefreshInterval);
-    systemAudioRefreshInterval = null;
-  }
-  for (const pid of [...systemAudioCaptures.keys()]) stopCaptureForPid(pid);
+  stopAllSystemAudioCapture();
 });
 
 // Atalhos GLOBAIS (mutar/ensurdecer) - ao contrario de um listener de "keydown" comum no
@@ -455,4 +500,9 @@ app.on("window-all-closed", () => {
 // Electron morrer de vez, mesmo com a janela ja fechada.
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
+  // Fecha o app com uma captura de audio por-processo ainda ativa (ver
+  // concorde:start-system-audio-excluding-self) - sem isso, a captura nativa podia continuar
+  // "pendurada" do lado do Windows entre uma sessao do app e a proxima, contribuindo pro
+  // "funcionou na primeira vez, nao numa segunda" reportado.
+  stopAllSystemAudioCapture();
 });

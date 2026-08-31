@@ -99,6 +99,11 @@ export async function startSystemAudioExcludingSelfTrack() {
   });
 
   const track = destNode.stream.getAudioTracks()[0];
+  // Preenchido so' quando o processo principal comecou a captura mas nao conseguiu pegar
+  // NENHUM processo tocando som (ver concorde:start-system-audio-excluding-self em main.cjs) -
+  // quem chamou mostra isso pro usuario em vez de deixar a transmissao sair muda sem
+  // explicacao nenhuma (era exatamente o que estava sendo reportado).
+  track._concordeWarning = result.warning || null;
   track._concordeCleanup = async () => {
     removeChunkListener();
     removeStoppedListener();

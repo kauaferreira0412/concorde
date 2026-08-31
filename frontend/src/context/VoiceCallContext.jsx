@@ -1535,7 +1535,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         // PROCESSO/inclusiva) - a solucao e' capturar todo mundo MENOS o Concorde, um processo
         // de cada vez, e juntar tudo numa faixa so' aqui.
         audioTrack = await startSystemAudioExcludingSelfTrack();
-        if (audioTrack) {
+        if (audioTrack?._concordeWarning) {
+          // Comecou, mas nao conseguiu capturar NENHUM processo tocando som agora (ver
+          // main.cjs) - avisa direto em vez de deixar a transmissao sair muda sem explicacao.
+          showAlert(audioTrack._concordeWarning);
+        } else if (audioTrack) {
           showAlert(
             "Compartilhando o áudio do sistema (exceto o do Concorde) - programas que você abrir DEPOIS de já estar compartilhando podem levar alguns segundos pra aparecer no áudio."
           );
