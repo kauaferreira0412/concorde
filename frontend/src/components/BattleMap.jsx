@@ -160,6 +160,7 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
   }
   function handleTokenPointerMove(e, token) {
     if (!dragTokenRef.current || dragTokenRef.current.id !== token.id || !imageRef.current) return;
+    e.stopPropagation();
     dragTokenRef.current.moved = true;
     const { x, y } = tokenFracFromEvent(e);
     setTokens((prev) => prev.map((t) => (t.id === token.id ? { ...t, x, y } : t)));
@@ -173,6 +174,12 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
     }
   }
   function handleTokenPointerUp(e, token) {
+    // Sem isso, soltar o arraste de um token "vazava" pro container do mapa por baixo (que
+    // escuta o MESMO pointerup pra criar um token novo quando "addMode" esta' ligado) - soltar
+    // um arraste enquanto "Adicionar token" estava ativo criava um token extra do nada no
+    // ponto onde voce largou o mouse (reportado: "quando clico pra mexer um token, ele acaba
+    // criando outro").
+    e.stopPropagation();
     if (dragTokenRef.current?.id === token.id) {
       if (dragTokenRef.current.moved && imageRef.current && stompClient && stompConnected) {
         const { x, y } = tokenFracFromEvent(e);

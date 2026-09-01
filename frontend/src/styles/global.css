@@ -3107,7 +3107,12 @@ h3.chat-heading {
 .battle-map-viewport {
   position: relative;
   width: 100%;
-  height: 420px;
+  /* Bem maior que antes (era 420px, pedido explicito do usuario) - calc com o topo da propria
+     viewport em vez de um numero fixo, pra aproveitar quase toda a altura da tela disponivel
+     mesmo em monitores menores, sem estourar pra fora e cortar o resto da sidebar. */
+  height: calc(100vh - 260px);
+  min-height: 480px;
+  max-height: 900px;
   overflow: hidden;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-soft);
@@ -3123,7 +3128,7 @@ h3.chat-heading {
   justify-content: center;
   transform-origin: center center;
 }
-.battle-map-image { max-width: none; width: 900px; height: auto; pointer-events: none; }
+.battle-map-image { max-width: none; width: 1400px; height: auto; pointer-events: none; }
 .battle-map-token {
   position: absolute;
   width: 26px;
