@@ -10,7 +10,6 @@ import ServerRolesModal from "../../components/ServerRolesModal.jsx";
 import AuditLogModal from "../../components/AuditLogModal.jsx";
 import CustomEmojiModal from "../../components/CustomEmojiModal.jsx";
 import SettingsModal from "../../components/SettingsModal.jsx";
-import PartyConfetti from "../../components/PartyConfetti.jsx";
 import { useServersContainer } from "./Container.jsx";
 import "./style.css";
 
@@ -42,7 +41,6 @@ export default function ServerPage() {
     stompError,
     selectedServerId,
     selectedServer,
-    isPotatoMafiaServer,
     handleCreateServer,
     handleUpdateServer,
     handleDeleteServer,
@@ -55,7 +53,6 @@ export default function ServerPage() {
 
   return (
     <>
-      {isPotatoMafiaServer && <PartyConfetti intervalMs={600000} />}
       <div className="app-shell">
         <ServerSidebar
           servers={servers}
@@ -100,12 +97,7 @@ export default function ServerPage() {
           />
         )}
 
-        <MemberList
-          serverId={selectedServerId}
-          stompClient={stompClient}
-          stompConnected={stompConnected}
-          showPotatoBanner={isPotatoMafiaServer}
-        />
+        <MemberList serverId={selectedServerId} stompClient={stompClient} stompConnected={stompConnected} />
 
         {showCreateServer && (
           <CreateServerModal onClose={() => setShowCreateServer(false)} onCreate={handleCreateServer} />

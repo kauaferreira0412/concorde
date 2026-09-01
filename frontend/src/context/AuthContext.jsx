@@ -49,6 +49,23 @@ export function AuthProvider({ children }) {
   async function login(usernameOrEmail, password, remember = false) {
     const { data } = await api.post("/api/auth/login", { usernameOrEmail, password });
     rememberRef.current = remember;
+    // Escreve no storage AQUI, sincrono, antes de setToken/setUser - nao da' pra confiar so'
+    // nos useEffect([token])/useEffect([user]) abaixo pra isso. Assim que setToken roda, o
+    // React re-renderiza e MONTA os componentes filhos (ServerPage etc), que disparam suas
+    // proprias chamadas (servidores, amigos, canais...) logo nos seus proprios useEffect - e
+    // os efeitos dos filhos rodam ANTES do efeito desse provider (mais alto na arvore). Sem a
+    // escrita sincrona aqui, essa PRIMEIRA leva de chamadas as vezes saia sem token nenhum no
+    // header (api/client.js le' direto do storage) - o backend nao rejeita, so' trata como
+    // anonimo e devolve listas vazias, entao a tela toda aparecia sem nenhum servidor/amigo/
+    // canal, do nada, so' depois do login (bug intermitente reportado: "as vezes fica tudo
+    // vazio"). O useEffect continua existindo (agora so' redundante/defensivo) pros outros
+    // casos que mudam token/user sem passar por login() (ex: logout, trocar avatar).
+    const storage = remember ? localStorage : sessionStorage;
+    const other = remember ? sessionStorage : localStorage;
+    storage.setItem("token", data.token);
+    storage.setItem("user", JSON.stringify(data.user));
+    other.removeItem("token");
+    other.removeItem("user");
     setToken(data.token);
     setUser(data.user);
   }

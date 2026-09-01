@@ -25,7 +25,6 @@ export function useServersContainer() {
 
   const selectedServerId = serverId ? Number(serverId) : null;
   const selectedServer = servers.find((s) => s.id === selectedServerId);
-  const isPotatoMafiaServer = (selectedServer?.name || "").toLowerCase().includes("potato");
 
   useEffect(() => {
     if (!token) return;
@@ -157,7 +156,6 @@ export function useServersContainer() {
     stompError,
     selectedServerId,
     selectedServer,
-    isPotatoMafiaServer,
     handleCreateServer,
     handleUpdateServer,
     handleDeleteServer,
