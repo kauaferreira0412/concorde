@@ -22,7 +22,7 @@ spring:
         format_sql: true
 app:
   cors:
-    allowed-origins: "http://localhost:5173,http://192.168.1.8:5173,https://*.ngrok-free.app,https://*.ngrok-free.dev,https://*.ngrok.io,${PUBLIC_ORIGIN:},app://."
+    allowed-origins: "http://localhost:5173,http://192.168.1.199:5173,https://*.ngrok-free.app,https://*.ngrok-free.dev,https://*.ngrok.io,${PUBLIC_ORIGIN:},app://."
   jwt:
     secret: "troque-este-segredo-por-um-valor-forte-de-32-bytes-no-minimo"
     expiration-minutes: 1440
@@ -36,7 +36,7 @@ app:
     email: "admin@codagis.local"
     password: ${ADMIN_PASSWORD:}
   livekit:
-    ws-url: ${LIVEKIT_PUBLIC_WS_URL:ws://192.168.1.8:7880}
+    ws-url: ${LIVEKIT_PUBLIC_WS_URL:ws://192.168.1.199:7880}
     internal-url: ${LIVEKIT_INTERNAL_URL:}
     api-key: ${LIVEKIT_API_KEY:devkey}
     api-secret: ${LIVEKIT_API_SECRET:devsecret1234567890devsecret1234567890}
