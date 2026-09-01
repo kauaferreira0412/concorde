@@ -14,6 +14,7 @@ import com.codagis.concorde.dto.PollDtos.PollDto;
 import com.codagis.concorde.dto.PollDtos.PollOptionDto;
 import com.codagis.concorde.enums.Role;
 import com.codagis.concorde.enums.ServerPermission;
+import com.codagis.concorde.repository.CategoryAccessRepository;
 import com.codagis.concorde.repository.ChannelRepository;
 import com.codagis.concorde.repository.MessageReactionRepository;
 import com.codagis.concorde.repository.MessageRepository;
@@ -42,11 +43,13 @@ public class MessageService {
     private final UserRepository userRepository;
     private final ChannelRepository channelRepository;
     private final PermissionService permissionService;
+    private final CategoryAccessRepository categoryAccessRepository;
 
     public MessageService(MessageRepository messageRepository, MessageReactionRepository messageReactionRepository,
                            PollRepository pollRepository, PollOptionRepository pollOptionRepository,
                            PollVoteRepository pollVoteRepository, UserRepository userRepository,
-                           ChannelRepository channelRepository, PermissionService permissionService) {
+                           ChannelRepository channelRepository, PermissionService permissionService,
+                           CategoryAccessRepository categoryAccessRepository) {
         this.messageRepository = messageRepository;
         this.messageReactionRepository = messageReactionRepository;
         this.pollRepository = pollRepository;
@@ -55,6 +58,7 @@ public class MessageService {
         this.userRepository = userRepository;
         this.channelRepository = channelRepository;
         this.permissionService = permissionService;
+        this.categoryAccessRepository = categoryAccessRepository;
     }
 
     @Transactional
@@ -222,12 +226,24 @@ public class MessageService {
 
     private void assertCanPostIn(Long channelId, Long authorId) {
         Channel channel = channelRepository.findById(channelId).orElse(null);
-        if (channel == null || !channel.isAdminOnly()) {
-            return;
+        if (channel == null) return;
+        if (channel.isAdminOnly()) {
+            boolean isAdmin = userRepository.findById(authorId).map(u -> u.getRole() == Role.ADMIN).orElse(false);
+            if (!isAdmin) {
+                throw new IllegalStateException("Só administradores podem postar nesse canal");
+            }
         }
-        boolean isAdmin = userRepository.findById(authorId).map(u -> u.getRole() == Role.ADMIN).orElse(false);
-        if (!isAdmin) {
-            throw new IllegalStateException("Só administradores podem postar nesse canal");
+        // Categoria com acesso restrito (ver CategoryAccessEntry/ServerService.
+        // setCategoryAccess) - quem nao esta' na lista nem consegue VER o canal na barra
+        // lateral (listChannels ja' filtra), mas isso aqui e' o que impede alguem que descobriu
+        // o id do canal por fora (ou tinha acesso e perdeu) de continuar postando.
+        if (channel.getCategoryId() != null) {
+            var entries = categoryAccessRepository.findByCategoryId(channel.getCategoryId());
+            boolean restricted = !entries.isEmpty();
+            boolean allowed = entries.stream().anyMatch(e -> e.getUserId().equals(authorId));
+            if (restricted && !allowed) {
+                throw new IllegalStateException("Você não tem acesso a essa categoria");
+            }
         }
     }
 

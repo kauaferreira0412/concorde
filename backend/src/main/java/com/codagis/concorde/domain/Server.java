@@ -1,5 +1,6 @@
 package com.codagis.concorde.domain;
 
+import com.codagis.concorde.enums.ServerType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -11,7 +12,8 @@ import java.time.Instant;
         @Index(name = "idx_servers_owner_id", columnList = "ownerId"),
         @Index(name = "idx_servers_icon_url", columnList = "iconUrl"),
         @Index(name = "idx_servers_description", columnList = "description"),
-        @Index(name = "idx_servers_created_at", columnList = "createdAt")
+        @Index(name = "idx_servers_created_at", columnList = "createdAt"),
+        @Index(name = "idx_servers_type", columnList = "type")
 })
 @Getter
 @Setter
@@ -34,6 +36,14 @@ public class Server {
 
     @Column(length = 300)
     private String description;
+
+    // Escolhido na criacao (ver ServerService.createServer/CreateServerModal.jsx) - RPG muda o
+    // canal de voz padrao ("Sessão" em vez de "Geral") e libera o kit de RPG (mapa de batalha,
+    // fichas em PDF). Nunca muda depois de criado.
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    @Builder.Default
+    private ServerType type = ServerType.NORMAL;
 
     @Builder.Default
     private Instant createdAt = Instant.now();

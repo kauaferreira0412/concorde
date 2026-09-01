@@ -163,4 +163,16 @@ public class ServerController {
     public ChannelResponse moveChannelToCategory(@PathVariable Long serverId, @PathVariable Long channelId, @RequestBody MoveChannelRequest req) {
         return serverService.moveChannelToCategory(serverId, currentUser.id(), channelId, req.categoryId());
     }
+
+    // Quem pode ver essa categoria/os canais dentro dela - ver CategoryAccessEntry no backend e
+    // CategoryAccessModal.jsx no frontend. Lista vazia = sem restricao (aberta pra todo mundo).
+    @GetMapping("/{serverId}/categories/{categoryId}/access")
+    public List<Long> getCategoryAccess(@PathVariable Long serverId, @PathVariable Long categoryId) {
+        return serverService.getCategoryAccess(serverId, currentUser.id(), categoryId);
+    }
+
+    @PutMapping("/{serverId}/categories/{categoryId}/access")
+    public void setCategoryAccess(@PathVariable Long serverId, @PathVariable Long categoryId, @RequestBody SetCategoryAccessRequest req) {
+        serverService.setCategoryAccess(serverId, currentUser.id(), categoryId, req.userIds());
+    }
 }

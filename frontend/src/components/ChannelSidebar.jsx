@@ -19,6 +19,7 @@ import {
   HeadphonesIcon,
   HeadphonesOffIcon,
   ListIcon,
+  LockIcon,
   LogOutIcon,
   MegaphoneIcon,
   MicIcon,
@@ -37,6 +38,7 @@ import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
 import CategoryModal from "./CategoryModal.jsx";
+import CategoryAccessModal from "./CategoryAccessModal.jsx";
 
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", INVISIBLE: "offline" };
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", INVISIBLE: "Invisível" };
@@ -130,6 +132,7 @@ export default function ChannelSidebar({
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null); // { id, name } | null
   const [deletingCategory, setDeletingCategory] = useState(null);
+  const [accessCategory, setAccessCategory] = useState(null); // categoria com o modal de "Restringir acesso" aberto
   const [movingChannel, setMovingChannel] = useState(false); // abre o submenu "Mover para categoria" no channelMenu
   // Criar/apagar canal (ver "+ canal de texto/voz" mais abaixo e o menu de botao direito em
   // cada canal) - mesma permissao MANAGE_CHANNELS pros dois, pode ser concedida pra qualquer
@@ -591,7 +594,7 @@ export default function ChannelSidebar({
         onContextMenu={(e) => {
           if (!canManageChannels) return;
           e.preventDefault();
-          setCategoryMenu({ id: category.id, name: category.name, x: e.clientX, y: e.clientY });
+          setCategoryMenu({ id: category.id, name: category.name, restricted: category.restricted, x: e.clientX, y: e.clientY });
         }}
         onDragOver={(e) => {
           if (!canManageChannels || !draggingChannelId) return;
@@ -610,6 +613,7 @@ export default function ChannelSidebar({
         <span className={"connected-chevron" + (!isCollapsed ? " open" : "")}>▸</span>
         <FolderIcon size={13} />
         <span className="channel-group-title">{category.name.toUpperCase()}</span>
+        {category.restricted && <LockIcon size={11} title="Acesso restrito" />}
       </button>
     );
   }
@@ -969,6 +973,16 @@ export default function ChannelSidebar({
             </button>
             <button
               type="button"
+              className="participant-mod-btn"
+              onClick={() => {
+                setAccessCategory(categoryMenu);
+                setCategoryMenu(null);
+              }}
+            >
+              <LockIcon size={14} /> Restringir acesso{categoryMenu.restricted ? " (ativo)" : ""}
+            </button>
+            <button
+              type="button"
               className="participant-mod-btn danger"
               onClick={() => {
                 setDeletingCategory(categoryMenu);
@@ -989,6 +1003,18 @@ export default function ChannelSidebar({
             setEditingCategory(null);
           }}
           onSave={handleSaveCategory}
+        />
+      )}
+
+      {accessCategory && (
+        <CategoryAccessModal
+          server={server}
+          category={accessCategory}
+          members={members}
+          onClose={() => setAccessCategory(null)}
+          onSaved={(restricted) => {
+            setCategories((prev) => prev.map((c) => (c.id === accessCategory.id ? { ...c, restricted } : c)));
+          }}
         />
       )}
 

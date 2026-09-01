@@ -4,6 +4,7 @@ import com.codagis.concorde.domain.*;
 import com.codagis.concorde.enums.ChannelType;
 import com.codagis.concorde.enums.PresenceStatus;
 import com.codagis.concorde.enums.ServerPermission;
+import com.codagis.concorde.enums.ServerType;
 import com.codagis.concorde.dto.ServerDtos.*;
 import com.codagis.concorde.dto.ServerRoleDtos.*;
 import com.codagis.concorde.repository.*;
@@ -35,6 +36,7 @@ public class ServerService {
     private final VoicePresenceService voicePresenceService;
     private final AuditLogService auditLogService;
     private final CustomEmojiRepository customEmojiRepository;
+    private final CategoryAccessRepository categoryAccessRepository;
 
     public ServerService(ServerRepository serverRepository, ChannelRepository channelRepository,
                           ChannelCategoryRepository channelCategoryRepository,
@@ -42,7 +44,8 @@ public class ServerService {
                           ServerRoleRepository serverRoleRepository, MessageRepository messageRepository,
                           AdminGuard adminGuard, OnlinePresenceService presenceService,
                           PermissionService permissionService, VoicePresenceService voicePresenceService,
-                          AuditLogService auditLogService, CustomEmojiRepository customEmojiRepository) {
+                          AuditLogService auditLogService, CustomEmojiRepository customEmojiRepository,
+                          CategoryAccessRepository categoryAccessRepository) {
         this.serverRepository = serverRepository;
         this.channelRepository = channelRepository;
         this.channelCategoryRepository = channelCategoryRepository;
@@ -56,6 +59,7 @@ public class ServerService {
         this.voicePresenceService = voicePresenceService;
         this.customEmojiRepository = customEmojiRepository;
         this.auditLogService = auditLogService;
+        this.categoryAccessRepository = categoryAccessRepository;
     }
 
     public List<VoiceParticipantInfo> getVoicePresence(Long serverId, Long userId) {
@@ -69,15 +73,22 @@ public class ServerService {
     @Transactional
     public ServerResponse createServer(Long ownerId, CreateServerRequest req) {
         adminGuard.assertAdmin(ownerId);
+        ServerType type = req.type() != null ? req.type() : ServerType.NORMAL;
         Server server = serverRepository.save(Server.builder()
                 .name(req.name())
                 .ownerId(ownerId)
+                .type(type)
                 .build());
 
         membershipRepository.save(Membership.builder().serverId(server.getId()).userId(ownerId).build());
 
         channelRepository.save(Channel.builder().serverId(server.getId()).name("geral").type(ChannelType.TEXT).build());
-        channelRepository.save(Channel.builder().serverId(server.getId()).name("Geral").type(ChannelType.VOICE).build());
+        // RPG: o canal de voz padrao vira "Sessão" (a primeira sessao de jogo) em vez de
+        // "Geral" - o mestre cria mais sessoes depois do mesmo jeito que cria qualquer outro
+        // canal de voz (ver ChannelSidebar.jsx "+ canal de voz"), so' muda o nome padrao pra
+        // deixar claro o proposito (pedido explicito do usuario).
+        String voiceChannelName = type == ServerType.RPG ? "Sessão" : "Geral";
+        channelRepository.save(Channel.builder().serverId(server.getId()).name(voiceChannelName).type(ChannelType.VOICE).build());
         channelRepository.save(Channel.builder().serverId(server.getId()).name("Atualizações").type(ChannelType.TEXT).adminOnly(true).build());
 
         return toResponse(server);
@@ -192,7 +203,15 @@ public class ServerService {
 
     public List<ChannelResponse> listChannels(Long serverId, Long userId) {
         assertMember(serverId, userId);
-        return channelRepository.findByServerIdOrderByIdAsc(serverId).stream()
+        List<Channel> channels = channelRepository.findByServerIdOrderByIdAsc(serverId);
+        // So' precisa ir no banco pelas categorias RESTRITAS (a maioria dos servidores nunca
+        // configurou nenhuma) - ver canAccessCategory/setCategoryAccess. Categoria sem nenhuma
+        // linha em CategoryAccessEntry continua aberta pra todo mundo, comportamento de sempre.
+        List<Long> categoryIds = channels.stream().map(Channel::getCategoryId).filter(java.util.Objects::nonNull).distinct().toList();
+        Set<Long> restrictedCategoryIds = categoryIds.isEmpty() ? Set.of() : categoryAccessRepository.findRestrictedCategoryIds(categoryIds);
+        return channels.stream()
+                .filter(c -> c.getCategoryId() == null || !restrictedCategoryIds.contains(c.getCategoryId())
+                        || categoryAccessRepository.existsByCategoryIdAndUserId(c.getCategoryId(), userId))
                 .map(this::toResponse)
                 .toList();
     }
@@ -249,9 +268,48 @@ public class ServerService {
 
     public List<CategoryResponse> listCategories(Long serverId, Long userId) {
         assertMember(serverId, userId);
-        return channelCategoryRepository.findByServerIdOrderByPositionAsc(serverId).stream()
-                .map(this::toResponse)
+        List<ChannelCategory> categories = channelCategoryRepository.findByServerIdOrderByPositionAsc(serverId);
+        List<Long> categoryIds = categories.stream().map(ChannelCategory::getId).toList();
+        Set<Long> restrictedCategoryIds = categoryIds.isEmpty() ? Set.of() : categoryAccessRepository.findRestrictedCategoryIds(categoryIds);
+        return categories.stream()
+                // Categoria restrita que esse usuario nao tem acesso simplesmente NAO aparece -
+                // nem o nome dela vaza (mesma logica de listChannels acima).
+                .filter(c -> !restrictedCategoryIds.contains(c.getId())
+                        || categoryAccessRepository.existsByCategoryIdAndUserId(c.getId(), userId))
+                .map(c -> toResponse(c, restrictedCategoryIds.contains(c.getId())))
                 .toList();
+    }
+
+    /** Quem tem acesso HOJE a essa categoria (lista de userId) - so' pra quem pode gerenciar
+     *  canais montar a UI de "restringir acesso" (ver CategoryAccessModal.jsx). Lista vazia
+     *  quer dizer "sem restricao nenhuma configurada" (aberta pra todo mundo). */
+    public List<Long> getCategoryAccess(Long serverId, Long userId, Long categoryId) {
+        assertMember(serverId, userId);
+        permissionService.assertHas(serverId, userId, ServerPermission.MANAGE_CHANNELS);
+        requireCategoryOfServer(serverId, categoryId);
+        return categoryAccessRepository.findByCategoryId(categoryId).stream()
+                .map(CategoryAccessEntry::getUserId)
+                .toList();
+    }
+
+    /** Substitui a lista de quem pode ver essa categoria - lista vazia REMOVE a restricao (fica
+     *  aberta de novo pra todo mundo do servidor), sem precisar de um endpoint separado pra
+     *  "desfazer". Ignora silenciosamente qualquer userId que nao seja membro do servidor (ex:
+     *  alguem que saiu entre a busca da lista e o salvar). */
+    @Transactional
+    public void setCategoryAccess(Long serverId, Long userId, Long categoryId, List<Long> allowedUserIds) {
+        assertMember(serverId, userId);
+        permissionService.assertHas(serverId, userId, ServerPermission.MANAGE_CHANNELS);
+        requireCategoryOfServer(serverId, categoryId);
+        categoryAccessRepository.deleteByCategoryId(categoryId);
+        List<Long> validUserIds = (allowedUserIds == null ? List.<Long>of() : allowedUserIds).stream()
+                .distinct()
+                .filter(uid -> membershipRepository.existsByServerIdAndUserId(serverId, uid))
+                .toList();
+        validUserIds.forEach(uid -> categoryAccessRepository.save(
+                CategoryAccessEntry.builder().categoryId(categoryId).userId(uid).build()));
+        ChannelCategory category = requireCategoryOfServer(serverId, categoryId);
+        auditLogService.log(serverId, userId, "SET_CATEGORY_ACCESS", null, "CATEGORY", categoryId, category.getName());
     }
 
     @Transactional
@@ -288,6 +346,7 @@ public class ServerService {
                     c.setCategoryId(null);
                     channelRepository.save(c);
                 });
+        categoryAccessRepository.deleteByCategoryId(categoryId);
         channelCategoryRepository.delete(category);
         auditLogService.log(serverId, userId, "DELETE_CATEGORY", null, "CATEGORY", categoryId, category.getName());
     }
@@ -403,7 +462,8 @@ public class ServerService {
     }
 
     private ServerResponse toResponse(Server server) {
-        return new ServerResponse(server.getId(), server.getName(), server.getOwnerId(), server.getIconUrl(), server.getDescription());
+        return new ServerResponse(server.getId(), server.getName(), server.getOwnerId(), server.getIconUrl(),
+                server.getDescription(), server.getType());
     }
 
     private ChannelResponse toResponse(Channel channel) {
@@ -412,6 +472,10 @@ public class ServerService {
     }
 
     private CategoryResponse toResponse(ChannelCategory category) {
-        return new CategoryResponse(category.getId(), category.getServerId(), category.getName(), category.getPosition());
+        return toResponse(category, categoryAccessRepository.findByCategoryId(category.getId()).size() > 0);
+    }
+
+    private CategoryResponse toResponse(ChannelCategory category, boolean restricted) {
+        return new CategoryResponse(category.getId(), category.getServerId(), category.getName(), category.getPosition(), restricted);
     }
 }

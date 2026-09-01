@@ -3,6 +3,7 @@ package com.codagis.concorde.dto;
 import com.codagis.concorde.enums.ChannelType;
 import com.codagis.concorde.enums.Role;
 import com.codagis.concorde.enums.PresenceStatus;
+import com.codagis.concorde.enums.ServerType;
 import jakarta.validation.constraints.NotBlank;
 
 import java.util.List;
@@ -10,9 +11,11 @@ import java.util.Set;
 
 public class ServerDtos {
 
-    public record CreateServerRequest(@NotBlank String name) {}
+    // type nulo = NORMAL (ver ServerService.createServer) - opcional pra nao quebrar nenhum
+    // client antigo que ainda nao manda esse campo.
+    public record CreateServerRequest(@NotBlank String name, ServerType type) {}
 
-    public record ServerResponse(Long id, String name, Long ownerId, String iconUrl, String description) {}
+    public record ServerResponse(Long id, String name, Long ownerId, String iconUrl, String description, ServerType type) {}
 
     public record UpdateServerRequest(@NotBlank String name, String description) {}
 
@@ -32,7 +35,15 @@ public class ServerDtos {
 
     public record UpdateCategoryRequest(@NotBlank String name) {}
 
-    public record CategoryResponse(Long id, Long serverId, String name, int position) {}
+    // restricted = tem alguma restricao de acesso configurada nessa categoria (ver
+    // CategoryAccessEntry/ServerService.setCategoryAccess) - so' um booleano aqui, a lista de
+    // quem tem acesso de verdade vem do GET /categories/{id}/access (so' quem pode gerenciar
+    // canais busca isso, nao faz sentido expor pra todo mundo).
+    public record CategoryResponse(Long id, Long serverId, String name, int position, boolean restricted) {}
 
     public record MoveChannelRequest(Long categoryId) {}
+
+    // Lista vazia = sem restricao (categoria aberta pra todo mundo do servidor) - e' assim que
+    // se remove uma restricao ja configurada, nao tem um endpoint separado de "desfazer".
+    public record SetCategoryAccessRequest(List<Long> userIds) {}
 }

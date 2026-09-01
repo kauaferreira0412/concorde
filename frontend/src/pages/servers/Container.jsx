@@ -77,8 +77,8 @@ export function useServersContainer() {
     return () => window.removeEventListener("concorde:open-settings", handleOpenSettings);
   }, []);
 
-  async function handleCreateServer(name) {
-    const { data } = await api.post("/api/servers", { name });
+  async function handleCreateServer(name, type) {
+    const { data } = await api.post("/api/servers", { name, type });
     setServers((prev) => [...prev, data]);
     navigate(`/servers/${data.id}`);
   }
