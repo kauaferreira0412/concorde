@@ -19,6 +19,10 @@ public class MapDtos {
     // backend confere de novo, de verdade, em cada acao (nunca confia so' no frontend).
     public record MapSnapshot(List<BattleMapResponse> maps, Long activeMapId, List<MapTokenResponse> tokens, boolean canManageMap) {}
 
+    // Mapa+tokens de UM mapa especifico (o mestre pode estar "olhando"/preparando um mapa
+    // diferente do ativo - ver MapService.getMapDetail/BattleMap.jsx "viewingMapId").
+    public record MapDetail(BattleMapResponse map, List<MapTokenResponse> tokens) {}
+
     // mapId: em qual mapa (dos varios que o canal pode ter) esse token nasce - pedido explicito
     // do usuario: token vive DENTRO de um mapa especifico, nao do canal como um todo. imageUrl
     // opcional - usado quando o token nasce ja' com a FOTO de um personagem da mesa ("Usar

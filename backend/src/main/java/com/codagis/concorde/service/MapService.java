@@ -6,6 +6,7 @@ import com.codagis.concorde.domain.ChannelCategory;
 import com.codagis.concorde.domain.MapToken;
 import com.codagis.concorde.dto.MapDtos.AddTokenRequest;
 import com.codagis.concorde.dto.MapDtos.BattleMapResponse;
+import com.codagis.concorde.dto.MapDtos.MapDetail;
 import com.codagis.concorde.dto.MapDtos.MapSnapshot;
 import com.codagis.concorde.dto.MapDtos.MapTokenResponse;
 import com.codagis.concorde.dto.MapDtos.RenameTokenRequest;
@@ -82,24 +83,41 @@ public class MapService {
         return channel;
     }
 
+    /** maps = TODOS os mapas do canal quando ESSE usuario e' o mestre (ele precisa ver/gerenciar
+     *  os mapas que ainda esta' preparando, que os jogadores nao devem ver ainda - pedido
+     *  explicito do usuario: "o mestre pode criar o mapa e adicionar os inimigos antes dos
+     *  jogadores verem"); pra quem NAO e' o mestre, so' o mapa ATIVO aparece (ou nenhum, se o
+     *  mestre ainda nao ativou nenhum) - assim nenhum jogador enxerga sequer a MINIATURA de um
+     *  mapa que o mestre ainda esta' preparando. tokens = os do mapa ATIVO (usado so' como valor
+     *  inicial - o mestre troca de mapa localmente sem mexer no ativo, ver getMapDetail). */
     public MapSnapshot getSnapshot(Long channelId, Long userId) {
         Channel channel = assertCanUseMap(channelId, userId);
+        boolean manage = canManageMap(channel, userId);
         List<BattleMap> maps = battleMapRepository.findByChannelIdOrderByIdAsc(channelId);
-        BattleMap active = resolveActive(maps);
+        BattleMap active = maps.stream().filter(m -> Boolean.TRUE.equals(m.getActive())).findFirst().orElse(null);
         List<MapTokenResponse> tokens = active == null ? List.of()
                 : mapTokenRepository.findByMapIdOrderByIdAsc(active.getId()).stream().map(this::toResponse).toList();
-        List<BattleMapResponse> mapResponses = maps.stream()
+        List<BattleMap> visibleMaps = manage ? maps : (active == null ? List.of() : List.of(active));
+        List<BattleMapResponse> mapResponses = visibleMaps.stream()
                 .map(m -> toResponse(m, active != null && m.getId().equals(active.getId())))
                 .toList();
-        return new MapSnapshot(mapResponses, active == null ? null : active.getId(), tokens, canManageMap(channel, userId));
+        return new MapSnapshot(mapResponses, active == null ? null : active.getId(), tokens, manage);
     }
 
-    /** Se nenhum mapa estiver marcado "active" (defensivo - dado antigo, ou os dois nunca
-     *  bateram por algum motivo), trata o PRIMEIRO mapa criado como o ativo, pra sempre ter
-     *  algo pra mostrar em vez de tela vazia. */
-    private BattleMap resolveActive(List<BattleMap> maps) {
-        return maps.stream().filter(m -> Boolean.TRUE.equals(m.getActive())).findFirst()
-                .orElse(maps.isEmpty() ? null : maps.get(0));
+    /** Detalhe (mapa + tokens) de UM mapa especifico, pra quando o mestre esta' "olhando"/
+     *  preparando um mapa diferente do que esta' ativo pros jogadores agora (ver BattleMap.jsx -
+     *  "viewingMapId" e' independente do mapa ativo). So' o mestre pode pedir um mapa que ainda
+     *  nao esta' ativo - um jogador so' consegue pedir o mapa que ja' esta' ativo mesmo (defesa
+     *  a mais, alem do frontend nem oferecer essa opcao pra ele). */
+    public MapDetail getMapDetail(Long channelId, Long userId, Long mapId) {
+        Channel channel = assertCanUseMap(channelId, userId);
+        BattleMap map = requireMapOfChannel(channelId, mapId);
+        boolean manage = canManageMap(channel, userId);
+        if (!manage && !Boolean.TRUE.equals(map.getActive())) {
+            throw new IllegalStateException("Esse mapa ainda não foi liberado pelo mestre");
+        }
+        List<MapTokenResponse> tokens = mapTokenRepository.findByMapIdOrderByIdAsc(mapId).stream().map(this::toResponse).toList();
+        return new MapDetail(toResponse(map, Boolean.TRUE.equals(map.getActive())), tokens);
     }
 
     /** So' o "mestre" (quem CRIOU a categoria desse canal, ver ChannelCategory.createdBy) pode
@@ -120,26 +138,26 @@ public class MapService {
     }
 
     /** Cria um mapa NOVO (nao substitui os existentes - pedido explicito do usuario: "mapa um,
-     *  mapa dois, mapa tres..."). O PRIMEIRO mapa de um canal ja' nasce ativo (senao ninguem
-     *  veria nada); os seguintes nascem inativos - o mestre decide quando "revelar" pros
-     *  jogadores via activateMap. */
+     *  mapa dois, mapa tres..."). Nasce SEMPRE inativo, mesmo o primeiro do canal - pedido
+     *  explicito do usuario: "o mestre pode criar o mapa e adicionar os inimigos, antes dos
+     *  jogadores verem"; ele decide quando "revelar" pros jogadores via activateMap. Enquanto
+     *  nenhum mapa estiver ativo, os jogadores so' veem "o mestre ainda não subiu um mapa". */
     @Transactional
     public BattleMapResponse createMap(Long channelId, Long userId, String name, String imageUrl) {
         Channel channel = assertCanUseMap(channelId, userId);
         if (!canManageMap(channel, userId)) {
             throw new IllegalStateException("Só o mestre dessa categoria pode adicionar um mapa");
         }
-        boolean isFirst = battleMapRepository.findByChannelIdOrderByIdAsc(channelId).isEmpty();
         String cleanName = (name == null || name.isBlank()) ? null : name.trim();
         if (cleanName != null && cleanName.length() > 60) cleanName = cleanName.substring(0, 60);
         BattleMap map = battleMapRepository.save(BattleMap.builder()
                 .channelId(channelId)
                 .name(cleanName)
                 .imageUrl(imageUrl)
-                .active(isFirst)
+                .active(false)
                 .createdBy(userId)
                 .build());
-        return toResponse(map, isFirst);
+        return toResponse(map, false);
     }
 
     /** Troca qual mapa esta' "ativo" (o que TODOS os jogadores veem) - pedido explicito do

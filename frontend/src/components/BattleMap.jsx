@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { useAlert } from "../context/AlertContext.jsx";
 import { subscribeToMap, addMapToken, moveMapToken, renameMapToken, removeMapToken } from "../ws/chatSocket";
-import { ImageIcon, MapIcon, MapPinIcon, PencilIcon, TrashIcon, UsersIcon, ZoomInIcon, ZoomOutIcon } from "./icons.jsx";
+import { EyeIcon, ImageIcon, MapIcon, MapPinIcon, PencilIcon, TrashIcon, UsersIcon, ZoomInIcon, ZoomOutIcon } from "./icons.jsx";
 
 const TOKEN_COLORS = ["#ed4245", "#5865f2", "#57f287", "#faa61a", "#eb459e", "#00c2ff"];
 function randomColor() {
@@ -12,18 +12,24 @@ function randomColor() {
 /**
  * Mapa(s) de batalha do canal de voz - kit de RPG (pedido explicito do usuario: "algo muito
  * parecido com o Roll20", sem precisar ser tão complexo). O mestre pode subir VARIOS mapas
- * (mapa 1, mapa 2...) e escolher qual deles esta' "ativo" (o que TODOS os jogadores veem agora,
- * ver o botao "Mapas") - cada mapa guarda o PROPRIO conjunto de tokens, entao trocar de mapa e
- * voltar restaura os tokens exatamente onde estavam. So' o mestre adiciona/apaga um token ou um
- * mapa; qualquer jogador pode mover/renomear/apagar um token que ja' existe (ao vivo de
- * verdade, via WebSocket com throttle - pedido explicito do usuario). Posicao de cada token e'
- * salva como FRACAO da imagem (0..1), nao pixel, entao bate certinho pra todo mundo independente
- * do zoom/tamanho de tela de cada um (ver MapToken.java).
+ * (mapa 1, mapa 2...) - cada um nasce INATIVO (so' o mestre enxerga), pra dar tempo dele
+ * preparar a cena (posicionar os inimigos, etc) ANTES dos jogadores verem (pedido explicito do
+ * usuario). "viewingMapId" e' o mapa que ESSE cliente esta' olhando agora: pro mestre, e' livre
+ * (ele escolhe no menu "Mapas", sem afetar ninguem) - pros jogadores, e' sempre travado no mapa
+ * ATIVO (activeMapId), que so' o mestre troca (botao "olho" no menu, ver handleActivateMap) e
+ * que atualiza a visao de TODOS ao vivo (WebSocket). Cada mapa guarda o PROPRIO conjunto de
+ * tokens, entao trocar de mapa e voltar restaura os tokens exatamente onde estavam. So' o mestre
+ * adiciona/apaga um token ou um mapa; qualquer jogador pode mover/renomear/apagar um token que
+ * ja' existe (ao vivo de verdade, via WebSocket com throttle - pedido explicito do usuario).
+ * Posicao de cada token e' salva como FRACAO da imagem (0..1), nao pixel, entao bate certinho
+ * pra todo mundo independente do zoom/tamanho de tela de cada um (ver MapToken.java).
  */
 export default function BattleMap({ channelId, serverId, categoryId, stompClient, stompConnected }) {
   const { showAlert } = useAlert();
   const [maps, setMaps] = useState([]);
   const [activeMapId, setActiveMapId] = useState(null);
+  // Mapa que ESSE cliente esta' vendo agora - ver comentario acima do componente.
+  const [viewingMapId, setViewingMapId] = useState(null);
   const [tokens, setTokens] = useState([]);
   // So' quem criou a categoria desse canal (o "mestre" - ver ChannelCategory.createdBy no
   // backend) pode gerenciar mapas/tokens - pedido explicito do usuario. O backend confere de
@@ -48,6 +54,10 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
   const [pendingTokenTemplate, setPendingTokenTemplate] = useState(null); // { label, color, imageUrl } | null
 
   const activeMap = maps.find((m) => m.id === activeMapId) || null;
+  const viewingMap = maps.find((m) => m.id === viewingMapId) || null;
+  // So' o mestre pode "espiar" um mapa diferente do ativo - pra jogador os dois sao sempre o
+  // mesmo (viewingMapId e' travado em activeMapId, ver loadSnapshot).
+  const isPreviewingUnpublished = canManageMap && viewingMap && viewingMap.id !== activeMapId;
 
   const imageRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -116,12 +126,21 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [showMapsMenu]);
 
+  // So' recarrega a LISTA de mapas/qual esta' ativo (nunca os tokens - isso fica por conta do
+  // efeito que busca o detalhe de "viewingMapId", ver abaixo). Pra jogador, "o que estou vendo"
+  // sempre vira o mapa ativo. Pro mestre, mantem o que ele ja' estava preparando (se esse mapa
+  // ainda existir) - senao um simples evento de outro mapa mudando de ativo interromperia o
+  // preparo dele.
   function loadSnapshot() {
     return api.get(`/api/channels/${channelId}/map`).then(({ data }) => {
       setMaps(data.maps);
       setActiveMapId(data.activeMapId);
-      setTokens(data.tokens);
       setCanManageMap(data.canManageMap);
+      setViewingMapId((prev) => {
+        if (!data.canManageMap) return data.activeMapId;
+        if (prev && data.maps.some((m) => m.id === prev)) return prev;
+        return data.activeMapId ?? (data.maps[0]?.id ?? null);
+      });
     });
   }
 
@@ -139,15 +158,37 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
 
+  // Busca o mapa+tokens do mapa que esse cliente esta' vendo AGORA (ver comentario no topo do
+  // componente) - dispara de novo toda vez que "viewingMapId" muda (o mestre trocou de mapa no
+  // menu, ou o mapa ativo mudou e o jogador foi arrastado junto).
+  useEffect(() => {
+    if (!viewingMapId) {
+      setTokens([]);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get(`/api/channels/${channelId}/map/${viewingMapId}`)
+      .then(({ data }) => {
+        if (!cancelled) setTokens(data.tokens);
+      })
+      .catch(() => {
+        if (!cancelled) setTokens([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [channelId, viewingMapId]);
+
   useEffect(() => {
     if (!stompClient || !stompConnected) return;
     const sub = subscribeToMap(stompClient, channelId, (event) => {
       if (event.type === "MAPS_CHANGED") {
-        // Mudanca estrutural (mapa criado/ativado/apagado) - recarrega o snapshot inteiro, mais
-        // simples que tentar remontar o estado a partir do proprio evento.
+        // Mudanca estrutural (mapa criado/ativado/apagado) - recarrega a lista, mais simples
+        // que tentar remontar o estado a partir do proprio evento.
         loadSnapshot().catch(() => {});
       } else if (event.type === "TOKEN_ADDED") {
-        setTokens((prev) => (event.token.mapId === activeMapId ? [...prev, event.token] : prev));
+        setTokens((prev) => (event.token.mapId === viewingMapId ? [...prev, event.token] : prev));
       } else if (event.type === "TOKEN_MOVED") {
         setTokens((prev) => prev.map((t) => (t.id === event.tokenId ? { ...t, x: event.x, y: event.y } : t)));
       } else if (event.type === "TOKEN_RENAMED") {
@@ -159,7 +200,7 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     });
     return () => sub.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stompClient, stompConnected, channelId, activeMapId]);
+  }, [stompClient, stompConnected, channelId, viewingMapId]);
 
   async function handleUpload(e) {
     const file = e.target.files?.[0];
@@ -172,9 +213,8 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
       if (newMapName.trim()) formData.append("name", newMapName.trim());
       await api.post(`/api/channels/${channelId}/map/image`, formData);
       setNewMapName("");
-      setShowMapsMenu(false);
-      // O estado local atualiza sozinho via WebSocket (o proprio backend transmite de volta
-      // pra quem subiu tambem, ver MapController) - nao precisa mexer no state aqui.
+      // O mapa novo nasce INATIVO (so' o mestre ve) - o WS avisa a lista pra atualizar, mas
+      // ninguem e' "arrastado" pra ele automaticamente (ver loadSnapshot).
     } catch (err) {
       showAlert(err.response?.data?.error || "Não foi possível subir o mapa");
     } finally {
@@ -182,16 +222,13 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     }
   }
 
+  // Torna um mapa "ativo" - o que TODOS os jogadores passam a ver, ao vivo (pedido explicito do
+  // usuario: o mestre prepara em privado e so' revela quando quiser).
   async function handleActivateMap(mapId) {
-    if (mapId === activeMapId) {
-      setShowMapsMenu(false);
-      return;
-    }
     try {
       await api.put(`/api/channels/${channelId}/map/${mapId}/activate`);
-      setShowMapsMenu(false);
     } catch (err) {
-      showAlert(err.response?.data?.error || "Não foi possível trocar o mapa");
+      showAlert(err.response?.data?.error || "Não foi possível ativar esse mapa");
     }
   }
 
@@ -225,16 +262,16 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     const wasPan = panStateRef.current;
     panStateRef.current = null;
     if (wasPan?.moved) return; // foi arrastar o mapa, nao clicar pra adicionar token
-    if (!addMode || !imageRef.current || !stompClient || !stompConnected || !activeMapId) return;
+    if (!addMode || !imageRef.current || !stompClient || !stompConnected || !viewingMapId) return;
     const rect = imageRef.current.getBoundingClientRect();
     const fracX = (e.clientX - rect.left) / rect.width;
     const fracY = (e.clientY - rect.top) / rect.height;
     if (fracX < 0 || fracX > 1 || fracY < 0 || fracY > 1) return;
     if (pendingTokenTemplate) {
-      addMapToken(stompClient, channelId, { mapId: activeMapId, ...pendingTokenTemplate, x: fracX, y: fracY });
+      addMapToken(stompClient, channelId, { mapId: viewingMapId, ...pendingTokenTemplate, x: fracX, y: fracY });
       setPendingTokenTemplate(null);
     } else {
-      addMapToken(stompClient, channelId, { mapId: activeMapId, label: "Token", color: randomColor(), x: fracX, y: fracY });
+      addMapToken(stompClient, channelId, { mapId: viewingMapId, label: "Token", color: randomColor(), x: fracX, y: fracY });
     }
     // Um clique = um token so', sempre - o botao "desliga" sozinho depois de colocar (pedido
     // explicito do usuario: senao o mestre pode se confundir e adicionar varios sem querer).
@@ -380,17 +417,29 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
                   </p>
                 ) : (
                   <div className="battle-map-menu-list">
-                    {maps.map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        className={"battle-map-menu-item" + (m.id === activeMapId ? " active" : "")}
-                        onClick={() => handleActivateMap(m.id)}
-                        title={m.id === activeMapId ? "Mapa que os jogadores estão vendo agora" : "Mostrar esse mapa pros jogadores"}
-                      >
-                        <img src={m.imageUrl} alt="" />
-                        <span className="battle-map-menu-item-name">{m.name || `Mapa ${maps.indexOf(m) + 1}`}</span>
-                        {m.id === activeMapId && <span className="battle-map-menu-badge">Ativo</span>}
+                    {maps.map((m, idx) => (
+                      <div key={m.id} className={"battle-map-menu-row" + (m.id === viewingMapId ? " viewing" : "")}>
+                        <button
+                          type="button"
+                          className={"battle-map-menu-item" + (m.id === activeMapId ? " active" : "")}
+                          onClick={() => setViewingMapId(m.id)}
+                          title={m.id === viewingMapId ? "Mapa que você está preparando/vendo agora" : "Ver e preparar esse mapa (só você enxerga)"}
+                        >
+                          <img src={m.imageUrl} alt="" />
+                          <span className="battle-map-menu-item-name">{m.name || `Mapa ${idx + 1}`}</span>
+                          {m.id === activeMapId && <span className="battle-map-menu-badge">Ativo</span>}
+                        </button>
+                        {m.id !== activeMapId && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            className="battle-map-menu-activate"
+                            onClick={() => handleActivateMap(m.id)}
+                            title="Mostrar esse mapa pros jogadores agora"
+                          >
+                            <EyeIcon size={13} />
+                          </span>
+                        )}
                         <span
                           role="button"
                           tabIndex={0}
@@ -400,7 +449,7 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
                         >
                           <TrashIcon size={13} />
                         </span>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -421,7 +470,7 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
             )}
           </div>
         )}
-        {activeMap && (
+        {viewingMap && (
           <>
             {canManageMap && (
               <>
@@ -491,9 +540,24 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
         )}
       </div>
 
+      {/* Avisa o mestre quando ele esta' olhando um mapa que os jogadores AINDA NAO veem (pedido
+          explicito do usuario) - com um atalho pra ativar sem precisar reabrir o menu "Mapas". */}
+      {isPreviewingUnpublished && (
+        <div className="battle-map-preview-banner">
+          <EyeIcon size={13} />
+          <span>
+            Só você está vendo esse mapa (em preparo) - os jogadores continuam vendo{" "}
+            {activeMap ? `"${activeMap.name || "o mapa atual"}"` : "nenhum mapa ainda"}.
+          </span>
+          <button type="button" onClick={() => handleActivateMap(viewingMap.id)}>
+            Tornar mapa atual
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <p className="admin-hint">Carregando mapa...</p>
-      ) : !activeMap ? (
+      ) : !viewingMap ? (
         <p className="admin-hint">
           {canManageMap
             ? "Nenhum mapa ainda - clique em \"Mapas\" pra subir uma imagem (jpg, png ou webp)."
@@ -510,7 +574,7 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
           style={{ cursor: addMode ? "crosshair" : panStateRef.current ? "grabbing" : "grab" }}
         >
           <div className="battle-map-canvas" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}>
-            <img ref={imageRef} src={activeMap.imageUrl} alt="Mapa de batalha" className="battle-map-image" draggable={false} />
+            <img ref={imageRef} src={viewingMap.imageUrl} alt="Mapa de batalha" className="battle-map-image" draggable={false} />
             {tokens.map((token) => (
               <div
                 key={token.id}

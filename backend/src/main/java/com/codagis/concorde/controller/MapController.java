@@ -1,6 +1,7 @@
 package com.codagis.concorde.controller;
 
 import com.codagis.concorde.dto.MapDtos.BattleMapResponse;
+import com.codagis.concorde.dto.MapDtos.MapDetail;
 import com.codagis.concorde.dto.MapDtos.MapEvent;
 import com.codagis.concorde.dto.MapDtos.MapSnapshot;
 import com.codagis.concorde.dto.MapDtos.TokenImageUploadResponse;
@@ -39,6 +40,14 @@ public class MapController {
     @GetMapping("/{channelId}/map")
     public MapSnapshot getMap(@PathVariable Long channelId) {
         return mapService.getSnapshot(channelId, currentUser.id());
+    }
+
+    // Mapa+tokens de UM mapa especifico - usado pelo mestre pra "olhar"/preparar um mapa
+    // diferente do que esta' ativo pros jogadores agora (ver MapService.getMapDetail/
+    // BattleMap.jsx "viewingMapId").
+    @GetMapping("/{channelId}/map/{mapId}")
+    public MapDetail getMapDetail(@PathVariable Long channelId, @PathVariable Long mapId) {
+        return mapService.getMapDetail(channelId, currentUser.id(), mapId);
     }
 
     // "name" opcional (multipart form field) - "Mapa 1", "Mapa 2"... se nao vier, o frontend

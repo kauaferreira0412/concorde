@@ -3110,6 +3110,29 @@ h3.chat-heading {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
+/* Aviso pro mestre quando ele esta' olhando um mapa que os jogadores AINDA NAO veem (mapa em
+   preparo, diferente do ativo) - pedido explicito do usuario: precisa ficar claro que so' ele
+   enxerga aquilo, com um atalho pra publicar sem reabrir o menu "Mapas". */
+.battle-map-preview-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+}
+.battle-map-preview-banner span { flex: 1; }
+.battle-map-preview-banner button {
+  width: auto !important;
+  flex-shrink: 0;
+  padding: 6px 10px !important;
+  font-size: 12px;
+  background: var(--accent) !important;
+}
 .battle-map-viewport {
   position: relative;
   width: 100%;
@@ -3211,6 +3234,18 @@ h3.chat-heading {
   overflow-y: auto;
   margin-bottom: 8px;
 }
+/* Uma linha = uma miniatura clicavel (ver/preparar, so' o mestre enxerga) + botao "olho"
+   (torna o mapa ativo pros jogadores) + botao de apagar - 3 controles separados, nao mais um
+   soh botao (evita interativo-dentro-de-interativo e deixa "ver" e "publicar" bem distintos,
+   pedido explicito do usuario). Borda a esquerda marca qual mapa o MESTRE esta' vendo agora. */
+.battle-map-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-left: 2px solid transparent;
+  border-radius: var(--radius-sm);
+}
+.battle-map-menu-row.viewing { border-left-color: var(--accent); }
 .battle-map-menu-item {
   display: flex;
   align-items: center;
@@ -3219,7 +3254,8 @@ h3.chat-heading {
   border-radius: var(--radius-sm);
   font-size: 13px;
   text-align: left;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
 }
 .battle-map-menu-item:hover { background: var(--bg-hover); }
 .battle-map-menu-item.active { background: var(--accent-soft); color: var(--accent-text); }
@@ -3238,6 +3274,7 @@ h3.chat-heading {
   color: var(--accent-text);
   flex-shrink: 0;
 }
+.battle-map-menu-activate,
 .battle-map-menu-delete {
   flex-shrink: 0;
   display: flex;
@@ -3249,6 +3286,7 @@ h3.chat-heading {
   color: var(--text-muted);
   cursor: pointer;
 }
+.battle-map-menu-activate:hover { background: var(--accent-soft); color: var(--accent-text); }
 .battle-map-menu-delete:hover { background: var(--danger-soft); color: var(--danger); }
 .battle-map-menu-new {
   display: flex;
