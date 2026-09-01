@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useAuth } from "../context/AuthContext.jsx";
 import { useDmNotifications } from "../context/DmNotificationsContext.jsx";
 import api from "../api/client";
 import Avatar from "./Avatar.jsx";
@@ -9,7 +8,6 @@ import { HeadphonesIcon } from "./icons.jsx";
 const MAX_AVATARS = 8; // depois disso so mostra "+N", senao a fileira fica gigante num servidor grande
 
 export default function ServerSidebar({ servers, selectedServerId, homeActive, onSelect, onHome, onCreateServer }) {
-  const { isAdmin } = useAuth();
   const { hasUnreadDm } = useDmNotifications();
   // Tooltip customizado ao passar o mouse num servidor - pedido explicito do usuario: mostrar
   // os avatares de quem esta numa call de voz AGORA nesse servidor, sem precisar entrar nele
@@ -87,12 +85,11 @@ export default function ServerSidebar({ servers, selectedServerId, homeActive, o
           </div>
         );
       })}
-      {/* Criar servidor e' exclusivo do administrador */}
-      {isAdmin && (
-        <button className="server-icon add" title="Criar servidor" onClick={onCreateServer}>
-          +
-        </button>
-      )}
+      {/* Qualquer usuario pode criar um servidor agora (pedido explicito do usuario) - o dono
+          decide depois quem entra, convidando amigos (ver InviteFriendsModal.jsx). */}
+      <button className="server-icon add" title="Criar servidor" onClick={onCreateServer}>
+        +
+      </button>
 
       {hoveredServer &&
         tooltipPos &&

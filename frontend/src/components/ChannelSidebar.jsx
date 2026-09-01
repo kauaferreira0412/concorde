@@ -33,6 +33,7 @@ import {
   ShieldIcon,
   SmileIcon,
   TrashIcon,
+  UsersIcon,
   VolumeIcon,
 } from "./icons.jsx";
 import Avatar from "./Avatar.jsx";
@@ -41,6 +42,7 @@ import VolumeSlider from "./VolumeSlider.jsx";
 import CategoryModal from "./CategoryModal.jsx";
 import CategoryAccessModal from "./CategoryAccessModal.jsx";
 import CharacterSheetsModal from "./CharacterSheetsModal.jsx";
+import InviteFriendsModal from "./InviteFriendsModal.jsx";
 
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", INVISIBLE: "offline" };
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", INVISIBLE: "Invisível" };
@@ -136,6 +138,7 @@ export default function ChannelSidebar({
   const [deletingCategory, setDeletingCategory] = useState(null);
   const [accessCategory, setAccessCategory] = useState(null); // categoria com o modal de "Restringir acesso" aberto
   const [sheetsCategory, setSheetsCategory] = useState(null); // categoria com o modal de "Fichas de personagem" aberto
+  const [showInviteFriends, setShowInviteFriends] = useState(false);
   const [movingChannel, setMovingChannel] = useState(false); // abre o submenu "Mover para categoria" no channelMenu
   // Criar/apagar canal (ver "+ canal de texto/voz" mais abaixo e o menu de botao direito em
   // cada canal) - mesma permissao MANAGE_CHANNELS pros dois, pode ser concedida pra qualquer
@@ -153,7 +156,8 @@ export default function ChannelSidebar({
     isAdmin ||
     myServerPermissions.has("MANAGE_SERVER") ||
     myServerPermissions.has("MANAGE_ROLES") ||
-    myServerPermissions.has("VIEW_AUDIT_LOG");
+    myServerPermissions.has("VIEW_AUDIT_LOG") ||
+    myServerPermissions.has("MANAGE_MEMBERS");
   // Arrastar alguem da lista de "quem esta na call" pra outro canal de voz (ver
   // draggable/onDrop abaixo) - so' existe enquanto o arraste esta rolando.
   const [draggingParticipant, setDraggingParticipant] = useState(null); // { channelId, userId }
@@ -975,8 +979,24 @@ export default function ChannelSidebar({
                 <ListIcon size={14} /> Log de auditoria
               </button>
             )}
+            {(isAdmin || myServerPermissions.has("MANAGE_MEMBERS")) && (
+              <button
+                type="button"
+                className="participant-mod-btn"
+                onClick={() => {
+                  setShowInviteFriends(true);
+                  setServerMenu(null);
+                }}
+              >
+                <UsersIcon size={14} /> Convidar amigos
+              </button>
+            )}
           </div>
         </div>
+      )}
+
+      {showInviteFriends && server && (
+        <InviteFriendsModal server={server} members={members} onClose={() => setShowInviteFriends(false)} />
       )}
 
       {categoryMenu && (

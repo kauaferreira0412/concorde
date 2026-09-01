@@ -48,4 +48,8 @@ public class ServerDtos {
     // Lista vazia = sem restricao (categoria aberta pra todo mundo do servidor) - e' assim que
     // se remove uma restricao ja configurada, nao tem um endpoint separado de "desfazer".
     public record SetCategoryAccessRequest(List<Long> userIds) {}
+
+    // Convida um AMIGO (aceito nos chats privados) pra entrar no servidor - ver
+    // ServerService.inviteFriend/InviteFriendsModal.jsx.
+    public record InviteFriendRequest(Long userId) {}
 }

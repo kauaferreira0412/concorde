@@ -99,6 +99,13 @@ public class ServerController {
         serverService.removeMember(currentUser.id(), serverId, userId);
     }
 
+    // Convida um AMIGO (aceito nos chats privados, ver FriendController) pra entrar nesse
+    // servidor - ver ServerService.inviteFriend/InviteFriendsModal.jsx.
+    @PostMapping("/{serverId}/invite-friend")
+    public void inviteFriend(@PathVariable Long serverId, @RequestBody InviteFriendRequest req) {
+        serverService.inviteFriend(currentUser.id(), serverId, req.userId());
+    }
+
     @PutMapping("/{serverId}/members/{userId}/nickname")
     public void setMemberNickname(@PathVariable Long serverId, @PathVariable Long userId, @RequestBody SetNicknameRequest req) {
         serverService.setMemberNickname(currentUser.id(), serverId, userId, req.nickname());

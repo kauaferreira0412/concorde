@@ -3,6 +3,7 @@ package com.codagis.concorde.service;
 import com.codagis.concorde.domain.*;
 import com.codagis.concorde.enums.ChannelType;
 import com.codagis.concorde.enums.PresenceStatus;
+import com.codagis.concorde.enums.Role;
 import com.codagis.concorde.enums.ServerPermission;
 import com.codagis.concorde.enums.ServerType;
 import com.codagis.concorde.dto.ServerDtos.*;
@@ -37,6 +38,7 @@ public class ServerService {
     private final AuditLogService auditLogService;
     private final CustomEmojiRepository customEmojiRepository;
     private final CategoryAccessRepository categoryAccessRepository;
+    private final FriendshipService friendshipService;
 
     public ServerService(ServerRepository serverRepository, ChannelRepository channelRepository,
                           ChannelCategoryRepository channelCategoryRepository,
@@ -45,7 +47,7 @@ public class ServerService {
                           AdminGuard adminGuard, OnlinePresenceService presenceService,
                           PermissionService permissionService, VoicePresenceService voicePresenceService,
                           AuditLogService auditLogService, CustomEmojiRepository customEmojiRepository,
-                          CategoryAccessRepository categoryAccessRepository) {
+                          CategoryAccessRepository categoryAccessRepository, FriendshipService friendshipService) {
         this.serverRepository = serverRepository;
         this.channelRepository = channelRepository;
         this.channelCategoryRepository = channelCategoryRepository;
@@ -60,6 +62,7 @@ public class ServerService {
         this.customEmojiRepository = customEmojiRepository;
         this.auditLogService = auditLogService;
         this.categoryAccessRepository = categoryAccessRepository;
+        this.friendshipService = friendshipService;
     }
 
     public List<VoiceParticipantInfo> getVoicePresence(Long serverId, Long userId) {
@@ -70,9 +73,12 @@ public class ServerService {
                 .toList();
     }
 
+    // Qualquer usuario autenticado pode criar um servidor agora (pedido explicito do usuario -
+    // antes era exclusivo do admin). Quem cria vira o dono (Server.ownerId) e ganha TODAS as
+    // permissoes nesse servidor de graca (ver PermissionService.isOwnerOrGlobalAdmin) - ele
+    // decide depois quem mais entra, convidando amigos (ver inviteFriend abaixo).
     @Transactional
     public ServerResponse createServer(Long ownerId, CreateServerRequest req) {
-        adminGuard.assertAdmin(ownerId);
         ServerType type = req.type() != null ? req.type() : ServerType.NORMAL;
         Server server = serverRepository.save(Server.builder()
                 .name(req.name())
@@ -94,7 +100,14 @@ public class ServerService {
         return toResponse(server);
     }
 
+    // O admin global enxerga TODOS os servidores que existem, mesmo sem ser membro de nenhum
+    // deles (pedido explicito do usuario: "o usuario adm deve ter acesso a todos os
+    // servidores") - todo mundo mais so' ve os que participa (Membership), como sempre.
     public List<ServerResponse> listServersOfUser(Long userId) {
+        boolean isGlobalAdmin = userRepository.findById(userId).map(u -> u.getRole() == Role.ADMIN).orElse(false);
+        if (isGlobalAdmin) {
+            return serverRepository.findAll().stream().map(this::toResponse).toList();
+        }
         return membershipRepository.findByUserId(userId).stream()
                 .map(m -> serverRepository.findById(m.getServerId()).orElse(null))
                 .filter(s -> s != null)
@@ -116,8 +129,38 @@ public class ServerService {
         }
     }
 
+    /** Concede acesso a um servidor pra um AMIGO (aceito nos chats privados, ver
+     *  FriendshipService.areFriends) - pedido explicito do usuario: "conceder acesso aos amigos
+     *  adicionados". Exige MANAGE_MEMBERS (o dono ja' tem de graca, ver
+     *  PermissionService.isOwnerOrGlobalAdmin - mas tambem pode ser dado a outros membros via
+     *  Perfis, mesma permissao que remover/renomear membro ja' usa). Diferente do
+     *  "grantAccessAsAdmin" (admin global, QUALQUER usuario, sem checar amizade nenhuma) - esse
+     *  aqui e' o caminho normal, pra gente de verdade. */
+    @Transactional
+    public void inviteFriend(Long requesterId, Long serverId, Long targetUserId) {
+        assertMember(serverId, requesterId);
+        permissionService.assertHas(serverId, requesterId, ServerPermission.MANAGE_MEMBERS);
+        if (!userRepository.existsById(targetUserId)) {
+            throw new IllegalArgumentException("Usuário não encontrado");
+        }
+        if (!friendshipService.areFriends(requesterId, targetUserId)) {
+            throw new IllegalStateException("Você só pode convidar quem já é seu amigo");
+        }
+        if (membershipRepository.existsByServerIdAndUserId(serverId, targetUserId)) {
+            throw new IllegalStateException("Essa pessoa já faz parte do servidor");
+        }
+        membershipRepository.save(Membership.builder().serverId(serverId).userId(targetUserId).build());
+        auditLogService.log(serverId, requesterId, "INVITE_FRIEND", targetUserId, "MEMBER", targetUserId, null);
+    }
+
+    // O admin global (e o dono do servidor) sempre passam por aqui, mesmo sem uma linha de
+    // Membership de verdade - pedido explicito do usuario: "o usuario adm deve ter acesso a
+    // todos os servidores", inclusive um que ele nunca entrou/foi convidado.
     public void assertMember(Long serverId, Long userId) {
-        if (!membershipRepository.existsByServerIdAndUserId(serverId, userId)) {
+        if (membershipRepository.existsByServerIdAndUserId(serverId, userId)) {
+            return;
+        }
+        if (!permissionService.isOwnerOrGlobalAdmin(serverId, userId)) {
             throw new IllegalStateException("Usuario nao pertence a esse servidor");
         }
     }

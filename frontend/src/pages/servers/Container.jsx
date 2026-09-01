@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../api/client";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { createChatClient } from "../../ws/chatSocket";
@@ -7,6 +7,7 @@ import { createChatClient } from "../../ws/chatSocket";
 export function useServersContainer() {
   const { serverId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, token, logout } = useAuth();
 
   const [servers, setServers] = useState([]);
@@ -68,6 +69,17 @@ export function useServersContainer() {
       if (firstText) setSelectedChannel(firstText);
     });
   }, [selectedServerId]);
+
+  // Veio do Home (fora de qualquer servidor - la' nao tem onde abrir o modal, ver
+  // pages/home/index.jsx "onCreateServer") com "?create=1" - abre o modal aqui e limpa a
+  // query pra nao reabrir sozinho num F5.
+  useEffect(() => {
+    if (searchParams.get("create") === "1") {
+      setShowCreateServer(true);
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     function handleOpenSettings() {

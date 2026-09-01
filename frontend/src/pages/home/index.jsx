@@ -59,7 +59,7 @@ export default function HomePage() {
         homeActive
         onSelect={(id) => navigate(`/servers/${id}`)}
         onHome={() => {}}
-        onCreateServer={() => {}}
+        onCreateServer={() => navigate("/servers?create=1")}
       />
 
       <div className="home-sidebar">
