@@ -1,19 +1,23 @@
 #!/usr/bin/env bash
-# Deploy do Concorde pra VPS - builda o instalador desktop (Windows), empacota o projeto (sem
-# node_modules/target/etc - a VPS builda tudo de novo dentro do Docker) e sobe pra VPS via
-# ssh/scp, terminando com "docker compose ... up -d --build" nos serviços certos. Junta num só
-# lugar os passos que sempre foram feitos manualmente nesse projeto (ver DEPLOY.md).
+# Deploy do Concorde pra VPS - builda o instalador desktop (Windows), commita/pusha o build id,
+# envia so' o instalador (.exe/.zip, gitignored) por scp, e atualiza o resto do codigo na VPS
+# via "git fetch/reset --hard origin/master" (a VPS tem o mesmo repo clonado, NAO recebe codigo
+# por scp) - termina com "docker compose ... up -d --build" nos serviços certos. Junta num só
+# lugar os comandos que sempre foram rodados manualmente nesse projeto (ver DEPLOY.md).
 #
 # Uso:
 #   scripts/deploy.sh                       # build completo + deploy (backend + gateway)
-#   scripts/deploy.sh --skip-desktop        # so' reenvia o codigo (nao regera o instalador .exe)
+#   scripts/deploy.sh --skip-desktop        # so' atualiza o codigo (nao regera o instalador .exe)
 #   scripts/deploy.sh --services "gateway"  # reconstroi so' o gateway (mudanca so' de frontend)
 #   scripts/deploy.sh --services "all"      # reconstroi TODOS os servicos com Dockerfile
 #   scripts/deploy.sh --services ""         # nao reconstroi nada, so' reinicia com o que ja existe
 #   scripts/deploy.sh --no-commit           # nao commita/pusha o desktop-min-version.txt sozinho
 #
 # Precisa: acesso SSH já configurado pra "root@187.127.37.101" (chave, sem senha) - se pedir
-# senha toda hora, veja `ssh-copy-id root@187.127.37.101`.
+# senha toda hora, veja `ssh-copy-id root@187.127.37.101`. E o commit mais novo do master
+# precisa já estar no GitHub (o passo 2 abaixo cuida do desktop-min-version.txt sozinho, mas
+# qualquer outra mudança de código precisa ter sido commitada/pushada ANTES de rodar esse
+# script).
 
 set -euo pipefail
 
@@ -74,33 +78,22 @@ else
   echo "==> [2/4] Pulando commit/push (--no-commit)"
 fi
 
-# ====== 3. Empacota o projeto e envia pra VPS ======
-# Exclui tudo que a propria VPS gera sozinha dentro do Docker (node_modules/target/dist/release)
-# e qualquer coisa que so' deveria existir na VPS mesmo (.env.prod com os segredos de verdade,
-# cookies.txt do music-bot, banco local de dev) - nunca sobrescreve isso.
-echo "==> [3/4] Empacotando e enviando o projeto pra $VPS_HOST:$VPS_PATH..."
-TARBALL="$(mktemp -u "${TMPDIR:-/tmp}/concorde-deploy-XXXXXX.tar.gz")"
-tar --exclude='.git' \
-    --exclude='frontend/node_modules' \
-    --exclude='frontend/dist' \
-    --exclude='frontend/release' \
-    --exclude='backend/target' \
-    --exclude='backend/data' \
-    --exclude='music-bot/node_modules' \
-    --exclude='music-bot/data' \
-    --exclude='data' \
-    --exclude='.env.prod' \
-    --exclude='Potato Chat.html' \
-    -czf "$TARBALL" .
-scp "$TARBALL" "$VPS_HOST:/tmp/concorde-deploy.tar.gz"
-rm -f "$TARBALL"
+# ====== 3. Envia so' o instalador desktop (o resto do codigo vai por git, ver passo 4) ======
+# frontend/public/downloads/ e' gitignored de proposito (nao versiona binario) - por isso o
+# .exe/.zip precisam ir por scp direto, separado do resto do codigo.
+echo "==> [3/4] Enviando o instalador desktop pra $VPS_HOST..."
+scp "frontend/public/downloads/Concorde-Setup.exe" "frontend/public/downloads/Concorde-Setup.zip" \
+    "$VPS_HOST:$VPS_PATH/frontend/public/downloads/"
 
-# ====== 4. Extrai na VPS e sobe os containers ======
-echo "==> [4/4] Extraindo na VPS e subindo os containers (serviços: '${SERVICES:-<nenhum, so reinicia>}')..."
+# ====== 4. Atualiza o codigo na VPS via git e sobe os containers ======
+# A VPS tem o mesmo repo clonado (nao recebe codigo por scp) - so' da' um fetch/reset pro commit
+# mais novo do master (empurrado no passo 2 acima, ou por qualquer commit anterior que ainda nao
+# tinha sido deployado) e reconstroi os servicos pedidos.
+echo "==> [4/4] Atualizando código na VPS (git) e subindo os containers (serviços: '${SERVICES:-<nenhum, so reinicia>}')..."
 BUILD_FLAG=""
 if [[ -n "$SERVICES" ]]; then
   BUILD_FLAG="--build"
 fi
-ssh "$VPS_HOST" "mkdir -p $VPS_PATH && tar -xzf /tmp/concorde-deploy.tar.gz -C $VPS_PATH && rm -f /tmp/concorde-deploy.tar.gz && cd $VPS_PATH && docker compose --env-file .env.prod -f docker-compose.prod.yml up -d $BUILD_FLAG $SERVICES"
+ssh "$VPS_HOST" "cd $VPS_PATH && git fetch origin && git reset --hard origin/master && git log -1 --oneline && docker compose --env-file .env.prod -f docker-compose.prod.yml up -d $BUILD_FLAG $SERVICES"
 
 echo "==> Pronto! https://$DOMAIN"

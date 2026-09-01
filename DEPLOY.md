@@ -14,14 +14,15 @@ Windows (Git Bash - o mesmo terminal que já roda `npm`/`git` nesse projeto):
 scripts/deploy.sh
 ```
 
-Isso builda o instalador desktop + o bundle web, commita/pusha o `desktop-min-version.txt`,
-empacota o projeto (sem `node_modules`/`target`/etc - a VPS builda tudo de novo dentro do
-Docker) e envia pra `root@187.127.37.101:~/concorde` via `scp`, terminando com
-`docker compose ... up -d --build backend gateway`. Ver `scripts/deploy.sh --help` pras opções
-(`--skip-desktop` quando só mexeu no backend, `--services "all"` pra reconstruir tudo incluindo
-o `music-bot`, `--services ""` pra só reiniciar sem rebuildar nada). Os passos abaixo (1-4) e o
-resto desse arquivo continuam valendo pra configurar uma VPS nova do zero, ou pra rodar os
-comandos manualmente se preferir.
+Isso builda o instalador desktop + o bundle web, commita/pusha o `desktop-min-version.txt`
+(o resto do código precisa já ter sido commitado/pushado por você antes), envia só o instalador
+(`.exe`/`.zip`, gitignorado) por `scp`, e atualiza o resto do código na VPS com
+`git fetch && git reset --hard origin/master` (a VPS tem o mesmo repo clonado - não recebe
+código por `scp`), terminando com `docker compose ... up -d --build backend gateway`. Ver
+`scripts/deploy.sh --help` pras opções (`--skip-desktop` quando o instalador não mudou,
+`--services "all"` pra reconstruir tudo incluindo o `music-bot`, `--services ""` pra só reiniciar
+sem rebuildar nada). Os passos abaixo (1-4) e o resto desse arquivo continuam valendo pra
+configurar uma VPS nova do zero, ou pra rodar os comandos manualmente se preferir.
 
 ## 1. Instalar o Docker na VPS
 
