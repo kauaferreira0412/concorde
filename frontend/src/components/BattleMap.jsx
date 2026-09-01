@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { useAlert } from "../context/AlertContext.jsx";
 import { subscribeToMap, addMapToken, moveMapToken, renameMapToken, removeMapToken } from "../ws/chatSocket";
-import { ImageIcon, MapPinIcon, PencilIcon, TrashIcon, UsersIcon, ZoomInIcon, ZoomOutIcon } from "./icons.jsx";
+import { ImageIcon, MapIcon, MapPinIcon, PencilIcon, TrashIcon, UsersIcon, ZoomInIcon, ZoomOutIcon } from "./icons.jsx";
 
 const TOKEN_COLORS = ["#ed4245", "#5865f2", "#57f287", "#faa61a", "#eb459e", "#00c2ff"];
 function randomColor() {
@@ -10,25 +10,29 @@ function randomColor() {
 }
 
 /**
- * Mapa de batalha do canal de voz - kit de RPG (pedido explicito do usuario: "algo muito
- * parecido com o Roll20", sem precisar ser tão complexo). Sobe uma imagem (vira o mapa de TODO
- * MUNDO nesse canal, ao vivo - ver MapController/MapService no backend), arrasta o fundo pra
- * navegar, roda do mouse pra dar zoom, e qualquer um pode colocar/mover/renomear/apagar um
- * "token" (pin colorido) - a posicao de cada token e' salva como FRACAO da imagem (0..1), nao
- * pixel, entao bate certinho pra todo mundo independente do zoom/tamanho de tela de cada um (ver
- * MapToken.java). Mover um token e' em tempo real de verdade (WebSocket com throttle, nao REST -
- * pedido explicito do usuario), igual o resto do chat ao vivo.
+ * Mapa(s) de batalha do canal de voz - kit de RPG (pedido explicito do usuario: "algo muito
+ * parecido com o Roll20", sem precisar ser tão complexo). O mestre pode subir VARIOS mapas
+ * (mapa 1, mapa 2...) e escolher qual deles esta' "ativo" (o que TODOS os jogadores veem agora,
+ * ver o botao "Mapas") - cada mapa guarda o PROPRIO conjunto de tokens, entao trocar de mapa e
+ * voltar restaura os tokens exatamente onde estavam. So' o mestre adiciona/apaga um token ou um
+ * mapa; qualquer jogador pode mover/renomear/apagar um token que ja' existe (ao vivo de
+ * verdade, via WebSocket com throttle - pedido explicito do usuario). Posicao de cada token e'
+ * salva como FRACAO da imagem (0..1), nao pixel, entao bate certinho pra todo mundo independente
+ * do zoom/tamanho de tela de cada um (ver MapToken.java).
  */
 export default function BattleMap({ channelId, serverId, categoryId, stompClient, stompConnected }) {
   const { showAlert } = useAlert();
-  const [map, setMap] = useState(null);
+  const [maps, setMaps] = useState([]);
+  const [activeMapId, setActiveMapId] = useState(null);
   const [tokens, setTokens] = useState([]);
   // So' quem criou a categoria desse canal (o "mestre" - ver ChannelCategory.createdBy no
-  // backend) pode subir/trocar o mapa - pedido explicito do usuario. O backend confere de
-  // novo (de verdade) no upload; isso aqui e' so' pra mostrar ou nao o botao.
+  // backend) pode gerenciar mapas/tokens - pedido explicito do usuario. O backend confere de
+  // novo (de verdade) em cada acao; isso aqui e' so' pra mostrar ou nao os botoes.
   const [canManageMap, setCanManageMap] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [newMapName, setNewMapName] = useState("");
+  const [showMapsMenu, setShowMapsMenu] = useState(false);
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [addMode, setAddMode] = useState(false);
@@ -43,13 +47,35 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
   const [showCharacterPicker, setShowCharacterPicker] = useState(false);
   const [pendingTokenTemplate, setPendingTokenTemplate] = useState(null); // { label, color, imageUrl } | null
 
+  const activeMap = maps.find((m) => m.id === activeMapId) || null;
+
   const imageRef = useRef(null);
   const fileInputRef = useRef(null);
   const tokenImageInputRef = useRef(null);
   const panStateRef = useRef(null); // { startX, startY, originX, originY, moved }
   const dragTokenRef = useRef(null); // { id, lastSentAt }
   const editorRef = useRef(null);
+  const mapsMenuRef = useRef(null);
   const characterPickerRef = useRef(null);
+
+  // Reposiciona o popover de editar token com a ALTURA/LARGURA REAIS dele (medidas depois de
+  // renderizado) em vez de um numero fixo chutado - senao, quando o conteudo cresce (rename +
+  // cores + imagem customizada + remover), o popover podia nascer perto da borda da tela e ficar
+  // cortado com uma barra de rolagem (reportado pelo usuario: "está cortando e ficando com uma
+  // barra de lateral"). Mesma tecnica ja' usada pro popover de moderacao de participante (ver
+  // ChannelSidebar.jsx).
+  useLayoutEffect(() => {
+    if (!editingToken || !editorRef.current) return;
+    const el = editorRef.current;
+    const margin = 8;
+    const rect = el.getBoundingClientRect();
+    let left = Math.min(editingToken.anchorX, window.innerWidth - rect.width - margin);
+    let top = Math.min(editingToken.anchorY, window.innerHeight - rect.height - margin);
+    left = Math.max(margin, left);
+    top = Math.max(margin, top);
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }, [editingToken?.id, editingToken?.imageUrl, editingToken?.anchorX, editingToken?.anchorY]);
 
   // Fecha o popover de editar token ao clicar fora - mesmo padrao usado no resto do app (ver
   // ChannelSidebar.jsx/MemberList.jsx).
@@ -69,8 +95,8 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     };
   }, [editingToken]);
 
-  // Fecha o seletor de personagem ao clicar fora - mesmo padrao do popover de editar token
-  // acima.
+  // Fecha o seletor de personagem/o menu de mapas ao clicar fora - mesmo padrao do popover de
+  // editar token acima.
   useEffect(() => {
     if (!showCharacterPicker) return;
     function handlePointerDown(e) {
@@ -81,16 +107,27 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
   }, [showCharacterPicker]);
 
   useEffect(() => {
+    if (!showMapsMenu) return;
+    function handlePointerDown(e) {
+      if (mapsMenuRef.current && !mapsMenuRef.current.contains(e.target)) setShowMapsMenu(false);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [showMapsMenu]);
+
+  function loadSnapshot() {
+    return api.get(`/api/channels/${channelId}/map`).then(({ data }) => {
+      setMaps(data.maps);
+      setActiveMapId(data.activeMapId);
+      setTokens(data.tokens);
+      setCanManageMap(data.canManageMap);
+    });
+  }
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api
-      .get(`/api/channels/${channelId}/map`)
-      .then(({ data }) => {
-        if (cancelled) return;
-        setMap(data.map);
-        setTokens(data.tokens);
-        setCanManageMap(data.canManageMap);
-      })
+    loadSnapshot()
       .catch(() => {})
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -98,15 +135,18 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
 
   useEffect(() => {
     if (!stompClient || !stompConnected) return;
     const sub = subscribeToMap(stompClient, channelId, (event) => {
-      if (event.type === "MAP_UPLOADED") {
-        setMap(event.map);
+      if (event.type === "MAPS_CHANGED") {
+        // Mudanca estrutural (mapa criado/ativado/apagado) - recarrega o snapshot inteiro, mais
+        // simples que tentar remontar o estado a partir do proprio evento.
+        loadSnapshot().catch(() => {});
       } else if (event.type === "TOKEN_ADDED") {
-        setTokens((prev) => [...prev, event.token]);
+        setTokens((prev) => (event.token.mapId === activeMapId ? [...prev, event.token] : prev));
       } else if (event.type === "TOKEN_MOVED") {
         setTokens((prev) => prev.map((t) => (t.id === event.tokenId ? { ...t, x: event.x, y: event.y } : t)));
       } else if (event.type === "TOKEN_RENAMED") {
@@ -117,7 +157,8 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
       }
     });
     return () => sub.unsubscribe();
-  }, [stompClient, stompConnected, channelId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stompClient, stompConnected, channelId, activeMapId]);
 
   async function handleUpload(e) {
     const file = e.target.files?.[0];
@@ -127,13 +168,38 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (newMapName.trim()) formData.append("name", newMapName.trim());
       await api.post(`/api/channels/${channelId}/map/image`, formData);
+      setNewMapName("");
+      setShowMapsMenu(false);
       // O estado local atualiza sozinho via WebSocket (o proprio backend transmite de volta
-      // pra quem subiu tambem, ver MapController) - nao precisa setMap aqui.
+      // pra quem subiu tambem, ver MapController) - nao precisa mexer no state aqui.
     } catch (err) {
       showAlert(err.response?.data?.error || "Não foi possível subir o mapa");
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleActivateMap(mapId) {
+    if (mapId === activeMapId) {
+      setShowMapsMenu(false);
+      return;
+    }
+    try {
+      await api.put(`/api/channels/${channelId}/map/${mapId}/activate`);
+      setShowMapsMenu(false);
+    } catch (err) {
+      showAlert(err.response?.data?.error || "Não foi possível trocar o mapa");
+    }
+  }
+
+  async function handleDeleteMap(e, mapId) {
+    e.stopPropagation();
+    try {
+      await api.delete(`/api/channels/${channelId}/map/${mapId}`);
+    } catch (err) {
+      showAlert(err.response?.data?.error || "Não foi possível apagar esse mapa");
     }
   }
 
@@ -158,19 +224,19 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     const wasPan = panStateRef.current;
     panStateRef.current = null;
     if (wasPan?.moved) return; // foi arrastar o mapa, nao clicar pra adicionar token
-    if (!addMode || !imageRef.current || !stompClient || !stompConnected) return;
+    if (!addMode || !imageRef.current || !stompClient || !stompConnected || !activeMapId) return;
     const rect = imageRef.current.getBoundingClientRect();
     const fracX = (e.clientX - rect.left) / rect.width;
     const fracY = (e.clientY - rect.top) / rect.height;
     if (fracX < 0 || fracX > 1 || fracY < 0 || fracY > 1) return;
     if (pendingTokenTemplate) {
-      addMapToken(stompClient, channelId, { ...pendingTokenTemplate, x: fracX, y: fracY });
+      addMapToken(stompClient, channelId, { mapId: activeMapId, ...pendingTokenTemplate, x: fracX, y: fracY });
       // "Usar personagem" e' de UM clique so' (escolheu o personagem, colocou UM token) -
       // diferente do "Adicionar token" generico, que fica ligado pra colocar varios seguidos.
       setPendingTokenTemplate(null);
       setAddMode(false);
     } else {
-      addMapToken(stompClient, channelId, { label: "Token", color: randomColor(), x: fracX, y: fracY });
+      addMapToken(stompClient, channelId, { mapId: activeMapId, label: "Token", color: randomColor(), x: fracX, y: fracY });
     }
   }
 
@@ -238,7 +304,7 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
 
   function openEditor(token, e) {
     setRenameDraft(token.label);
-    setEditingToken({ id: token.id, color: token.color, imageUrl: token.imageUrl || null, x: e.clientX, y: e.clientY });
+    setEditingToken({ id: token.id, color: token.color, imageUrl: token.imageUrl || null, anchorX: e.clientX, anchorY: e.clientY });
   }
 
   function handleRenameSave() {
@@ -256,9 +322,9 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
   }
 
   // Imagem CUSTOMIZADA do token (retrato do personagem, etc - pedido explicito do usuario) -
-  // qualquer um pode subir uma pro PROPRIO token, nao precisa ser o mestre (diferente do mapa
-  // em si). Sobe pro GCS primeiro (REST), depois manda a URL junto com o resto via WebSocket -
-  // mesmo caminho que trocar nome/cor usa (ver renameMapToken).
+  // qualquer um pode subir uma pro PROPRIO token, nao precisa ser o mestre (diferente de
+  // adicionar/apagar um token). Sobe pro GCS primeiro (REST), depois manda a URL junto com o
+  // resto via WebSocket - mesmo caminho que trocar nome/cor usa (ver renameMapToken).
   async function handleTokenImageUpload(e) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -295,57 +361,112 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     <div>
       <div className="battle-map-toolbar">
         {canManageMap && (
-          <>
-            <input type="file" accept="image/png,image/jpeg,image/webp" ref={fileInputRef} onChange={handleUpload} hidden />
-            <button type="button" className="icon-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Subir mapa">
-              <ImageIcon size={15} /> {uploading ? "Enviando..." : map ? "Trocar mapa" : "Subir mapa"}
-            </button>
-          </>
-        )}
-        {map && (
-          <>
+          <div style={{ position: "relative" }}>
             <button
               type="button"
-              className={"icon-btn" + (addMode && !pendingTokenTemplate ? " icon-btn-active" : "")}
-              onClick={() => {
-                setPendingTokenTemplate(null);
-                setAddMode((v) => !v);
-              }}
-              title="Clique no mapa pra adicionar um token"
+              className={"icon-btn" + (showMapsMenu ? " icon-btn-active" : "")}
+              onClick={() => setShowMapsMenu((v) => !v)}
+              title="Gerenciar mapas dessa mesa"
             >
-              <MapPinIcon size={15} /> {addMode && !pendingTokenTemplate ? "Clique no mapa..." : "Adicionar token"}
+              <MapIcon size={15} /> Mapas{maps.length > 0 ? ` (${maps.length})` : ""}
             </button>
-            {categoryId && (
-              <div style={{ position: "relative" }}>
+            {showMapsMenu && (
+              <div className="battle-map-menu" ref={mapsMenuRef}>
+                {maps.length === 0 ? (
+                  <p className="admin-hint" style={{ margin: 0, padding: "6px 4px" }}>
+                    Nenhum mapa ainda.
+                  </p>
+                ) : (
+                  <div className="battle-map-menu-list">
+                    {maps.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        className={"battle-map-menu-item" + (m.id === activeMapId ? " active" : "")}
+                        onClick={() => handleActivateMap(m.id)}
+                        title={m.id === activeMapId ? "Mapa que os jogadores estão vendo agora" : "Mostrar esse mapa pros jogadores"}
+                      >
+                        <img src={m.imageUrl} alt="" />
+                        <span className="battle-map-menu-item-name">{m.name || `Mapa ${maps.indexOf(m) + 1}`}</span>
+                        {m.id === activeMapId && <span className="battle-map-menu-badge">Ativo</span>}
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className="battle-map-menu-delete"
+                          onClick={(e) => handleDeleteMap(e, m.id)}
+                          title="Apagar esse mapa"
+                        >
+                          <TrashIcon size={13} />
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="battle-map-menu-new">
+                  <input
+                    type="text"
+                    placeholder="Nome do novo mapa (opcional)"
+                    value={newMapName}
+                    onChange={(e) => setNewMapName(e.target.value)}
+                    maxLength={60}
+                  />
+                  <input type="file" accept="image/png,image/jpeg,image/webp" ref={fileInputRef} onChange={handleUpload} hidden />
+                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                    <ImageIcon size={14} /> {uploading ? "Enviando..." : "Novo mapa"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {activeMap && (
+          <>
+            {canManageMap && (
+              <>
                 <button
                   type="button"
-                  className={"icon-btn" + (pendingTokenTemplate ? " icon-btn-active" : "")}
-                  onClick={openCharacterPicker}
-                  title="Usar a foto de um personagem da mesa como token"
+                  className={"icon-btn" + (addMode && !pendingTokenTemplate ? " icon-btn-active" : "")}
+                  onClick={() => {
+                    setPendingTokenTemplate(null);
+                    setAddMode((v) => !v);
+                  }}
+                  title="Clique no mapa pra adicionar um token"
                 >
-                  <UsersIcon size={15} /> {pendingTokenTemplate ? "Clique no mapa..." : "Usar personagem"}
+                  <MapPinIcon size={15} /> {addMode && !pendingTokenTemplate ? "Clique no mapa..." : "Adicionar token"}
                 </button>
-                {showCharacterPicker && (
-                  <div className="battle-map-character-picker" ref={characterPickerRef}>
-                    {characters.length === 0 ? (
-                      <p className="admin-hint" style={{ margin: 0, padding: "6px 4px" }}>
-                        Nenhum personagem disponível pra você nessa categoria.
-                      </p>
-                    ) : (
-                      characters.map((c) => (
-                        <button key={c.id} type="button" className="battle-map-character-option" onClick={() => handlePickCharacter(c)}>
-                          {c.imageUrl ? (
-                            <img src={c.imageUrl} alt="" />
-                          ) : (
-                            <span className="battle-map-character-placeholder" style={{ background: randomColor() }} />
-                          )}
-                          {c.characterName}
-                        </button>
-                      ))
+                {categoryId && (
+                  <div style={{ position: "relative" }}>
+                    <button
+                      type="button"
+                      className={"icon-btn" + (pendingTokenTemplate ? " icon-btn-active" : "")}
+                      onClick={openCharacterPicker}
+                      title="Usar a foto de um personagem da mesa como token"
+                    >
+                      <UsersIcon size={15} /> {pendingTokenTemplate ? "Clique no mapa..." : "Usar personagem"}
+                    </button>
+                    {showCharacterPicker && (
+                      <div className="battle-map-character-picker" ref={characterPickerRef}>
+                        {characters.length === 0 ? (
+                          <p className="admin-hint" style={{ margin: 0, padding: "6px 4px" }}>
+                            Nenhum personagem disponível pra você nessa categoria.
+                          </p>
+                        ) : (
+                          characters.map((c) => (
+                            <button key={c.id} type="button" className="battle-map-character-option" onClick={() => handlePickCharacter(c)}>
+                              {c.imageUrl ? (
+                                <img src={c.imageUrl} alt="" />
+                              ) : (
+                                <span className="battle-map-character-placeholder" style={{ background: randomColor() }} />
+                              )}
+                              {c.characterName}
+                            </button>
+                          ))
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
-              </div>
+              </>
             )}
             <button type="button" className="icon-btn" onClick={() => setScale((s) => Math.max(0.4, +(s - 0.2).toFixed(2)))} title="Diminuir zoom">
               <ZoomOutIcon size={15} />
@@ -370,10 +491,10 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
 
       {loading ? (
         <p className="admin-hint">Carregando mapa...</p>
-      ) : !map ? (
+      ) : !activeMap ? (
         <p className="admin-hint">
           {canManageMap
-            ? "Nenhum mapa ainda - suba uma imagem pra começar (jpg, png ou webp)."
+            ? "Nenhum mapa ainda - clique em \"Mapas\" pra subir uma imagem (jpg, png ou webp)."
             : "O mestre dessa categoria ainda não subiu um mapa."}
         </p>
       ) : (
@@ -387,7 +508,7 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
           style={{ cursor: addMode ? "crosshair" : panStateRef.current ? "grabbing" : "grab" }}
         >
           <div className="battle-map-canvas" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})` }}>
-            <img ref={imageRef} src={map.imageUrl} alt="Mapa de batalha" className="battle-map-image" draggable={false} />
+            <img ref={imageRef} src={activeMap.imageUrl} alt="Mapa de batalha" className="battle-map-image" draggable={false} />
             {tokens.map((token) => (
               <div
                 key={token.id}
@@ -410,12 +531,7 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
       )}
 
       {editingToken && (
-        <div
-          className="volume-popover"
-          ref={editorRef}
-          style={{ left: Math.min(editingToken.x, window.innerWidth - 220), top: Math.min(editingToken.y, window.innerHeight - 180) }}
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="volume-popover battle-map-token-popover" ref={editorRef} onClick={(e) => e.stopPropagation()}>
           <p className="volume-popover-title">Editar token</p>
           <div className="settings-inline-save" style={{ marginBottom: 8 }}>
             <input

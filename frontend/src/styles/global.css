@@ -3113,12 +3113,13 @@ h3.chat-heading {
 .battle-map-viewport {
   position: relative;
   width: 100%;
-  /* Bem maior que antes (era 420px, pedido explicito do usuario) - calc com o topo da propria
-     viewport em vez de um numero fixo, pra aproveitar quase toda a altura da tela disponivel
-     mesmo em monitores menores, sem estourar pra fora e cortar o resto da sidebar. */
-  height: calc(100vh - 260px);
-  min-height: 480px;
-  max-height: 900px;
+  /* Aumentado de novo (pedido explicito do usuario: "aumente ele mais pra baixo") - calc com o
+     topo da propria viewport em vez de um numero fixo, pra aproveitar quase toda a altura da
+     tela disponivel mesmo em monitores menores, sem estourar pra fora e cortar o resto da
+     sidebar. */
+  height: calc(100vh - 160px);
+  min-height: 560px;
+  max-height: 1300px;
   overflow: hidden;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-soft);
@@ -3177,6 +3178,101 @@ h3.chat-heading {
   cursor: pointer;
 }
 .battle-map-color-swatch.active { border-color: var(--text-primary); }
+
+/* Popover de editar token (ver BattleMap.jsx) - nasce fora da tela (top/left calculados so'
+   depois de renderizado, ver useLayoutEffect) pra nunca "piscar" no canto errado; largura
+   um pouco maior que o volume-popover padrao pra caber a linha de cores + os botoes de
+   imagem sem precisar de barra de rolagem (reportado pelo usuario: "está cortando"). */
+.battle-map-token-popover { top: -9999px; left: -9999px; width: 236px; }
+
+/* Menu "Mapas" do mestre (varios mapas por canal, cada um com o proprio conjunto de tokens -
+   pedido explicito do usuario) - dropdown simples ancorado no proprio botao, mesmo padrao do
+   seletor de "Usar personagem" (.battle-map-character-picker). */
+.battle-map-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  min-width: 240px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 8px;
+}
+.battle-map-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+.battle-map-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  text-align: left;
+  width: 100%;
+}
+.battle-map-menu-item:hover { background: var(--bg-hover); }
+.battle-map-menu-item.active { background: var(--accent-soft); color: var(--accent-text); }
+.battle-map-menu-item img {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.battle-map-menu-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.battle-map-menu-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  flex-shrink: 0;
+}
+.battle-map-menu-delete {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.battle-map-menu-delete:hover { background: var(--danger-soft); color: var(--danger); }
+.battle-map-menu-new {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+.battle-map-menu-new input[type="text"] {
+  width: 100%;
+  padding: 7px 9px;
+  font-size: 12.5px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+.battle-map-menu-new button {
+  width: 100% !important;
+  padding: 7px 10px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12.5px;
+  background: var(--accent) !important;
+}
 
 /* Seletor de "Usar personagem" (foto de um personagem da mesa vira token direto, ver
    BattleMap.jsx) - dropdown simples ancorado no proprio botao. */

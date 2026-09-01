@@ -102,19 +102,22 @@ export function subscribeToTyping(client, channelId, onEvent) {
 }
 
 /** Mapa de batalha do canal de voz (kit de RPG, ver BattleMap.jsx/MapService no backend).
- *  onEvent recebe um MapEvent: { type: "MAP_UPLOADED"|"TOKEN_ADDED"|"TOKEN_MOVED"|
- *  "TOKEN_RENAMED"|"TOKEN_REMOVED", map?, token?, tokenId?, x?, y? }. */
+ *  onEvent recebe um MapEvent: { type: "MAPS_CHANGED"|"TOKEN_ADDED"|"TOKEN_MOVED"|
+ *  "TOKEN_RENAMED"|"TOKEN_REMOVED", token?, tokenId?, x?, y? }. "MAPS_CHANGED" cobre
+ *  criar/ativar/apagar um mapa - o frontend so' recarrega o snapshot inteiro de novo. */
 export function subscribeToMap(client, channelId, onEvent) {
   return client.subscribe(`/topic/channel.${channelId}.map`, (frame) => {
     onEvent(JSON.parse(frame.body));
   });
 }
-/** imageUrl opcional - token ja' nasce com a foto de um personagem da mesa escolhido no
- *  seletor (ver CharacterSheetsModal.jsx/BattleMap.jsx). */
-export function addMapToken(client, channelId, { label, color, x, y, imageUrl }) {
+/** mapId: em qual mapa (dos varios que o canal pode ter) o token nasce - so' o mestre pode
+ *  adicionar (ver MapService.addToken no backend). imageUrl opcional - token ja' nasce com a
+ *  foto de um personagem da mesa escolhido no seletor (ver CharacterSheetsModal.jsx/
+ *  BattleMap.jsx). */
+export function addMapToken(client, channelId, { mapId, label, color, x, y, imageUrl }) {
   client.publish({
     destination: `/app/channel.${channelId}.map.token.add`,
-    body: JSON.stringify({ label, color, x, y, imageUrl }),
+    body: JSON.stringify({ mapId, label, color, x, y, imageUrl }),
   });
 }
 /** Chamado com throttle enquanto arrasta (ver BattleMap.jsx) - senao vira dezenas de
