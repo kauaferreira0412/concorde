@@ -5,6 +5,44 @@ import { useAlert } from "../context/AlertContext.jsx";
 import { formatFileSize } from "../utils/fileSize";
 import { DownloadIcon, FileIcon, ImageIcon, PencilIcon, PlusIcon, TrashIcon, XIcon } from "./icons.jsx";
 
+/** PDF embutido dentro do proprio sistema (pedido explicito do usuario: "deve abrir um popup
+ *  com a ficha, o PDF da ficha no sistema") - iframe simples, o navegador ja' sabe renderizar
+ *  PDF sozinho (Chrome/Edge/Firefox fazem isso nativamente). "Abrir em nova aba" continua
+ *  disponivel como reforco, pro raro caso de alguem com isso desabilitado no navegador. */
+function CharacterSheetViewerModal({ sheet, onClose }) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal character-sheet-viewer-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="settings-modal-header">
+          <h2>
+            {sheet.imageUrl && <img src={sheet.imageUrl} alt="" className="character-sheet-viewer-avatar" />}
+            {sheet.characterName}
+          </h2>
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            {sheet.fileUrl && (
+              <a href={sheet.fileUrl} target="_blank" rel="noopener noreferrer" className="icon-btn" title="Abrir em nova aba">
+                <DownloadIcon size={16} />
+              </a>
+            )}
+            <button type="button" className="icon-btn" onClick={onClose}>
+              <XIcon />
+            </button>
+          </div>
+        </div>
+        <div className="character-sheet-viewer-body">
+          {sheet.fileUrl ? (
+            <iframe src={sheet.fileUrl} title={`Ficha de ${sheet.characterName}`} />
+          ) : (
+            <p className="admin-hint" style={{ padding: 20 }}>
+              {sheet.canEdit ? "Nenhum PDF subido ainda pra esse personagem - use o ícone de arquivo pra subir um." : "O mestre ainda não subiu o PDF dessa ficha."}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Personagens de uma mesa de RPG (kit de RPG, pedido explicito do usuario) - villoes, NPCs,
  * personagens de jogador. SO' O MESTRE (quem criou a categoria) cria personagens e vincula um
@@ -20,6 +58,7 @@ export default function CharacterSheetsModal({ server, category, members, onClos
   const [newName, setNewName] = useState("");
   const [creatingBusy, setCreatingBusy] = useState(false);
   const [error, setError] = useState("");
+  const [viewingSheet, setViewingSheet] = useState(null);
 
   const isMaster = category.createdBy === user?.id;
 
@@ -133,12 +172,15 @@ export default function CharacterSheetsModal({ server, category, members, onClos
                   isMaster={isMaster}
                   onChanged={(updated) => setSheets((prev) => (prev || []).map((s) => (s.id === updated.id ? updated : s)))}
                   onDelete={() => handleDelete(sheet)}
+                  onOpen={() => setViewingSheet(sheet)}
                 />
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {viewingSheet && <CharacterSheetViewerModal sheet={viewingSheet} onClose={() => setViewingSheet(null)} />}
     </div>
   );
 }
@@ -146,7 +188,7 @@ export default function CharacterSheetsModal({ server, category, members, onClos
 /** Uma linha (um personagem) - foto, nome, quem esta' vinculado, PDF, e os controles de
  *  edicao (so' aparecem se "sheet.canEdit" - mestre OU o jogador vinculado, ver
  *  CharacterSheetService no backend). Estado de edicao proprio, isolado por linha. */
-function CharacterRow({ server, category, sheet, members, isMaster, onChanged, onDelete }) {
+function CharacterRow({ server, category, sheet, members, isMaster, onChanged, onDelete, onOpen }) {
   const { showAlert } = useAlert();
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(sheet.characterName);
@@ -212,13 +254,15 @@ function CharacterRow({ server, category, sheet, members, isMaster, onChanged, o
 
   return (
     <div className="character-sheet-row">
-      {sheet.imageUrl ? (
-        <img src={sheet.imageUrl} alt="" className="character-sheet-photo" />
-      ) : (
-        <span className="character-sheet-photo character-sheet-photo-empty">
-          <FileIcon size={16} />
-        </span>
-      )}
+      <button type="button" className="character-sheet-photo-btn" onClick={onOpen} title="Abrir ficha">
+        {sheet.imageUrl ? (
+          <img src={sheet.imageUrl} alt="" className="character-sheet-photo" />
+        ) : (
+          <span className="character-sheet-photo character-sheet-photo-empty">
+            <FileIcon size={16} />
+          </span>
+        )}
+      </button>
 
       <div className="character-sheet-info">
         {editingName ? (
@@ -236,7 +280,9 @@ function CharacterRow({ server, category, sheet, members, isMaster, onChanged, o
           </div>
         ) : (
           <strong>
-            {sheet.characterName}
+            <span className="character-sheet-name-link" onClick={onOpen} title="Abrir ficha">
+              {sheet.characterName}
+            </span>
             {sheet.canEdit && (
               <button type="button" className="icon-btn character-sheet-inline-edit" onClick={() => setEditingName(true)} title="Renomear">
                 <PencilIcon size={12} />

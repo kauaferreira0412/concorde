@@ -627,12 +627,18 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 /* Cabecalho de uma CATEGORIA (pasta de canais, texto e voz juntos, igual Discord - ver
    ChannelSidebar.jsx renderCategoryHeader/groupByCategory). Clicavel pra recolher/expandir,
    botao direito abre renomear/excluir. */
+/* Linha com o cabecalho da categoria (botao grande, ocupa o resto do espaco) + o botaozinho
+   de "Personagens" ao lado (ver renderCategoryHeader em ChannelSidebar.jsx) - visivel pra
+   QUALQUER membro, nao so' quem gerencia canais. */
+.channel-category-subheader-row { display: flex; align-items: center; gap: 2px; margin: 6px 0 2px; }
+.channel-category-subheader-row .channel-category-subheader { margin: 0; }
+.channel-category-sheets-btn { flex-shrink: 0; width: 22px !important; height: 22px; color: var(--text-muted); }
+.channel-category-sheets-btn:hover { color: var(--text-secondary); }
 .channel-category-subheader {
   width: 100%;
   background: transparent;
   border: none;
   padding: 5px 6px 5px 4px;
-  margin: 6px 0 2px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3268,6 +3274,30 @@ h3.chat-heading {
   align-self: flex-start;
 }
 .character-sheet-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+/* Foto/nome clicaveis abrem o popup com o PDF da ficha (ver CharacterSheetViewerModal em
+   CharacterSheetsModal.jsx) - !important pelo mesmo motivo de sempre (".modal button:not(...)"
+   forca width:100%/padding sem isso, ver historico de bugs identico com outros botoes dentro
+   de modal). */
+.character-sheet-photo-btn {
+  width: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: none !important;
+  flex-shrink: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.character-sheet-name-link { cursor: pointer; }
+.character-sheet-name-link:hover { text-decoration: underline; }
+
+/* Popup com o PDF embutido (ver CharacterSheetViewerModal) - bem maior que o modal de lista,
+   pra dar espaco de verdade pra ler a ficha. */
+.character-sheet-viewer-modal { width: min(820px, 92vw); height: min(880px, 88vh); display: flex; flex-direction: column; }
+.character-sheet-viewer-modal .settings-modal-header h2 { display: flex; align-items: center; gap: 8px; }
+.character-sheet-viewer-avatar { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
+.character-sheet-viewer-body { flex: 1; min-height: 0; padding: 0; }
+.character-sheet-viewer-body iframe { width: 100%; height: 100%; border: none; background: #fff; }
 .profile-modal .settings-actions { padding: 14px 20px 20px; }
 .profile-modal textarea {
   background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm);

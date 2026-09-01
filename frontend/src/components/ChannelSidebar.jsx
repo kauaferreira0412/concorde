@@ -586,12 +586,17 @@ export default function ChannelSidebar({
   }
 
   /** Cabecalho de uma categoria dentro de uma secao (texto OU voz) - clique recolhe/expande,
-   *  botao direito abre o menu de renomear/excluir (so' pra quem tem MANAGE_CHANNELS). */
+   *  botao direito abre o menu de renomear/excluir (so' pra quem tem MANAGE_CHANNELS). O botao
+   *  de "Personagens" ao lado, diferente do menu, aparece pra QUALQUER membro (nao so' quem
+   *  gerencia canais) - sem isso, um jogador comum (sem MANAGE_CHANNELS) nunca conseguia nem
+   *  abrir o botao direito da categoria, entao nunca tinha como ver o proprio personagem
+   *  vinculado (reportado pelo usuario: "onde que o Anderson vai ver essa ficha?"). Fica
+   *  visivel mesmo fora de qualquer call de voz, ja' que mora aqui na barra lateral. */
   function renderCategoryHeader(category) {
     const isCollapsed = collapsedCategories.has(category.id);
     return (
+      <div key={`cat-${category.id}`} className="channel-category-subheader-row">
       <button
-        key={`cat-${category.id}`}
         className={"channel-category-subheader" + (dragOverCategoryId === category.id ? " drop-target" : "")}
         onClick={() => toggleCategoryCollapsed(category.id)}
         onContextMenu={(e) => {
@@ -625,6 +630,20 @@ export default function ChannelSidebar({
         <span className="channel-group-title">{category.name.toUpperCase()}</span>
         {category.restricted && <LockIcon size={11} title="Acesso restrito" />}
       </button>
+      {server?.type === "RPG" && (
+        <button
+          type="button"
+          className="icon-btn channel-category-sheets-btn"
+          title="Ver personagens/fichas dessa mesa"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSheetsCategory({ id: category.id, name: category.name, createdBy: category.createdBy });
+          }}
+        >
+          <FileIcon size={12} />
+        </button>
+      )}
+      </div>
     );
   }
 
