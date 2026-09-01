@@ -85,6 +85,7 @@ export default function ServerPage() {
           <VoiceChannel
             channel={selectedChannel}
             serverName={selectedServer?.name}
+            serverType={selectedServer?.type}
             stompClient={stompClient}
             stompConnected={stompConnected}
           />

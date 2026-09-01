@@ -101,6 +101,41 @@ export function subscribeToTyping(client, channelId, onEvent) {
   });
 }
 
+/** Mapa de batalha do canal de voz (kit de RPG, ver BattleMap.jsx/MapService no backend).
+ *  onEvent recebe um MapEvent: { type: "MAP_UPLOADED"|"TOKEN_ADDED"|"TOKEN_MOVED"|
+ *  "TOKEN_RENAMED"|"TOKEN_REMOVED", map?, token?, tokenId?, x?, y? }. */
+export function subscribeToMap(client, channelId, onEvent) {
+  return client.subscribe(`/topic/channel.${channelId}.map`, (frame) => {
+    onEvent(JSON.parse(frame.body));
+  });
+}
+export function addMapToken(client, channelId, { label, color, x, y }) {
+  client.publish({
+    destination: `/app/channel.${channelId}.map.token.add`,
+    body: JSON.stringify({ label, color, x, y }),
+  });
+}
+/** Chamado com throttle enquanto arrasta (ver BattleMap.jsx) - senao vira dezenas de
+ *  mensagens por segundo so' de um arraste. */
+export function moveMapToken(client, channelId, tokenId, x, y) {
+  client.publish({
+    destination: `/app/channel.${channelId}.map.token.move`,
+    body: JSON.stringify({ tokenId, x, y }),
+  });
+}
+export function renameMapToken(client, channelId, tokenId, label, color) {
+  client.publish({
+    destination: `/app/channel.${channelId}.map.token.rename`,
+    body: JSON.stringify({ tokenId, label, color }),
+  });
+}
+export function removeMapToken(client, channelId, tokenId) {
+  client.publish({
+    destination: `/app/channel.${channelId}.map.token.remove`,
+    body: JSON.stringify({ tokenId }),
+  });
+}
+
 /** Cria uma enquete nova (ver /poll em ChatWindow.jsx) - vira uma mensagem normal no chat
  *  com o campo "poll" preenchido (ver PollController/PollService no backend). */
 export function createPoll(client, channelId, question, options, multipleChoice) {

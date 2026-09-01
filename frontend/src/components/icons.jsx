@@ -546,3 +546,24 @@ export function BlockIcon(props) {
     </svg>
   );
 }
+
+// Mapa dobrado (kit de RPG - mapa de batalha, ver BattleMap.jsx).
+export function MapIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
+      <line x1="9" y1="3" x2="9" y2="18" />
+      <line x1="15" y1="6" x2="15" y2="21" />
+    </svg>
+  );
+}
+
+// Um pin de mapa (kit de RPG - token/marcador no mapa de batalha, ver BattleMap.jsx).
+export function MapPinIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  );
+}

@@ -6,6 +6,7 @@ import {
   ExternalLinkIcon,
   EyeIcon,
   EyeOffIcon,
+  MapIcon,
   MaximizeIcon,
   MenuIcon,
   MicIcon,
@@ -25,6 +26,7 @@ import { useAppFocused } from "../utils/useAppFocused";
 import CameraPipWindow from "./CameraPipWindow.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import SoundboardPanel from "./SoundboardPanel.jsx";
+import BattleMap from "./BattleMap.jsx";
 
 // window.concordeDesktop so' existe dentro do app Electron (ver electron/preload.cjs). A janela
 // separada das cameras usa Document Picture-in-Picture (CameraPipWindow.jsx) NO NAVEGADOR - mas
@@ -362,7 +364,7 @@ function ScreenShareTile({
  * ela sobrevive mesmo se voce sair desse canal para ler um canal de texto - igual ao
  * Discord, que te mantem na call enquanto voce navega pelo servidor.
  */
-export default function VoiceChannel({ channel, serverName, stompClient, stompConnected }) {
+export default function VoiceChannel({ channel, serverName, serverType, stompClient, stompConnected }) {
   const { showAlert } = useAlert();
   const {
     activeChannel,
@@ -531,6 +533,17 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
             inferior esquerda para mutar ou ensurdecer.
           </p>
         </section>
+
+        {serverType === "RPG" && (
+          <section className="voice-section">
+            <div className="voice-section-header">
+              <p className="voice-section-title battle-map-section-title">
+                <MapIcon size={13} /> MAPA DE BATALHA
+              </p>
+            </div>
+            <BattleMap channelId={channel.id} stompClient={stompClient} stompConnected={stompConnected} />
+          </section>
+        )}
 
         {cameraTracks.length > 0 && (
           <section className="voice-section">

@@ -3089,6 +3089,79 @@ h3.chat-heading {
 }
 .category-access-row:hover { background: var(--bg-hover); }
 .category-access-row input { flex-shrink: 0; }
+
+/* Mapa de batalha (kit de RPG, ver BattleMap.jsx) - dentro de uma secao normal do canal de
+   voz (mesmo "voice-section" das cameras/microfone). */
+.battle-map-section-title { display: flex; align-items: center; gap: 5px; }
+.battle-map-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.battle-map-toolbar .icon-btn {
+  width: auto;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.battle-map-viewport {
+  position: relative;
+  width: 100%;
+  height: 420px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-soft);
+  background: #0d0d12;
+  touch-action: none;
+  user-select: none;
+}
+.battle-map-canvas {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+}
+.battle-map-image { max-width: none; width: 900px; height: auto; pointer-events: none; }
+.battle-map-token {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.battle-map-token:active { cursor: grabbing; }
+.battle-map-token-label {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 1px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.battle-map-color-row { display: flex; gap: 6px; margin-bottom: 10px; }
+.battle-map-color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.battle-map-color-swatch.active { border-color: var(--text-primary); }
 .profile-modal .settings-actions { padding: 14px 20px 20px; }
 .profile-modal textarea {
   background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm);
