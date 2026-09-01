@@ -123,10 +123,12 @@ export function moveMapToken(client, channelId, tokenId, x, y) {
     body: JSON.stringify({ tokenId, x, y }),
   });
 }
-export function renameMapToken(client, channelId, tokenId, label, color) {
+/** imageUrl: undefined/omitido = nao mexe na imagem atual; "" = REMOVE (volta pro circulo
+ *  colorido); string = troca pra essa imagem nova (ver MapService.renameToken no backend). */
+export function renameMapToken(client, channelId, tokenId, label, color, imageUrl) {
   client.publish({
     destination: `/app/channel.${channelId}.map.token.rename`,
-    body: JSON.stringify({ tokenId, label, color }),
+    body: JSON.stringify({ tokenId, label, color, imageUrl }),
   });
 }
 export function removeMapToken(client, channelId, tokenId) {

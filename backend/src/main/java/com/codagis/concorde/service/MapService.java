@@ -53,6 +53,13 @@ public class MapService {
         this.permissionService = permissionService;
     }
 
+    /** Versao PUBLICA de assertCanUseMap - usada pelo MapController antes de subir a imagem de
+     *  um token pro GCS (mesma regra de "pode usar o mapa desse canal", nao precisa ser o
+     *  mestre pra isso - qualquer jogador customiza o proprio token). */
+    public void assertCanUploadTokenImage(Long channelId, Long userId) {
+        assertCanUseMap(channelId, userId);
+    }
+
     /** Confere que o canal existe, que o usuario e' membro do servidor dono dele, e que (se a
      *  categoria do canal tiver acesso restrito) o usuario esta' na lista - devolve o canal pra
      *  quem chamou nao precisar buscar de novo. */
@@ -150,6 +157,11 @@ public class MapService {
         if (req.color() != null && !req.color().isBlank()) {
             token.setColor(req.color());
         }
+        // "" (vazio) = REMOVE a imagem (volta pro circulo colorido) - null = nao mexe na
+        // imagem atual (ver comentario no RenameTokenRequest/MapDtos.java).
+        if (req.imageUrl() != null) {
+            token.setImageUrl(req.imageUrl().isBlank() ? null : req.imageUrl());
+        }
         return toResponse(mapTokenRepository.save(token));
     }
 
@@ -178,6 +190,7 @@ public class MapService {
     }
 
     private MapTokenResponse toResponse(MapToken token) {
-        return new MapTokenResponse(token.getId(), token.getChannelId(), token.getLabel(), token.getColor(), token.getX(), token.getY());
+        return new MapTokenResponse(token.getId(), token.getChannelId(), token.getLabel(), token.getColor(),
+                token.getX(), token.getY(), token.getImageUrl());
     }
 }

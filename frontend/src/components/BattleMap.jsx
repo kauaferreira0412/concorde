@@ -32,11 +32,13 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [addMode, setAddMode] = useState(false);
-  const [editingToken, setEditingToken] = useState(null); // { id, label, color, x, y (tela) }
+  const [editingToken, setEditingToken] = useState(null); // { id, label, color, imageUrl, x, y (tela) }
   const [renameDraft, setRenameDraft] = useState("");
+  const [uploadingTokenImage, setUploadingTokenImage] = useState(false);
 
   const imageRef = useRef(null);
   const fileInputRef = useRef(null);
+  const tokenImageInputRef = useRef(null);
   const panStateRef = useRef(null); // { startX, startY, originX, originY, moved }
   const dragTokenRef = useRef(null); // { id, lastSentAt }
   const editorRef = useRef(null);
@@ -193,7 +195,7 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
 
   function openEditor(token, e) {
     setRenameDraft(token.label);
-    setEditingToken({ id: token.id, color: token.color, x: e.clientX, y: e.clientY });
+    setEditingToken({ id: token.id, color: token.color, imageUrl: token.imageUrl || null, x: e.clientX, y: e.clientY });
   }
 
   function handleRenameSave() {
@@ -208,6 +210,36 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
     if (stompClient && stompConnected) {
       renameMapToken(stompClient, channelId, editingToken.id, renameDraft.trim() || "Token", color);
     }
+  }
+
+  // Imagem CUSTOMIZADA do token (retrato do personagem, etc - pedido explicito do usuario) -
+  // qualquer um pode subir uma pro PROPRIO token, nao precisa ser o mestre (diferente do mapa
+  // em si). Sobe pro GCS primeiro (REST), depois manda a URL junto com o resto via WebSocket -
+  // mesmo caminho que trocar nome/cor usa (ver renameMapToken).
+  async function handleTokenImageUpload(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !editingToken) return;
+    setUploadingTokenImage(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const { data } = await api.post(`/api/channels/${channelId}/map/token-image`, formData);
+      setEditingToken((prev) => (prev ? { ...prev, imageUrl: data.url } : prev));
+      if (stompClient && stompConnected) {
+        renameMapToken(stompClient, channelId, editingToken.id, renameDraft.trim() || "Token", editingToken.color, data.url);
+      }
+    } catch (err) {
+      showAlert(err.response?.data?.error || "Não foi possível subir essa imagem");
+    } finally {
+      setUploadingTokenImage(false);
+    }
+  }
+
+  function handleRemoveTokenImage() {
+    if (!editingToken || !stompClient || !stompConnected) return;
+    setEditingToken((prev) => (prev ? { ...prev, imageUrl: null } : prev));
+    renameMapToken(stompClient, channelId, editingToken.id, renameDraft.trim() || "Token", editingToken.color, "");
   }
 
   function handleRemoveToken() {
@@ -282,7 +314,11 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
               <div
                 key={token.id}
                 className="battle-map-token"
-                style={{ left: `${token.x * 100}%`, top: `${token.y * 100}%`, background: token.color }}
+                style={
+                  token.imageUrl
+                    ? { left: `${token.x * 100}%`, top: `${token.y * 100}%`, borderColor: token.color, backgroundImage: `url(${token.imageUrl})` }
+                    : { left: `${token.x * 100}%`, top: `${token.y * 100}%`, background: token.color }
+                }
                 onPointerDown={(e) => handleTokenPointerDown(e, token)}
                 onPointerMove={(e) => handleTokenPointerMove(e, token)}
                 onPointerUp={(e) => handleTokenPointerUp(e, token)}
@@ -325,6 +361,22 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
                 onClick={() => handleChangeColor(c)}
               />
             ))}
+          </div>
+          <input type="file" accept="image/png,image/jpeg,image/webp" ref={tokenImageInputRef} onChange={handleTokenImageUpload} hidden />
+          <div className="participant-mod-actions" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
+            <button
+              type="button"
+              className="participant-mod-btn"
+              onClick={() => tokenImageInputRef.current?.click()}
+              disabled={uploadingTokenImage}
+            >
+              <ImageIcon size={14} /> {uploadingTokenImage ? "Enviando..." : editingToken.imageUrl ? "Trocar imagem" : "Imagem customizada"}
+            </button>
+            {editingToken.imageUrl && (
+              <button type="button" className="participant-mod-btn" onClick={handleRemoveTokenImage}>
+                <TrashIcon size={14} /> Remover imagem
+              </button>
+            )}
           </div>
           <div className="participant-mod-actions">
             <button type="button" className="participant-mod-btn danger" onClick={handleRemoveToken}>

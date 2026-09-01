@@ -7,7 +7,9 @@ public class MapDtos {
 
     public record BattleMapResponse(Long channelId, String imageUrl, Instant updatedAt) {}
 
-    public record MapTokenResponse(Long id, Long channelId, String label, String color, double x, double y) {}
+    public record MapTokenResponse(Long id, Long channelId, String label, String color, double x, double y, String imageUrl) {}
+
+    public record TokenImageUploadResponse(String url) {}
 
     // map = null quando o canal ainda nao tem nenhum mapa subido. canManageMap = se ESSE
     // usuario pode subir/trocar o mapa (ver MapService.canManageMap) - so' quem criou a
@@ -24,7 +26,9 @@ public class MapDtos {
     // varias {variaveis} num so' destino STOMP (sem precedente no resto do projeto).
     public record MoveTokenRequest(Long tokenId, double x, double y) {}
 
-    public record RenameTokenRequest(Long tokenId, String label, String color) {}
+    // imageUrl: null = nao mexe na imagem atual; "" (string vazia) = REMOVE a imagem (volta pro
+    // circulo colorido de sempre); URL = troca pra essa imagem nova (ver MapService.renameToken).
+    public record RenameTokenRequest(Long tokenId, String label, String color, String imageUrl) {}
 
     public record RemoveTokenRequest(Long tokenId) {}
 

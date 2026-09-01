@@ -33,6 +33,13 @@ public class MapToken {
     @Column(nullable = false, length = 10)
     private String color;
 
+    // Imagem customizada do token (retrato do personagem, icone, etc - pedido explicito do
+    // usuario) - null = mostra so' o circulo colorido de sempre (ver "color" acima). SEM
+    // "nullable = false" de proposito - coluna nova numa tabela que ja tem tokens existentes
+    // (ver historico de bugs de ddl-auto:update com NOT NULL em tabela com dados).
+    @Column(length = 1000)
+    private String imageUrl;
+
     @Column(nullable = false)
     private double x;
 
