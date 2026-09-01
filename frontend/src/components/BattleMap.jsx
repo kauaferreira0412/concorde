@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { useAlert } from "../context/AlertContext.jsx";
 import { subscribeToMap, addMapToken, moveMapToken, renameMapToken, removeMapToken } from "../ws/chatSocket";
-import { ImageIcon, MapPinIcon, PencilIcon, TrashIcon, ZoomInIcon, ZoomOutIcon } from "./icons.jsx";
+import { ImageIcon, MapPinIcon, PencilIcon, TrashIcon, UsersIcon, ZoomInIcon, ZoomOutIcon } from "./icons.jsx";
 
 const TOKEN_COLORS = ["#ed4245", "#5865f2", "#57f287", "#faa61a", "#eb459e", "#00c2ff"];
 function randomColor() {
@@ -19,7 +19,7 @@ function randomColor() {
  * MapToken.java). Mover um token e' em tempo real de verdade (WebSocket com throttle, nao REST -
  * pedido explicito do usuario), igual o resto do chat ao vivo.
  */
-export default function BattleMap({ channelId, stompClient, stompConnected }) {
+export default function BattleMap({ channelId, serverId, categoryId, stompClient, stompConnected }) {
   const { showAlert } = useAlert();
   const [map, setMap] = useState(null);
   const [tokens, setTokens] = useState([]);
@@ -35,6 +35,13 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
   const [editingToken, setEditingToken] = useState(null); // { id, label, color, imageUrl, x, y (tela) }
   const [renameDraft, setRenameDraft] = useState("");
   const [uploadingTokenImage, setUploadingTokenImage] = useState(false);
+  // Personagens da mesa (categoria) pra criar um token ja' com a foto certa - ver
+  // CharacterSheetsModal.jsx/handlePickCharacter abaixo (pedido explicito do usuario: "a foto
+  // pode ser transformada em um token"). So' os personagens que ESSE usuario enxerga (o mestre
+  // ve todos, o jogador so' os vinculados a ele - ver CharacterSheetService.list no backend).
+  const [characters, setCharacters] = useState([]);
+  const [showCharacterPicker, setShowCharacterPicker] = useState(false);
+  const [pendingTokenTemplate, setPendingTokenTemplate] = useState(null); // { label, color, imageUrl } | null
 
   const imageRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -42,6 +49,7 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
   const panStateRef = useRef(null); // { startX, startY, originX, originY, moved }
   const dragTokenRef = useRef(null); // { id, lastSentAt }
   const editorRef = useRef(null);
+  const characterPickerRef = useRef(null);
 
   // Fecha o popover de editar token ao clicar fora - mesmo padrao usado no resto do app (ver
   // ChannelSidebar.jsx/MemberList.jsx).
@@ -60,6 +68,17 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [editingToken]);
+
+  // Fecha o seletor de personagem ao clicar fora - mesmo padrao do popover de editar token
+  // acima.
+  useEffect(() => {
+    if (!showCharacterPicker) return;
+    function handlePointerDown(e) {
+      if (characterPickerRef.current && !characterPickerRef.current.contains(e.target)) setShowCharacterPicker(false);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [showCharacterPicker]);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,7 +163,31 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
     const fracX = (e.clientX - rect.left) / rect.width;
     const fracY = (e.clientY - rect.top) / rect.height;
     if (fracX < 0 || fracX > 1 || fracY < 0 || fracY > 1) return;
-    addMapToken(stompClient, channelId, { label: "Token", color: randomColor(), x: fracX, y: fracY });
+    if (pendingTokenTemplate) {
+      addMapToken(stompClient, channelId, { ...pendingTokenTemplate, x: fracX, y: fracY });
+      // "Usar personagem" e' de UM clique so' (escolheu o personagem, colocou UM token) -
+      // diferente do "Adicionar token" generico, que fica ligado pra colocar varios seguidos.
+      setPendingTokenTemplate(null);
+      setAddMode(false);
+    } else {
+      addMapToken(stompClient, channelId, { label: "Token", color: randomColor(), x: fracX, y: fracY });
+    }
+  }
+
+  function openCharacterPicker() {
+    setShowCharacterPicker((v) => !v);
+    if (serverId && categoryId) {
+      api
+        .get(`/api/servers/${serverId}/categories/${categoryId}/sheets`)
+        .then(({ data }) => setCharacters(data))
+        .catch(() => setCharacters([]));
+    }
+  }
+
+  function handlePickCharacter(character) {
+    setPendingTokenTemplate({ label: character.characterName, color: randomColor(), imageUrl: character.imageUrl || null });
+    setAddMode(true);
+    setShowCharacterPicker(false);
   }
 
   function handleTokenPointerDown(e, token) {
@@ -263,12 +306,47 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
           <>
             <button
               type="button"
-              className={"icon-btn" + (addMode ? " icon-btn-active" : "")}
-              onClick={() => setAddMode((v) => !v)}
+              className={"icon-btn" + (addMode && !pendingTokenTemplate ? " icon-btn-active" : "")}
+              onClick={() => {
+                setPendingTokenTemplate(null);
+                setAddMode((v) => !v);
+              }}
               title="Clique no mapa pra adicionar um token"
             >
-              <MapPinIcon size={15} /> {addMode ? "Clique no mapa..." : "Adicionar token"}
+              <MapPinIcon size={15} /> {addMode && !pendingTokenTemplate ? "Clique no mapa..." : "Adicionar token"}
             </button>
+            {categoryId && (
+              <div style={{ position: "relative" }}>
+                <button
+                  type="button"
+                  className={"icon-btn" + (pendingTokenTemplate ? " icon-btn-active" : "")}
+                  onClick={openCharacterPicker}
+                  title="Usar a foto de um personagem da mesa como token"
+                >
+                  <UsersIcon size={15} /> {pendingTokenTemplate ? "Clique no mapa..." : "Usar personagem"}
+                </button>
+                {showCharacterPicker && (
+                  <div className="battle-map-character-picker" ref={characterPickerRef}>
+                    {characters.length === 0 ? (
+                      <p className="admin-hint" style={{ margin: 0, padding: "6px 4px" }}>
+                        Nenhum personagem disponível pra você nessa categoria.
+                      </p>
+                    ) : (
+                      characters.map((c) => (
+                        <button key={c.id} type="button" className="battle-map-character-option" onClick={() => handlePickCharacter(c)}>
+                          {c.imageUrl ? (
+                            <img src={c.imageUrl} alt="" />
+                          ) : (
+                            <span className="battle-map-character-placeholder" style={{ background: randomColor() }} />
+                          )}
+                          {c.characterName}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <button type="button" className="icon-btn" onClick={() => setScale((s) => Math.max(0.4, +(s - 0.2).toFixed(2)))} title="Diminuir zoom">
               <ZoomOutIcon size={15} />
             </button>

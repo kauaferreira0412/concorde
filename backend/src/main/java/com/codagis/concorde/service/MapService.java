@@ -131,6 +131,7 @@ public class MapService {
                 .channelId(channelId)
                 .label(label)
                 .color(color)
+                .imageUrl(req.imageUrl() == null || req.imageUrl().isBlank() ? null : req.imageUrl())
                 .x(x)
                 .y(y)
                 .createdBy(userId)

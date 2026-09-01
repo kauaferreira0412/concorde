@@ -109,10 +109,12 @@ export function subscribeToMap(client, channelId, onEvent) {
     onEvent(JSON.parse(frame.body));
   });
 }
-export function addMapToken(client, channelId, { label, color, x, y }) {
+/** imageUrl opcional - token ja' nasce com a foto de um personagem da mesa escolhido no
+ *  seletor (ver CharacterSheetsModal.jsx/BattleMap.jsx). */
+export function addMapToken(client, channelId, { label, color, x, y, imageUrl }) {
   client.publish({
     destination: `/app/channel.${channelId}.map.token.add`,
-    body: JSON.stringify({ label, color, x, y }),
+    body: JSON.stringify({ label, color, x, y, imageUrl }),
   });
 }
 /** Chamado com throttle enquanto arrasta (ver BattleMap.jsx) - senao vira dezenas de

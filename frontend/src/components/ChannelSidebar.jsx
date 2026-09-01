@@ -1041,7 +1041,7 @@ export default function ChannelSidebar({
       )}
 
       {sheetsCategory && (
-        <CharacterSheetsModal server={server} category={sheetsCategory} onClose={() => setSheetsCategory(null)} />
+        <CharacterSheetsModal server={server} category={sheetsCategory} members={members} onClose={() => setSheetsCategory(null)} />
       )}
 
       {deletingCategory && (

@@ -19,7 +19,10 @@ public class MapDtos {
     // backend confere de novo, de verdade, no upload (nunca confia so' no frontend).
     public record MapSnapshot(BattleMapResponse map, List<MapTokenResponse> tokens, boolean canManageMap) {}
 
-    public record AddTokenRequest(String label, String color, double x, double y) {}
+    // imageUrl opcional - usado quando o token nasce ja' com a FOTO de um personagem da mesa
+    // (pedido explicito do usuario: "essa foto pode ser transformada em um token"), ver
+    // BattleMap.jsx/CharacterSheetService. null = token normal, so' com o circulo colorido.
+    public record AddTokenRequest(String label, String color, double x, double y, String imageUrl) {}
 
     // tokenId vai no CORPO (nao na URL/destino STOMP) - mesmo padrao ja' usado em
     // ToggleReactionRequest/PinMessageRequest/DeleteChatMessage (MessageDtos.java), em vez de

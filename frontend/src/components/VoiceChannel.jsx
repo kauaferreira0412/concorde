@@ -541,7 +541,13 @@ export default function VoiceChannel({ channel, serverName, serverType, stompCli
                 <MapIcon size={13} /> MAPA DE BATALHA
               </p>
             </div>
-            <BattleMap channelId={channel.id} stompClient={stompClient} stompConnected={stompConnected} />
+            <BattleMap
+              channelId={channel.id}
+              serverId={channel.serverId}
+              categoryId={channel.categoryId}
+              stompClient={stompClient}
+              stompConnected={stompConnected}
+            />
           </section>
         )}
 
