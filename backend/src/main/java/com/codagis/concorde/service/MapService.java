@@ -2,14 +2,17 @@ package com.codagis.concorde.service;
 
 import com.codagis.concorde.domain.BattleMap;
 import com.codagis.concorde.domain.Channel;
+import com.codagis.concorde.domain.ChannelCategory;
 import com.codagis.concorde.domain.MapToken;
 import com.codagis.concorde.dto.MapDtos.AddTokenRequest;
 import com.codagis.concorde.dto.MapDtos.BattleMapResponse;
 import com.codagis.concorde.dto.MapDtos.MapSnapshot;
 import com.codagis.concorde.dto.MapDtos.MapTokenResponse;
 import com.codagis.concorde.dto.MapDtos.RenameTokenRequest;
+import com.codagis.concorde.enums.ServerPermission;
 import com.codagis.concorde.repository.BattleMapRepository;
 import com.codagis.concorde.repository.CategoryAccessRepository;
+import com.codagis.concorde.repository.ChannelCategoryRepository;
 import com.codagis.concorde.repository.ChannelRepository;
 import com.codagis.concorde.repository.MapTokenRepository;
 import com.codagis.concorde.repository.MembershipRepository;
@@ -34,15 +37,20 @@ public class MapService {
     private final ChannelRepository channelRepository;
     private final MembershipRepository membershipRepository;
     private final CategoryAccessRepository categoryAccessRepository;
+    private final ChannelCategoryRepository channelCategoryRepository;
+    private final PermissionService permissionService;
 
     public MapService(BattleMapRepository battleMapRepository, MapTokenRepository mapTokenRepository,
                        ChannelRepository channelRepository, MembershipRepository membershipRepository,
-                       CategoryAccessRepository categoryAccessRepository) {
+                       CategoryAccessRepository categoryAccessRepository, ChannelCategoryRepository channelCategoryRepository,
+                       PermissionService permissionService) {
         this.battleMapRepository = battleMapRepository;
         this.mapTokenRepository = mapTokenRepository;
         this.channelRepository = channelRepository;
         this.membershipRepository = membershipRepository;
         this.categoryAccessRepository = categoryAccessRepository;
+        this.channelCategoryRepository = channelCategoryRepository;
+        this.permissionService = permissionService;
     }
 
     /** Confere que o canal existe, que o usuario e' membro do servidor dono dele, e que (se a
@@ -66,17 +74,37 @@ public class MapService {
     }
 
     public MapSnapshot getSnapshot(Long channelId, Long userId) {
-        assertCanUseMap(channelId, userId);
+        Channel channel = assertCanUseMap(channelId, userId);
         BattleMapResponse map = battleMapRepository.findByChannelId(channelId).map(this::toResponse).orElse(null);
         List<MapTokenResponse> tokens = mapTokenRepository.findByChannelIdOrderByIdAsc(channelId).stream()
                 .map(this::toResponse)
                 .toList();
-        return new MapSnapshot(map, tokens);
+        return new MapSnapshot(map, tokens, canManageMap(channel, userId));
+    }
+
+    /** So' o "mestre" (quem CRIOU a categoria desse canal, ver ChannelCategory.createdBy) pode
+     *  subir/trocar o mapa - pedido explicito do usuario: "quem vai criar a categoria do seu
+     *  RPG e' o mestre... apenas eu posso adicionar o mapa". Cai pro fallback de
+     *  MANAGE_CHANNELS quando o canal nao tem categoria, ou quando a categoria e' de ANTES
+     *  dessa regra existir (createdBy null - nao da' pra saber quem criou). Dono do servidor/
+     *  admin global sempre passam (ver PermissionService.isOwnerOrGlobalAdmin, embutido em
+     *  has()). */
+    private boolean canManageMap(Channel channel, Long userId) {
+        if (channel.getCategoryId() != null) {
+            ChannelCategory category = channelCategoryRepository.findById(channel.getCategoryId()).orElse(null);
+            if (category != null && category.getCreatedBy() != null) {
+                return category.getCreatedBy().equals(userId);
+            }
+        }
+        return permissionService.has(channel.getServerId(), userId, ServerPermission.MANAGE_CHANNELS);
     }
 
     @Transactional
     public BattleMapResponse uploadMap(Long channelId, Long userId, String imageUrl) {
-        assertCanUseMap(channelId, userId);
+        Channel channel = assertCanUseMap(channelId, userId);
+        if (!canManageMap(channel, userId)) {
+            throw new IllegalStateException("Só o mestre dessa categoria pode subir o mapa");
+        }
         BattleMap map = battleMapRepository.findByChannelId(channelId)
                 .orElseGet(() -> BattleMap.builder().channelId(channelId).build());
         map.setImageUrl(imageUrl);

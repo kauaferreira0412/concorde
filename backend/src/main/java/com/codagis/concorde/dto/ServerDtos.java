@@ -39,7 +39,9 @@ public class ServerDtos {
     // CategoryAccessEntry/ServerService.setCategoryAccess) - so' um booleano aqui, a lista de
     // quem tem acesso de verdade vem do GET /categories/{id}/access (so' quem pode gerenciar
     // canais busca isso, nao faz sentido expor pra todo mundo).
-    public record CategoryResponse(Long id, Long serverId, String name, int position, boolean restricted) {}
+    // createdBy = "o mestre" dessa categoria (ver ChannelCategory.createdBy/MapService.
+    // assertCanManageMap) - null pra categoria criada antes dessa coluna existir.
+    public record CategoryResponse(Long id, Long serverId, String name, int position, boolean restricted, Long createdBy) {}
 
     public record MoveChannelRequest(Long categoryId) {}
 

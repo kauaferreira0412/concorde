@@ -321,6 +321,7 @@ public class ServerService {
                 .serverId(serverId)
                 .name(req.name())
                 .position(position)
+                .createdBy(userId)
                 .build());
         auditLogService.log(serverId, userId, "CREATE_CATEGORY", null, "CATEGORY", category.getId(), category.getName());
         return toResponse(category);
@@ -476,6 +477,7 @@ public class ServerService {
     }
 
     private CategoryResponse toResponse(ChannelCategory category, boolean restricted) {
-        return new CategoryResponse(category.getId(), category.getServerId(), category.getName(), category.getPosition(), restricted);
+        return new CategoryResponse(category.getId(), category.getServerId(), category.getName(), category.getPosition(),
+                restricted, category.getCreatedBy());
     }
 }

@@ -23,6 +23,10 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
   const { showAlert } = useAlert();
   const [map, setMap] = useState(null);
   const [tokens, setTokens] = useState([]);
+  // So' quem criou a categoria desse canal (o "mestre" - ver ChannelCategory.createdBy no
+  // backend) pode subir/trocar o mapa - pedido explicito do usuario. O backend confere de
+  // novo (de verdade) no upload; isso aqui e' so' pra mostrar ou nao o botao.
+  const [canManageMap, setCanManageMap] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [scale, setScale] = useState(1);
@@ -64,6 +68,7 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
         if (cancelled) return;
         setMap(data.map);
         setTokens(data.tokens);
+        setCanManageMap(data.canManageMap);
       })
       .catch(() => {})
       .finally(() => {
@@ -207,10 +212,14 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
   return (
     <div>
       <div className="battle-map-toolbar">
-        <input type="file" accept="image/png,image/jpeg,image/webp" ref={fileInputRef} onChange={handleUpload} hidden />
-        <button type="button" className="icon-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Subir mapa">
-          <ImageIcon size={15} /> {uploading ? "Enviando..." : map ? "Trocar mapa" : "Subir mapa"}
-        </button>
+        {canManageMap && (
+          <>
+            <input type="file" accept="image/png,image/jpeg,image/webp" ref={fileInputRef} onChange={handleUpload} hidden />
+            <button type="button" className="icon-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading} title="Subir mapa">
+              <ImageIcon size={15} /> {uploading ? "Enviando..." : map ? "Trocar mapa" : "Subir mapa"}
+            </button>
+          </>
+        )}
         {map && (
           <>
             <button
@@ -245,7 +254,11 @@ export default function BattleMap({ channelId, stompClient, stompConnected }) {
       {loading ? (
         <p className="admin-hint">Carregando mapa...</p>
       ) : !map ? (
-        <p className="admin-hint">Nenhum mapa ainda - suba uma imagem pra começar (jpg, png ou webp).</p>
+        <p className="admin-hint">
+          {canManageMap
+            ? "Nenhum mapa ainda - suba uma imagem pra começar (jpg, png ou webp)."
+            : "O mestre dessa categoria ainda não subiu um mapa."}
+        </p>
       ) : (
         <div
           className="battle-map-viewport"

@@ -9,8 +9,13 @@ public class MapDtos {
 
     public record MapTokenResponse(Long id, Long channelId, String label, String color, double x, double y) {}
 
-    // map = null quando o canal ainda nao tem nenhum mapa subido.
-    public record MapSnapshot(BattleMapResponse map, List<MapTokenResponse> tokens) {}
+    // map = null quando o canal ainda nao tem nenhum mapa subido. canManageMap = se ESSE
+    // usuario pode subir/trocar o mapa (ver MapService.canManageMap) - so' quem criou a
+    // categoria do canal (o "mestre", pedido explicito do usuario), com fallback pra quem tem
+    // MANAGE_CHANNELS (categoria sem categoria/antiga sem essa info, ou canal sem categoria
+    // nenhuma). O frontend usa isso so' pra mostrar ou nao o botao (ver BattleMap.jsx) - o
+    // backend confere de novo, de verdade, no upload (nunca confia so' no frontend).
+    public record MapSnapshot(BattleMapResponse map, List<MapTokenResponse> tokens, boolean canManageMap) {}
 
     public record AddTokenRequest(String label, String color, double x, double y) {}
 
