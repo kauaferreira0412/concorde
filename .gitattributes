@@ -1,0 +1,5 @@
+# Patches aplicados via patch-package (ver frontend/package.json "postinstall") - precisam
+# ficar EXATAMENTE como foram gerados (diff e' sensivel a quebra de linha byte a byte); sem
+# isso, o autocrlf do Windows convertia LF->CRLF ao dar checkout e o patch podia falhar (ou
+# aplicar errado) na hora do "npm install" de outra pessoa/maquina.
+frontend/patches/*.patch -text

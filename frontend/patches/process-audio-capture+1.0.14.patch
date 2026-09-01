@@ -1,0 +1,273 @@
+diff --git a/node_modules/process-audio-capture/dist/core-Dk5oUVlC.js b/node_modules/process-audio-capture/dist/core-Dk5oUVlC.js
+index b78c718..09df78e 100644
+--- a/node_modules/process-audio-capture/dist/core-Dk5oUVlC.js
++++ b/node_modules/process-audio-capture/dist/core-Dk5oUVlC.js
+@@ -99,6 +99,10 @@ class AudioCaptureStub extends events.EventEmitter {
+   startCapture(_pid, _callback) {
+     return false;
+   }
++  /** [Patch Concorde] */
++  startCaptureExcludingSelf(_pid, _callback) {
++    return false;
++  }
+   /** 停止捕获 */
+   stopCapture() {
+     return false;
+@@ -158,6 +162,29 @@ class AudioCapture extends AudioCaptureStub {
+       throw error;
+     }
+   }
++  /** [Patch Concorde] Captura TUDO MENOS o processo "pid" (e sua arvore) - so' Windows, ver
++   *  win_audio_capture.cpp/audio_tap.cpp/audio_capture_addon.cc. */
++  startCaptureExcludingSelf(pid, callback) {
++    const permission = this.checkPermission();
++    if (permission.status !== "authorized") {
++      throw new Error("没有音频捕获权限");
++    }
++    if (typeof this.addon.startCaptureExcludingSelf !== "function") {
++      return false;
++    }
++    try {
++      const result = this.addon.startCaptureExcludingSelf(pid, (audioData) => {
++        callback == null ? void 0 : callback(audioData);
++        this.emit("audio-data", audioData);
++      });
++      if (result) {
++        this.emit("capturing", true);
++      }
++      return result;
++    } catch (error) {
++      throw error;
++    }
++  }
+   stopCapture() {
+     if (!this.isCapturing) {
+       return false;
+diff --git a/node_modules/process-audio-capture/include/audio_capture.h b/node_modules/process-audio-capture/include/audio_capture.h
+index b324b5a..078dc2b 100644
+--- a/node_modules/process-audio-capture/include/audio_capture.h
++++ b/node_modules/process-audio-capture/include/audio_capture.h
+@@ -59,6 +59,21 @@ public:
+    */
+   virtual bool StartCapture(uint32_t pid, AudioDataCallback callback) = 0;
+ 
++  /**
++   * @brief [Patch Concorde] Captura TUDO MENOS o processo "pid" (e sua arvore de filhos) -
++   * so' implementado no Windows (ver WinAudioCapture); a implementacao padrao aqui devolve
++   * false pra nao quebrar outras plataformas (mac). Usado pra "Tela Inteira, exceto o proprio
++   * Concorde" - "pid" nesse caso e' o PID do proprio app, nao de um processo alheio.
++   * @param pid Processo a EXCLUIR da captura (normalmente o proprio app chamador)
++   * @param callback Recebe os dados PCM de todo o resto do sistema
++   * @return Se conseguiu comecar a capturar
++   */
++  virtual bool StartCaptureExcluding(uint32_t pid, AudioDataCallback callback) {
++    (void)pid;
++    (void)callback;
++    return false;
++  }
++
+   /**
+    * @brief 停止捕获
+    * @return 是否成功停止捕获
+diff --git a/node_modules/process-audio-capture/include/win/audio_tap.h b/node_modules/process-audio-capture/include/win/audio_tap.h
+index 486526f..5dd0762 100644
+--- a/node_modules/process-audio-capture/include/win/audio_tap.h
++++ b/node_modules/process-audio-capture/include/win/audio_tap.h
+@@ -44,7 +44,12 @@ public:
+   ~AudioTap();
+ 
+   // WRL初始化方法
+-  HRESULT RuntimeClassInitialize(uint32_t pid);
++  // exclude_self: false (padrao) = INCLUDE_TARGET_PROCESS_TREE (captura SO' o processo "pid" -
++  // comportamento original da lib). true = EXCLUDE_TARGET_PROCESS_TREE (captura TUDO MENOS o
++  // processo "pid" e sua arvore de filhos - usado pelo Concorde pra "Tela Inteira, exceto o
++  // proprio Concorde", ver StartCaptureExcluding em win_audio_capture.h/cpp e
++  // ActivateProcessLoopbackAudioClient abaixo).
++  HRESULT RuntimeClassInitialize(uint32_t pid, bool exclude_self = false);
+ 
+   // 主要接口
+   bool Initialize();
+@@ -62,6 +67,7 @@ public:
+ private:
+   // 基本属性
+   uint32_t target_pid_;
++  bool exclude_mode_ = false; // ver comentario no RuntimeClassInitialize acima
+   std::atomic<bool> is_capturing_{false};
+   std::string error_message_;
+   AudioDataCallback callback_;
+diff --git a/node_modules/process-audio-capture/include/win/win_audio_capture.h b/node_modules/process-audio-capture/include/win/win_audio_capture.h
+index 4c2635b..c8b9174 100644
+--- a/node_modules/process-audio-capture/include/win/win_audio_capture.h
++++ b/node_modules/process-audio-capture/include/win/win_audio_capture.h
+@@ -40,6 +40,7 @@ public:
+   ~WinAudioCapture() override;
+ 
+   bool StartCapture(uint32_t pid, AudioDataCallback callback) override;
++  bool StartCaptureExcluding(uint32_t pid, AudioDataCallback callback) override; // [Patch Concorde]
+   bool StopCapture() override;
+   bool IsCapturing() const override;
+ 
+diff --git a/node_modules/process-audio-capture/src/audio_capture_addon.cc b/node_modules/process-audio-capture/src/audio_capture_addon.cc
+index 69de961..312e393 100644
+--- a/node_modules/process-audio-capture/src/audio_capture_addon.cc
++++ b/node_modules/process-audio-capture/src/audio_capture_addon.cc
+@@ -42,6 +42,9 @@ public:
+             InstanceMethod("getProcessList",
+                            &AudioCaptureAddon::GetProcessList),
+             InstanceMethod("startCapture", &AudioCaptureAddon::StartCapture),
++            // [Patch Concorde] ver StartCaptureExcluding em audio_capture.h/win_audio_capture.*
++            InstanceMethod("startCaptureExcludingSelf",
++                           &AudioCaptureAddon::StartCaptureExcludingSelf),
+             InstanceMethod("stopCapture", &AudioCaptureAddon::StopCapture),
+             InstanceMethod("isCapturing", &AudioCaptureAddon::IsCapturing),
+         });
+@@ -281,6 +284,75 @@ private:
+     return Napi::Boolean::New(env, result);
+   }
+ 
++  // [Patch Concorde] Igual StartCapture acima, so' que chama StartCaptureExcluding - "pid" aqui
++  // e' o processo a EXCLUIR (captura TUDO MENOS ele), nao o alvo a capturar. Mesma logica de
++  // callback/thread-safe-function (o resto do pipeline PCM->JS e' identico, so' muda QUAL
++  // metodo do g_audio_capture e' chamado).
++  Napi::Value StartCaptureExcludingSelf(const Napi::CallbackInfo &info) {
++    Napi::Env env = info.Env();
++
++    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsFunction()) {
++      Napi::TypeError::New(env, "参数错误: 需要进程ID和回调函数")
++          .ThrowAsJavaScriptException();
++      return env.Null();
++    }
++
++    uint32_t pid = info[0].As<Napi::Number>().Uint32Value();
++    Napi::Function callback = info[1].As<Napi::Function>();
++
++    g_ts_callback = Napi::ThreadSafeFunction::New(
++        env, callback, "AudioCaptureCallback", 0, 1, [](Napi::Env) {});
++
++    bool result = g_audio_capture->StartCaptureExcluding(
++        pid, [](const uint8_t *data, size_t length, int channels,
++                int sampleRate) {
++          if (!data || length == 0 || length > 16 * 1024 * 1024) {
++            return;
++          }
++          if (channels <= 0 || channels > 32 || sampleRate <= 0 ||
++              sampleRate > 192000) {
++            return;
++          }
++
++          std::vector<uint8_t> dataCopy;
++          try {
++            dataCopy.assign(data, data + length);
++          } catch (const std::exception &e) {
++            return;
++          }
++
++          auto callback = [dataCopy = std::move(dataCopy), length, channels,
++                           sampleRate](Napi::Env env, Napi::Function jsCallback) {
++            try {
++              if (dataCopy.size() != length || length == 0) {
++                return;
++              }
++              Napi::ArrayBuffer buffer = Napi::ArrayBuffer::New(env, length);
++              if (!buffer.Data()) {
++                return;
++              }
++              std::memcpy(buffer.Data(), dataCopy.data(), length);
++
++              Napi::Object result = Napi::Object::New(env);
++              size_t sampleCount = length / sizeof(float);
++              result.Set("buffer",
++                         Napi::Float32Array::New(env, sampleCount, buffer, 0));
++              result.Set("channels", Napi::Number::New(env, channels));
++              result.Set("sampleRate", Napi::Number::New(env, sampleRate));
++
++              jsCallback.Call({result});
++            } catch (const Napi::Error &e) {
++            } catch (const std::exception &e) {
++            } catch (...) {
++            }
++          };
++
++          g_ts_callback.BlockingCall(callback);
++        });
++
++    return Napi::Boolean::New(env, result);
++  }
++
+   // 停止捕获
+   Napi::Value StopCapture(const Napi::CallbackInfo &info) {
+     Napi::Env env = info.Env();
+diff --git a/node_modules/process-audio-capture/src/win/audio_tap.cpp b/node_modules/process-audio-capture/src/win/audio_tap.cpp
+index 2d7b7c2..15a2e10 100644
+--- a/node_modules/process-audio-capture/src/win/audio_tap.cpp
++++ b/node_modules/process-audio-capture/src/win/audio_tap.cpp
+@@ -33,8 +33,9 @@ AudioTap::AudioTap()
+       capture_event_(nullptr), activate_completed_event_(nullptr),
+       activate_result_(E_FAIL) {}
+ 
+-HRESULT AudioTap::RuntimeClassInitialize(uint32_t pid) {
++HRESULT AudioTap::RuntimeClassInitialize(uint32_t pid, bool exclude_self) {
+   target_pid_ = pid;
++  exclude_mode_ = exclude_self;
+ 
+   // 创建事件对象
+   capture_event_ = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+@@ -245,9 +246,14 @@ bool AudioTap::ActivateProcessLoopbackAudioClient() {
+   activation_params.ActivationType =
+       AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK;
+ 
+-  // 配置为包含目标进程树模式，这样可以捕获主进程及其子进程的音频
++  // exclude_mode_ = false (padrao/original): INCLUDE - captura SO' o processo alvo e sua
++  // arvore (uso original da lib: audio isolado de UMA janela/processo especifico).
++  // exclude_mode_ = true (patch Concorde): EXCLUDE - captura TUDO MENOS o processo alvo e sua
++  // arvore (uso novo: "Tela Inteira, exceto o proprio Concorde" - target_pid_ e' o PID do
++  // proprio Concorde nesse caso, ver StartCaptureExcluding em win_audio_capture.cpp).
+   activation_params.ProcessLoopbackParams.ProcessLoopbackMode =
+-      PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE;
++      exclude_mode_ ? PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE
++                    : PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE;
+   activation_params.ProcessLoopbackParams.TargetProcessId = target_pid_;
+ 
+   // 将参数封装为PROPVARIANT格式，供Windows音频系统使用
+diff --git a/node_modules/process-audio-capture/src/win/win_audio_capture.cpp b/node_modules/process-audio-capture/src/win/win_audio_capture.cpp
+index 36855ec..8d4f889 100644
+--- a/node_modules/process-audio-capture/src/win/win_audio_capture.cpp
++++ b/node_modules/process-audio-capture/src/win/win_audio_capture.cpp
+@@ -81,6 +81,37 @@ bool WinAudioCapture::StartCapture(uint32_t pid, AudioDataCallback callback) {
+   return true;
+ }
+ 
++// [Patch Concorde] Mesma coisa que StartCapture acima, so' que em modo EXCLUDE (ver
++// AudioTap::RuntimeClassInitialize/ActivateProcessLoopbackAudioClient) - "pid" aqui e' o
++// processo a EXCLUIR (o proprio Concorde), nao o alvo a capturar. Usa o MESMO
++// g_audio_capture/capturing_ (essa lib so' suporta UMA captura ativa por vez, de qualquer
++// modo - nunca faz sentido ter janela E tela inteira capturando ao mesmo tempo mesmo, o
++// Concorde so' compartilha uma tela de cada vez).
++bool WinAudioCapture::StartCaptureExcluding(uint32_t pid,
++                                             AudioDataCallback callback) {
++  if (capturing_) {
++    return false;
++  }
++
++  callback_ = callback;
++  current_pid_ = pid;
++
++  Microsoft::WRL::ComPtr<win_audio::AudioTap> audio_tap;
++  HRESULT hr = Microsoft::WRL::MakeAndInitialize<win_audio::AudioTap>(
++      &audio_tap, pid, /*exclude_self=*/true);
++  if (FAILED(hr)) {
++    return false;
++  }
++  process_capture_ = std::move(audio_tap);
++
++  if (!process_capture_->Initialize() || !process_capture_->Start(callback)) {
++    return false;
++  }
++
++  capturing_ = true;
++  return true;
++}
++
+ bool WinAudioCapture::StopCapture() {
+   if (!capturing_) {
+     return false;

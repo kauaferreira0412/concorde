@@ -1529,19 +1529,13 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       if (wantSystemAudio) {
         // Tela Inteira leva o audio do SISTEMA INTEIRO (jogo, musica, qualquer coisa tocando),
         // MENOS o audio do proprio Concorde - pedido explicito do usuario: continuar ouvindo a
-        // call normal enquanto compartilha, sem ficar mudo. Ver systemAudioTrack.js/
-        // main.cjs (concorde:start-system-audio-excluding-self) pro motivo de nao dar pra
-        // simplesmente "excluir" o Concorde de uma captura so' (a lib so' captura POR
-        // PROCESSO/inclusiva) - a solucao e' capturar todo mundo MENOS o Concorde, um processo
-        // de cada vez, e juntar tudo numa faixa so' aqui.
+        // call normal enquanto compartilha, sem ficar mudo, e sem atraso nenhum pra pegar som
+        // de programa novo (o Windows exclui o Concorde de verdade na captura em si, ver
+        // systemAudioTrack.js/main.cjs) - nao precisa mais avisar sobre delay.
         audioTrack = await startSystemAudioExcludingSelfTrack();
-        if (audioTrack?._concordeWarning) {
-          // Comecou, mas nao conseguiu capturar NENHUM processo tocando som agora (ver
-          // main.cjs) - avisa direto em vez de deixar a transmissao sair muda sem explicacao.
-          showAlert(audioTrack._concordeWarning);
-        } else if (audioTrack) {
+        if (!audioTrack) {
           showAlert(
-            "Compartilhando o áudio do sistema (exceto o do Concorde) - programas que você abrir DEPOIS de já estar compartilhando podem levar alguns segundos pra aparecer no áudio."
+            "Não foi possível capturar o áudio do sistema agora (só o vídeo vai ser compartilhado) - tente parar e compartilhar de novo."
           );
         }
       } else {

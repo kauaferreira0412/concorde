@@ -11,7 +11,8 @@
     "electron": "electron electron/main.cjs",
     "dist": "electron-builder --publish=never",
     "dist:win": "electron-builder --win nsis --publish=never",
-    "package:desktop": "node scripts/package-desktop.mjs"
+    "package:desktop": "node scripts/package-desktop.mjs",
+    "postinstall": "patch-package && npm rebuild process-audio-capture"
   },
   "dependencies": {
     "@sapphi-red/web-noise-suppressor": "^0.4.0",
@@ -29,6 +30,8 @@
     "@vitejs/plugin-react": "^4.3.1",
     "electron": "^32.1.2",
     "electron-builder": "^25.1.8",
+    "node-gyp": "^13.0.2",
+    "patch-package": "^8.0.1",
     "vite": "^5.4.8"
   },
   "build": {
@@ -92,6 +95,7 @@
   },
   "allowScripts": {
     "electron@32.3.3": true,
-    "esbuild@0.21.5": true
+    "esbuild@0.21.5": true,
+    "process-audio-capture@1.0.14": true
   }
 }

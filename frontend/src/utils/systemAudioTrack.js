@@ -1,14 +1,17 @@
 // Constroi uma MediaStreamTrack de audio pra "Tela Inteira, sem o proprio Concorde" (Windows,
-// app desktop - ver main.cjs concorde:start-system-audio-excluding-self). Diferente de
-// windowAudioTrack.js (UM processo so'), aqui o Windows nao oferece um jeito de capturar "tudo
-// menos X" de uma vez - a solucao e' capturar TODOS os outros processos que estiverem tocando
-// som, um de cada vez (o processo principal ja filtra fora os do proprio Concorde, ver
-// ownProcessPids em main.cjs), e MISTURAR tudo numa unica faixa aqui - um AudioWorkletNode
-// "tocador" por processo, todos conectados no MESMO destino (o proprio Web Audio soma os sinais
-// automaticamente ao conectar varias fontes no mesmo no', sem precisar somar amostra por
-// amostra na mao). Processos novos que comecem a tocar som DEPOIS que a transmissao ja comecou
-// entram sozinhos (o processo principal reforca a lista a cada poucos segundos), com um pequeno
-// atraso ate' serem percebidos - avisado ao usuario ao iniciar (ver VoiceCallContext.jsx).
+// app desktop) - UMA UNICA sessao de captura nativa do lado do processo principal (WASAPI
+// Process Loopback em modo EXCLUDE, a mesma API que Discord/OBS usam pra isso - a lib
+// "process-audio-capture" so' expunha o modo INCLUDE por padrao, patcheamos ela pra adicionar
+// "startCaptureExcludingSelf" via patch-package, ver patches/process-audio-capture+*.patch e
+// main.cjs). Sistema inteiro (jogo, musica, qualquer coisa tocando), menos o proprio Concorde -
+// e' o Windows quem faz a exclusao de verdade, entao nao tem atraso nenhum pra pegar som de um
+// programa aberto DEPOIS que a transmissao ja comecou (era o problema da versao anterior, que
+// tentava capturar cada processo na mao).
+//
+// Mesmo "sintetizador" de audio que windowAudioTrack.js usa - os chunks PCM (Float32Array, ja'
+// pronto) chegam por IPC do processo principal, um AudioWorklet vai tocando eles no ritmo
+// certo, alimentando um MediaStreamDestination (a forma padrao da Web Audio API de virar uma
+// MediaStreamTrack de verdade, publicavel no LiveKit).
 const WORKLET_SOURCE = `
 class SystemAudioProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -69,51 +72,27 @@ export async function startSystemAudioExcludingSelfTrack() {
   }
   URL.revokeObjectURL(blobUrl);
 
+  const workletNode = new AudioWorkletNode(audioContext, "system-audio-processor", {
+    numberOfInputs: 0,
+    numberOfOutputs: 1,
+    outputChannelCount: [2],
+  });
   const destNode = audioContext.createMediaStreamDestination();
-  // pid -> AudioWorkletNode, um "tocador" por processo capturado - todos somados no mesmo
-  // destNode (ver comentario no topo do arquivo).
-  const nodesByPid = new Map();
-
-  function nodeFor(pid) {
-    let node = nodesByPid.get(pid);
-    if (!node) {
-      node = new AudioWorkletNode(audioContext, "system-audio-processor", {
-        numberOfInputs: 0,
-        numberOfOutputs: 1,
-        outputChannelCount: [2],
-      });
-      node.connect(destNode);
-      nodesByPid.set(pid, node);
-    }
-    return node;
-  }
+  workletNode.connect(destNode);
 
   const removeChunkListener = desktop.onSystemAudioChunk((audioData) => {
-    nodeFor(audioData.pid).port.postMessage({ buffer: audioData.buffer, channels: audioData.channels });
-  });
-  const removeStoppedListener = desktop.onSystemAudioPidStopped((pid) => {
-    const node = nodesByPid.get(pid);
-    if (!node) return;
-    node.disconnect();
-    nodesByPid.delete(pid);
+    workletNode.port.postMessage({ buffer: audioData.buffer, channels: audioData.channels });
   });
 
   const track = destNode.stream.getAudioTracks()[0];
-  // Preenchido so' quando o processo principal comecou a captura mas nao conseguiu pegar
-  // NENHUM processo tocando som (ver concorde:start-system-audio-excluding-self em main.cjs) -
-  // quem chamou mostra isso pro usuario em vez de deixar a transmissao sair muda sem
-  // explicacao nenhuma (era exatamente o que estava sendo reportado).
-  track._concordeWarning = result.warning || null;
   track._concordeCleanup = async () => {
     removeChunkListener();
-    removeStoppedListener();
     try {
       await desktop.stopSystemAudioExcludingSelf();
     } catch {
       /* processo principal ja' pode ter derrubado tudo (ex: app fechando) */
     }
-    nodesByPid.forEach((node) => node.disconnect());
-    nodesByPid.clear();
+    workletNode.disconnect();
     await audioContext.close();
   };
   return track;
