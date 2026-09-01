@@ -3182,8 +3182,11 @@ h3.chat-heading {
 /* Popover de editar token (ver BattleMap.jsx) - nasce fora da tela (top/left calculados so'
    depois de renderizado, ver useLayoutEffect) pra nunca "piscar" no canto errado; largura
    um pouco maior que o volume-popover padrao pra caber a linha de cores + os botoes de
-   imagem sem precisar de barra de rolagem (reportado pelo usuario: "está cortando"). */
-.battle-map-token-popover { top: -9999px; left: -9999px; width: 236px; }
+   imagem sem precisar de barra de rolagem (reportado pelo usuario: "está cortando"). overflow-x
+   hidden explicito - sem isso, so' ter "overflow-y: auto" (herdado de .volume-popover) ja' basta
+   pro navegador tratar o eixo X tambem como "auto" (regra da propria especificacao de CSS) e
+   mostrar uma barrinha horizontal do nada quando o conteudo bate certinho na borda. */
+.battle-map-token-popover { top: -9999px; left: -9999px; width: 236px; overflow-x: hidden; box-sizing: border-box; }
 
 /* Menu "Mapas" do mestre (varios mapas por canal, cada um com o proprio conjunto de tokens -
    pedido explicito do usuario) - dropdown simples ancorado no proprio botao, mesmo padrao do

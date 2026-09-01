@@ -68,9 +68,10 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     if (!editingToken || !editorRef.current) return;
     const el = editorRef.current;
     const margin = 8;
+    const offset = 14; // afasta um pouco do ponto clicado, senao o popover nasce EM CIMA do proprio token
     const rect = el.getBoundingClientRect();
-    let left = Math.min(editingToken.anchorX, window.innerWidth - rect.width - margin);
-    let top = Math.min(editingToken.anchorY, window.innerHeight - rect.height - margin);
+    let left = Math.min(editingToken.anchorX + offset, window.innerWidth - rect.width - margin);
+    let top = Math.min(editingToken.anchorY + offset, window.innerHeight - rect.height - margin);
     left = Math.max(margin, left);
     top = Math.max(margin, top);
     el.style.left = `${left}px`;
@@ -231,13 +232,14 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     if (fracX < 0 || fracX > 1 || fracY < 0 || fracY > 1) return;
     if (pendingTokenTemplate) {
       addMapToken(stompClient, channelId, { mapId: activeMapId, ...pendingTokenTemplate, x: fracX, y: fracY });
-      // "Usar personagem" e' de UM clique so' (escolheu o personagem, colocou UM token) -
-      // diferente do "Adicionar token" generico, que fica ligado pra colocar varios seguidos.
       setPendingTokenTemplate(null);
-      setAddMode(false);
     } else {
       addMapToken(stompClient, channelId, { mapId: activeMapId, label: "Token", color: randomColor(), x: fracX, y: fracY });
     }
+    // Um clique = um token so', sempre - o botao "desliga" sozinho depois de colocar (pedido
+    // explicito do usuario: senao o mestre pode se confundir e adicionar varios sem querer).
+    // Pra colocar outro, precisa clicar em "Adicionar token"/"Usar personagem" de novo.
+    setAddMode(false);
   }
 
   function openCharacterPicker() {
