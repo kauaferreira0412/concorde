@@ -3,3 +3,8 @@
 # isso, o autocrlf do Windows convertia LF->CRLF ao dar checkout e o patch podia falhar (ou
 # aplicar errado) na hora do "npm install" de outra pessoa/maquina.
 frontend/patches/*.patch -text
+
+# Scripts de shell (ver scripts/deploy.sh) - precisam ficar com quebra de linha LF sempre,
+# mesmo mexendo neles no Windows. Um shebang com \r no final vira "bad interpreter" no Git
+# Bash/na VPS (o mesmo motivo do bloco acima, pros patches).
+scripts/*.sh text eol=lf

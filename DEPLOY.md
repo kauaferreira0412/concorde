@@ -4,6 +4,25 @@
 Passo a passo pra rodar o Concorde inteiro (Postgres + backend + LiveKit + frontend) numa
 VPS Ubuntu/Debian com IP público, sem depender de ngrok.
 
+## Deploy do dia a dia (depois que a VPS já está configurada uma vez)
+
+Depois que os passos 1-4 abaixo já foram feitos uma vez (Docker instalado, firewall aberto,
+código na VPS, `.env.prod` preenchido), **todo deploy seguinte é um só comando**, rodado do
+Windows (Git Bash - o mesmo terminal que já roda `npm`/`git` nesse projeto):
+
+```bash
+scripts/deploy.sh
+```
+
+Isso builda o instalador desktop + o bundle web, commita/pusha o `desktop-min-version.txt`,
+empacota o projeto (sem `node_modules`/`target`/etc - a VPS builda tudo de novo dentro do
+Docker) e envia pra `root@187.127.37.101:~/concorde` via `scp`, terminando com
+`docker compose ... up -d --build backend gateway`. Ver `scripts/deploy.sh --help` pras opções
+(`--skip-desktop` quando só mexeu no backend, `--services "all"` pra reconstruir tudo incluindo
+o `music-bot`, `--services ""` pra só reiniciar sem rebuildar nada). Os passos abaixo (1-4) e o
+resto desse arquivo continuam valendo pra configurar uma VPS nova do zero, ou pra rodar os
+comandos manualmente se preferir.
+
 ## 1. Instalar o Docker na VPS
 
 Via SSH, como root (ou usuário com sudo):
