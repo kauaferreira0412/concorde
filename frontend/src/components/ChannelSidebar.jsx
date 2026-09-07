@@ -61,6 +61,10 @@ export default function ChannelSidebar({
   onOpenEmojis,
   onMoveChannelCategory,
   onCategoryDeleted,
+  serversLoadError,
+  channelsLoadError,
+  onRetryLoadServers,
+  onRetryLoadChannels,
   stompClient,
   stompConnected,
   user,
@@ -720,11 +724,29 @@ export default function ChannelSidebar({
 
       <div className="channel-list">
         {!server ? (
-          <p className="channel-group-title">
-            {isAdmin
-              ? "Crie ou selecione um servidor na barra à esquerda para ver os canais."
-              : "Nenhum servidor liberado para você ainda. Peça acesso ao administrador."}
-          </p>
+          serversLoadError ? (
+            // Distingue de "voce nao tem servidor nenhum" (abaixo) - isso aqui e' FALHA DE
+            // CARREGAR (soluco de rede, ver fetchWithRetry.js), nao falta de acesso de verdade.
+            // Antes disso mostrava a mesma mensagem de "sem acesso" pros dois casos, deixando a
+            // tela vazia pra sempre ate' deslogar/logar de novo (reportado pelo usuario).
+            <div className="channel-list-error">
+              <p className="channel-group-title">Não foi possível carregar seus servidores agora.</p>
+              <button type="button" className="link-btn" onClick={onRetryLoadServers}>
+                Tentar de novo
+              </button>
+            </div>
+          ) : (
+            <p className="channel-group-title">
+              Crie um servidor na barra à esquerda, ou peça pra um amigo te convidar pra um dele.
+            </p>
+          )
+        ) : channelsLoadError ? (
+          <div className="channel-list-error">
+            <p className="channel-group-title">Não foi possível carregar os canais desse servidor agora.</p>
+            <button type="button" className="link-btn" onClick={onRetryLoadChannels}>
+              Tentar de novo
+            </button>
+          </div>
         ) : (
           <>
             {canManageChannels && (

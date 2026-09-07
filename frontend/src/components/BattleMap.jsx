@@ -60,6 +60,7 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
   const isPreviewingUnpublished = canManageMap && viewingMap && viewingMap.id !== activeMapId;
 
   const imageRef = useRef(null);
+  const viewportRef = useRef(null);
   const fileInputRef = useRef(null);
   const tokenImageInputRef = useRef(null);
   const panStateRef = useRef(null); // { startX, startY, originX, originY, moved }
@@ -241,11 +242,23 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     }
   }
 
-  function handleWheel(e) {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.15 : 0.15;
-    setScale((s) => Math.max(0.4, Math.min(4, +(s + delta).toFixed(2))));
-  }
+  // Listener NATIVO (nao "onWheel" do React) e' de proposito - o React registra "onWheel" como
+  // listener PASSIVO por padrao, entao um "e.preventDefault()" ali dentro nao faz NADA de
+  // verdade (o navegador ignora, sem nem avisar) - por isso o scroll do mouse em cima do mapa
+  // rolava a SIDEBAR por baixo ao mesmo tempo que dava zoom no mapa (reportado pelo usuario).
+  // "{ passive: false }" aqui e' o que faz o preventDefault valer e travar o scroll da pagina
+  // por trás enquanto o mouse estiver em cima do mapa.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    function onWheelNative(e) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.15 : 0.15;
+      setScale((s) => Math.max(0.4, Math.min(4, +(s + delta).toFixed(2))));
+    }
+    el.addEventListener("wheel", onWheelNative, { passive: false });
+    return () => el.removeEventListener("wheel", onWheelNative);
+  }, [viewingMap?.id]);
 
   function handleContainerPointerDown(e) {
     if (e.target.closest(".battle-map-token")) return;
@@ -566,7 +579,7 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
       ) : (
         <div
           className="battle-map-viewport"
-          onWheel={handleWheel}
+          ref={viewportRef}
           onPointerDown={handleContainerPointerDown}
           onPointerMove={handleContainerPointerMove}
           onPointerUp={handleContainerPointerUp}

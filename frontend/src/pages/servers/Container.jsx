@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "../../api/client";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { createChatClient } from "../../ws/chatSocket";
+import { fetchWithRetry } from "../../utils/fetchWithRetry";
 
 export function useServersContainer() {
   const { serverId } = useParams();
@@ -23,6 +24,12 @@ export function useServersContainer() {
   const [stompClient, setStompClient] = useState(null);
   const [stompConnected, setStompConnected] = useState(false);
   const [stompError, setStompError] = useState("");
+  // true so' quando o carregamento inicial da lista de servidores falhou de vez (depois de 3
+  // tentativas) - distingue de "voce realmente nao tem nenhum servidor ainda" (ver
+  // ChannelSidebar.jsx). Reportado pelo usuario: um soluco de rede deixava a tela vazia pra
+  // sempre, parecendo "sem acesso", sem jeito de saber que era so' falha de carregar.
+  const [serversLoadError, setServersLoadError] = useState(false);
+  const [channelsLoadError, setChannelsLoadError] = useState(false);
 
   const selectedServerId = serverId ? Number(serverId) : null;
   const selectedServer = servers.find((s) => s.id === selectedServerId);
@@ -50,24 +57,45 @@ export function useServersContainer() {
     return () => client.deactivate();
   }, [token]);
 
+  function loadServers() {
+    setServersLoadError(false);
+    return fetchWithRetry(() => api.get("/api/servers"))
+      .then(({ data }) => {
+        setServers(data);
+        if (!selectedServerId && data.length > 0) {
+          navigate(`/servers/${data[0].id}`, { replace: true });
+        }
+      })
+      .catch((err) => {
+        console.error("Não foi possível carregar seus servidores depois de várias tentativas:", err);
+        setServersLoadError(true);
+      });
+  }
+
   useEffect(() => {
-    api.get("/api/servers").then(({ data }) => {
-      setServers(data);
-      if (!selectedServerId && data.length > 0) {
-        navigate(`/servers/${data[0].id}`, { replace: true });
-      }
-    });
+    loadServers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
+  function loadChannels() {
     if (!selectedServerId) return;
+    setChannelsLoadError(false);
     setSelectedChannel(null);
-    api.get(`/api/servers/${selectedServerId}/channels`).then(({ data }) => {
-      setChannels(data);
-      const firstText = data.find((c) => c.type === "TEXT");
-      if (firstText) setSelectedChannel(firstText);
-    });
+    fetchWithRetry(() => api.get(`/api/servers/${selectedServerId}/channels`))
+      .then(({ data }) => {
+        setChannels(data);
+        const firstText = data.find((c) => c.type === "TEXT");
+        if (firstText) setSelectedChannel(firstText);
+      })
+      .catch((err) => {
+        console.error("Não foi possível carregar os canais desse servidor depois de várias tentativas:", err);
+        setChannelsLoadError(true);
+      });
+  }
+
+  useEffect(() => {
+    loadChannels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedServerId]);
 
   // Veio do Home (fora de qualquer servidor - la' nao tem onde abrir o modal, ver
@@ -166,6 +194,10 @@ export function useServersContainer() {
     stompClient,
     stompConnected,
     stompError,
+    serversLoadError,
+    channelsLoadError,
+    onRetryLoadServers: loadServers,
+    onRetryLoadChannels: loadChannels,
     selectedServerId,
     selectedServer,
     handleCreateServer,

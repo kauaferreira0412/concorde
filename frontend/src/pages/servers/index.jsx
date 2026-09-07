@@ -39,6 +39,10 @@ export default function ServerPage() {
     stompClient,
     stompConnected,
     stompError,
+    serversLoadError,
+    channelsLoadError,
+    onRetryLoadServers,
+    onRetryLoadChannels,
     selectedServerId,
     selectedServer,
     handleCreateServer,
@@ -79,6 +83,10 @@ export default function ServerPage() {
           stompConnected={stompConnected}
           user={user}
           onLogout={logout}
+          serversLoadError={serversLoadError}
+          channelsLoadError={channelsLoadError}
+          onRetryLoadServers={onRetryLoadServers}
+          onRetryLoadChannels={onRetryLoadChannels}
         />
 
         {selectedChannel?.type === "VOICE" ? (
