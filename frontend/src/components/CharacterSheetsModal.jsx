@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import api from "../api/client";
-import { useAuth } from "../context/AuthContext.jsx";
 import { useAlert } from "../context/AlertContext.jsx";
 import { formatFileSize } from "../utils/fileSize";
-import { DownloadIcon, FileIcon, ImageIcon, PencilIcon, PlusIcon, TrashIcon, XIcon } from "./icons.jsx";
+import { DownloadIcon, FileIcon, ImageIcon, PencilIcon, PlusIcon, TrashIcon, UsersIcon, XIcon } from "./icons.jsx";
 
 /** PDF embutido dentro do proprio sistema (pedido explicito do usuario: "deve abrir um popup
  *  com a ficha, o PDF da ficha no sistema") - iframe simples, o navegador ja' sabe renderizar
@@ -45,13 +44,14 @@ function CharacterSheetViewerModal({ sheet, onClose }) {
 
 /**
  * Personagens de uma mesa de RPG (kit de RPG, pedido explicito do usuario) - villoes, NPCs,
- * personagens de jogador. SO' O MESTRE (quem criou a categoria) cria personagens e vincula um
- * JOGADOR a cada um; o jogador vinculado ve e EDITA a propria ficha (nome/foto/PDF), mas nao
- * cria nem apaga nada, nem ve os personagens de outros jogadores/villoes sem vinculo. O backend
- * ja' devolve so' o que ESSE usuario pode ver (ver CharacterSheetService.list).
+ * personagens de jogador. O SERVIDOR INTEIRO e' a mesa agora (nao mais uma categoria - pedido
+ * explicito: "desvincule as fichas dos personagens de uma categoria"). SO' O MESTRE (o dono do
+ * servidor) cria personagens e vincula um JOGADOR a cada um; o jogador vinculado ve e EDITA a
+ * propria ficha (nome/foto/PDF), mas nao cria nem apaga nada, nem ve os personagens de outros
+ * jogadores/villoes sem vinculo. O backend ja' devolve so' o que ESSE usuario pode ver (ver
+ * CharacterSheetService.list).
  */
-export default function CharacterSheetsModal({ server, category, members, onClose }) {
-  const { user } = useAuth();
+export default function CharacterSheetsModal({ server, isMaster, members, onClose }) {
   const { showAlert } = useAlert();
   const [sheets, setSheets] = useState(null); // null = carregando
   const [creating, setCreating] = useState(false);
@@ -60,10 +60,8 @@ export default function CharacterSheetsModal({ server, category, members, onClos
   const [error, setError] = useState("");
   const [viewingSheet, setViewingSheet] = useState(null);
 
-  const isMaster = category.createdBy === user?.id;
-
   function reload() {
-    return api.get(`/api/servers/${server.id}/categories/${category.id}/sheets`).then(({ data }) => setSheets(data));
+    return api.get(`/api/servers/${server.id}/sheets`).then(({ data }) => setSheets(data));
   }
 
   useEffect(() => {
@@ -77,7 +75,7 @@ export default function CharacterSheetsModal({ server, category, members, onClos
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [server.id, category.id]);
+  }, [server.id]);
 
   async function handleCreate(e) {
     e.preventDefault();
@@ -87,7 +85,7 @@ export default function CharacterSheetsModal({ server, category, members, onClos
     try {
       const formData = new FormData();
       formData.append("characterName", newName.trim());
-      const { data } = await api.post(`/api/servers/${server.id}/categories/${category.id}/sheets`, formData);
+      const { data } = await api.post(`/api/servers/${server.id}/sheets`, formData);
       setSheets((prev) => [data, ...(prev || [])]);
       setNewName("");
       setCreating(false);
@@ -100,7 +98,7 @@ export default function CharacterSheetsModal({ server, category, members, onClos
 
   async function handleDelete(sheet) {
     try {
-      await api.delete(`/api/servers/${server.id}/categories/${category.id}/sheets/${sheet.id}`);
+      await api.delete(`/api/servers/${server.id}/sheets/${sheet.id}`);
       setSheets((prev) => (prev || []).filter((s) => s.id !== sheet.id));
     } catch (err) {
       showAlert(err.response?.data?.error || "Não foi possível apagar esse personagem");
@@ -111,10 +109,20 @@ export default function CharacterSheetsModal({ server, category, members, onClos
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal settings-modal character-sheets-modal" onClick={(e) => e.stopPropagation()}>
         <div className="settings-modal-header">
-          <h2>Personagens - {category.name}</h2>
-          <button type="button" className="icon-btn" onClick={onClose}>
-            <XIcon />
-          </button>
+          <h2>
+            <UsersIcon size={16} style={{ marginRight: 6, verticalAlign: -2 }} />
+            Personagens
+          </h2>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {isMaster && !creating && (
+              <button type="button" className="character-sheets-new-btn" onClick={() => setCreating(true)}>
+                <PlusIcon size={12} /> Novo
+              </button>
+            )}
+            <button type="button" className="icon-btn" onClick={onClose}>
+              <XIcon />
+            </button>
+          </div>
         </div>
 
         <div className="settings-content character-sheets-content">
@@ -124,32 +132,24 @@ export default function CharacterSheetsModal({ server, category, members, onClos
               : "Aqui aparecem só os personagens que o mestre vinculou a você."}
           </p>
 
-          {isMaster && (
-            <>
-              {creating ? (
-                <form onSubmit={handleCreate} className="emoji-upload-row character-sheets-create-form">
-                  <input
-                    autoFocus
-                    type="text"
-                    className="emoji-name-input"
-                    placeholder="Nome do personagem"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    maxLength={60}
-                  />
-                  <button type="submit" disabled={!newName.trim() || creatingBusy}>
-                    {creatingBusy ? "Criando..." : "Criar"}
-                  </button>
-                  <button type="button" className="link-btn" onClick={() => setCreating(false)}>
-                    Cancelar
-                  </button>
-                </form>
-              ) : (
-                <button type="button" className="channel-item add character-sheets-create-btn" onClick={() => setCreating(true)}>
-                  <PlusIcon size={13} /> Criar personagem
-                </button>
-              )}
-            </>
+          {isMaster && creating && (
+            <form onSubmit={handleCreate} className="emoji-upload-row character-sheets-create-form">
+              <input
+                autoFocus
+                type="text"
+                className="emoji-name-input"
+                placeholder="Nome do personagem"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                maxLength={60}
+              />
+              <button type="submit" disabled={!newName.trim() || creatingBusy}>
+                {creatingBusy ? "Criando..." : "Criar"}
+              </button>
+              <button type="button" className="link-btn" onClick={() => setCreating(false)}>
+                Cancelar
+              </button>
+            </form>
           )}
 
           {error && <p className="auth-error">{error}</p>}
@@ -166,7 +166,6 @@ export default function CharacterSheetsModal({ server, category, members, onClos
                 <CharacterCard
                   key={sheet.id}
                   server={server}
-                  category={category}
                   sheet={sheet}
                   members={members}
                   isMaster={isMaster}
@@ -190,7 +189,7 @@ export default function CharacterSheetsModal({ server, category, members, onClos
  *  vinculado, status do PDF, e os controles de edicao embaixo (so' aparecem se
  *  "sheet.canEdit" - mestre OU o jogador vinculado, ver CharacterSheetService no backend).
  *  Estado de edicao proprio, isolado por card. */
-function CharacterCard({ server, category, sheet, members, isMaster, onChanged, onDelete, onOpen }) {
+function CharacterCard({ server, sheet, members, isMaster, onChanged, onDelete, onOpen }) {
   const { showAlert } = useAlert();
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(sheet.characterName);
@@ -203,7 +202,7 @@ function CharacterCard({ server, category, sheet, members, isMaster, onChanged, 
     try {
       const formData = new FormData();
       formDataFiller(formData);
-      const { data } = await api.put(`/api/servers/${server.id}/categories/${category.id}/sheets/${sheet.id}`, formData);
+      const { data } = await api.put(`/api/servers/${server.id}/sheets/${sheet.id}`, formData);
       onChanged(data);
     } catch (err) {
       showAlert(err.response?.data?.error || "Não foi possível salvar essa alteração");
@@ -245,7 +244,7 @@ function CharacterCard({ server, category, sheet, members, isMaster, onChanged, 
     const userId = value === "" ? null : Number(value);
     setBusy(true);
     try {
-      const { data } = await api.put(`/api/servers/${server.id}/categories/${category.id}/sheets/${sheet.id}/link`, { userId });
+      const { data } = await api.put(`/api/servers/${server.id}/sheets/${sheet.id}/link`, { userId });
       onChanged(data);
     } catch (err) {
       showAlert(err.response?.data?.error || "Não foi possível vincular esse jogador");

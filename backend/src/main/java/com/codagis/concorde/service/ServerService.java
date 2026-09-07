@@ -39,6 +39,7 @@ public class ServerService {
     private final CustomEmojiRepository customEmojiRepository;
     private final CategoryAccessRepository categoryAccessRepository;
     private final FriendshipService friendshipService;
+    private final CharacterSheetRepository characterSheetRepository;
 
     public ServerService(ServerRepository serverRepository, ChannelRepository channelRepository,
                           ChannelCategoryRepository channelCategoryRepository,
@@ -47,7 +48,8 @@ public class ServerService {
                           AdminGuard adminGuard, OnlinePresenceService presenceService,
                           PermissionService permissionService, VoicePresenceService voicePresenceService,
                           AuditLogService auditLogService, CustomEmojiRepository customEmojiRepository,
-                          CategoryAccessRepository categoryAccessRepository, FriendshipService friendshipService) {
+                          CategoryAccessRepository categoryAccessRepository, FriendshipService friendshipService,
+                          CharacterSheetRepository characterSheetRepository) {
         this.serverRepository = serverRepository;
         this.channelRepository = channelRepository;
         this.channelCategoryRepository = channelCategoryRepository;
@@ -63,6 +65,7 @@ public class ServerService {
         this.auditLogService = auditLogService;
         this.categoryAccessRepository = categoryAccessRepository;
         this.friendshipService = friendshipService;
+        this.characterSheetRepository = characterSheetRepository;
     }
 
     public List<VoiceParticipantInfo> getVoicePresence(Long serverId, Long userId) {
@@ -213,6 +216,7 @@ public class ServerService {
         membershipRepository.deleteByServerId(serverId);
         auditLogService.deleteAllForServer(serverId);
         customEmojiRepository.deleteByServerId(serverId);
+        characterSheetRepository.deleteByServerId(serverId);
         serverRepository.deleteById(serverId);
     }
 

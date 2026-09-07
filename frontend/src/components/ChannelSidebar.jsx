@@ -142,7 +142,10 @@ export default function ChannelSidebar({
   const [editingCategory, setEditingCategory] = useState(null); // { id, name } | null
   const [deletingCategory, setDeletingCategory] = useState(null);
   const [accessCategory, setAccessCategory] = useState(null); // categoria com o modal de "Restringir acesso" aberto
-  const [sheetsCategory, setSheetsCategory] = useState(null); // categoria com o modal de "Fichas de personagem" aberto
+  const [showCharacterSheets, setShowCharacterSheets] = useState(false); // modal de "Personagens" (servidor inteiro, ver CharacterSheetsModal.jsx)
+  // O "mestre" de uma mesa RPG e' o DONO do servidor (ou admin global) - mesma regra do
+  // backend (ver CharacterSheetService.isMaster/PermissionService.isOwnerOrGlobalAdmin).
+  const isCharacterMaster = isAdmin || (server && user?.id === server.ownerId);
   const [showInviteFriends, setShowInviteFriends] = useState(false);
   const [movingChannel, setMovingChannel] = useState(false); // abre o submenu "Mover para categoria" no channelMenu
   // Criar/apagar canal (ver "+ canal de texto/voz" mais abaixo e o menu de botao direito em
@@ -669,19 +672,6 @@ export default function ChannelSidebar({
         <span className="channel-group-title">{category.name.toUpperCase()}</span>
         {category.restricted && <LockIcon size={11} title="Acesso restrito" />}
       </button>
-      {server?.type === "RPG" && (
-        <button
-          type="button"
-          className="icon-btn channel-category-sheets-btn"
-          title="Ver personagens/fichas dessa mesa"
-          onClick={(e) => {
-            e.stopPropagation();
-            setSheetsCategory({ id: category.id, name: category.name, createdBy: category.createdBy });
-          }}
-        >
-          <FileIcon size={12} />
-        </button>
-      )}
       </div>
     );
   }
@@ -780,6 +770,17 @@ export default function ChannelSidebar({
           </div>
         ) : (
           <>
+            {server?.type === "RPG" && (
+              <button
+                type="button"
+                className="channel-item character-sheets-shortcut"
+                onClick={() => setShowCharacterSheets(true)}
+                title="Ver os personagens dessa mesa"
+              >
+                <FileIcon size={16} className="channel-item-icon" /> Personagens
+              </button>
+            )}
+
             {canManageChannels && (
               <button className="channel-item add category-add" onClick={() => setCreatingCategory(true)}>
                 <PlusIcon size={13} /> categoria
@@ -1137,8 +1138,13 @@ export default function ChannelSidebar({
         />
       )}
 
-      {sheetsCategory && (
-        <CharacterSheetsModal server={server} category={sheetsCategory} members={members} onClose={() => setSheetsCategory(null)} />
+      {showCharacterSheets && server && (
+        <CharacterSheetsModal
+          server={server}
+          isMaster={isCharacterMaster}
+          members={members}
+          onClose={() => setShowCharacterSheets(false)}
+        />
       )}
 
       {deletingCategory && (

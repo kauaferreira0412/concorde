@@ -524,6 +524,21 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   border: 1px dashed var(--border);
 }
 .channel-item.add:hover { border-color: var(--border-strong); color: var(--text-primary); }
+/* Atalho pra "Personagens" (kit de RPG, ver CharacterSheetsModal.jsx) - fixo no topo da lista
+   de canais de um servidor RPG, visivel pra QUALQUER membro (nao e' um canal de verdade, so'
+   abre o modal) - pedido explicito do usuario: "deve ficar solto em algum lugar, pra você
+   clicar, abrir o modal". Cor de destaque (nao cinza como os canais normais) pra diferenciar
+   visualmente de um canal de verdade. */
+.channel-item.character-sheets-shortcut {
+  color: var(--accent-text);
+  font-weight: 600;
+  margin-bottom: 10px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--border-soft);
+  border-radius: 0;
+}
+.channel-item.character-sheets-shortcut .channel-item-icon { color: var(--accent-text); }
+.channel-item.character-sheets-shortcut:hover { background: var(--accent-soft); }
 .channel-item-icon { flex-shrink: 0; margin-right: 8px; color: var(--text-muted); }
 .channel-item.active .channel-item-icon { color: var(--accent-text); }
 /* Canal de voz que voce esta REALMENTE conectado agora (nao so' selecionado/olhando) -
@@ -3404,7 +3419,24 @@ h3.chat-heading {
 .character-sheets-content { padding: 16px 22px; }
 .character-sheets-hint { margin-top: 0; }
 .character-sheets-create-form { margin-bottom: 14px; }
-.character-sheets-create-btn { margin-bottom: 14px; }
+/* Botao de criar personagem - pequeno, no cabecalho do modal (nao mais uma barra grandona
+   ocupando a largura toda, pedido explicito do usuario: "esse botão grandão... está muito
+   feio" - estilo mais parecido com o "+" discreto do Roll20 pra adicionar um personagem novo
+   no Journal). !important pelo mesmo motivo de sempre (".modal button:not(...)" forca
+   width:100%/padding sem isso). */
+.character-sheets-new-btn {
+  width: auto !important;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 11px !important;
+  font-size: 12px !important;
+  font-weight: 600;
+  border-radius: 999px;
+  background: var(--accent-soft) !important;
+  color: var(--accent-text) !important;
+}
+.character-sheets-new-btn:hover { background: var(--accent) !important; color: #fff !important; }
 
 .character-sheet-grid {
   display: grid;

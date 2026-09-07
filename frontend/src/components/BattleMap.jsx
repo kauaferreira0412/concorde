@@ -294,9 +294,12 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
 
   function openCharacterPicker() {
     setShowCharacterPicker((v) => !v);
-    if (serverId && categoryId) {
+    if (serverId) {
+      // Personagens sao do SERVIDOR inteiro agora, nao mais de uma categoria (ver
+      // CharacterSheetService no backend) - so' os que ESSE usuario enxerga (o mestre ve
+      // todos, o jogador so' os vinculados a ele).
       api
-        .get(`/api/servers/${serverId}/categories/${categoryId}/sheets`)
+        .get(`/api/servers/${serverId}/sheets`)
         .then(({ data }) => setCharacters(data))
         .catch(() => setCharacters([]));
     }
@@ -498,7 +501,7 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
                 >
                   <MapPinIcon size={15} /> {addMode && !pendingTokenTemplate ? "Clique no mapa..." : "Adicionar token"}
                 </button>
-                {categoryId && (
+                {serverId && (
                   <div style={{ position: "relative" }}>
                     <button
                       type="button"

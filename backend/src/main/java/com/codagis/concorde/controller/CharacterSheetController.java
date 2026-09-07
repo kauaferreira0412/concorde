@@ -13,12 +13,13 @@ import java.util.Locale;
 
 /**
  * Personagens de uma mesa de RPG (villoes, NPCs, personagens de jogador - kit de RPG, ver
- * CharacterSheetService). So' o mestre cria/apaga/vincula jogador; o mestre e o jogador
- * vinculado editam. PDF da ficha e' opcional e restrito a PDF de proposito (diferente do anexo
- * generico do chat - pedido explicito do usuario: "fichas de RPG em PDF").
+ * CharacterSheetService). Um servidor inteiro = uma mesa (pedido explicito do usuario). So' o
+ * mestre (dono do servidor) cria/apaga/vincula jogador; o mestre e o jogador vinculado editam.
+ * PDF da ficha e' opcional e restrito a PDF de proposito (diferente do anexo generico do chat -
+ * pedido explicito do usuario: "fichas de RPG em PDF").
  */
 @RestController
-@RequestMapping("/api/servers/{serverId}/categories/{categoryId}/sheets")
+@RequestMapping("/api/servers/{serverId}/sheets")
 public class CharacterSheetController {
 
     private final CharacterSheetService characterSheetService;
@@ -32,24 +33,24 @@ public class CharacterSheetController {
     }
 
     @GetMapping
-    public List<CharacterSheetResponse> list(@PathVariable Long serverId, @PathVariable Long categoryId) {
-        return characterSheetService.list(serverId, categoryId, currentUser.id());
+    public List<CharacterSheetResponse> list(@PathVariable Long serverId) {
+        return characterSheetService.list(serverId, currentUser.id());
     }
 
     @PostMapping(consumes = "multipart/form-data")
-    public CharacterSheetResponse create(@PathVariable Long serverId, @PathVariable Long categoryId,
+    public CharacterSheetResponse create(@PathVariable Long serverId,
                                           @RequestParam("characterName") String characterName,
                                           @RequestParam(value = "photo", required = false) MultipartFile photo,
                                           @RequestParam(value = "file", required = false) MultipartFile file) {
-        String imageUrl = photo != null && !photo.isEmpty() ? gcsService.upload(photo, "sheets/" + categoryId + "/photos") : null;
-        GcsService.FileUploadResult uploaded = uploadPdfIfPresent(file, categoryId);
-        return characterSheetService.create(serverId, categoryId, currentUser.id(), characterName, imageUrl,
+        String imageUrl = photo != null && !photo.isEmpty() ? gcsService.upload(photo, "sheets/" + serverId + "/photos") : null;
+        GcsService.FileUploadResult uploaded = uploadPdfIfPresent(file, serverId);
+        return characterSheetService.create(serverId, currentUser.id(), characterName, imageUrl,
                 uploaded != null ? uploaded.url() : null, uploaded != null ? uploaded.name() : null,
                 uploaded != null ? uploaded.size() : null);
     }
 
     @PutMapping(value = "/{sheetId}", consumes = "multipart/form-data")
-    public CharacterSheetResponse update(@PathVariable Long serverId, @PathVariable Long categoryId, @PathVariable Long sheetId,
+    public CharacterSheetResponse update(@PathVariable Long serverId, @PathVariable Long sheetId,
                                           @RequestParam(value = "characterName", required = false) String characterName,
                                           @RequestParam(value = "photo", required = false) MultipartFile photo,
                                           @RequestParam(value = "removePhoto", required = false, defaultValue = "false") boolean removePhoto,
@@ -57,7 +58,7 @@ public class CharacterSheetController {
                                           @RequestParam(value = "removeFile", required = false, defaultValue = "false") boolean removeFile) {
         String imageUrl = null; // null = nao mexe
         if (removePhoto) imageUrl = "";
-        else if (photo != null && !photo.isEmpty()) imageUrl = gcsService.upload(photo, "sheets/" + categoryId + "/photos");
+        else if (photo != null && !photo.isEmpty()) imageUrl = gcsService.upload(photo, "sheets/" + serverId + "/photos");
 
         String fileUrl = null;
         String fileName = null;
@@ -65,28 +66,27 @@ public class CharacterSheetController {
         if (removeFile) {
             fileUrl = "";
         } else {
-            GcsService.FileUploadResult uploaded = uploadPdfIfPresent(file, categoryId);
+            GcsService.FileUploadResult uploaded = uploadPdfIfPresent(file, serverId);
             if (uploaded != null) {
                 fileUrl = uploaded.url();
                 fileName = uploaded.name();
                 fileSize = uploaded.size();
             }
         }
-        return characterSheetService.update(serverId, categoryId, currentUser.id(), sheetId, characterName, imageUrl, fileUrl, fileName, fileSize);
+        return characterSheetService.update(serverId, currentUser.id(), sheetId, characterName, imageUrl, fileUrl, fileName, fileSize);
     }
 
     @PutMapping("/{sheetId}/link")
-    public CharacterSheetResponse link(@PathVariable Long serverId, @PathVariable Long categoryId, @PathVariable Long sheetId,
-                                        @RequestBody LinkPlayerRequest req) {
-        return characterSheetService.linkPlayer(serverId, categoryId, currentUser.id(), sheetId, req.userId());
+    public CharacterSheetResponse link(@PathVariable Long serverId, @PathVariable Long sheetId, @RequestBody LinkPlayerRequest req) {
+        return characterSheetService.linkPlayer(serverId, currentUser.id(), sheetId, req.userId());
     }
 
     @DeleteMapping("/{sheetId}")
-    public void delete(@PathVariable Long serverId, @PathVariable Long categoryId, @PathVariable Long sheetId) {
-        characterSheetService.delete(serverId, categoryId, currentUser.id(), sheetId);
+    public void delete(@PathVariable Long serverId, @PathVariable Long sheetId) {
+        characterSheetService.delete(serverId, currentUser.id(), sheetId);
     }
 
-    private GcsService.FileUploadResult uploadPdfIfPresent(MultipartFile file, Long categoryId) {
+    private GcsService.FileUploadResult uploadPdfIfPresent(MultipartFile file, Long serverId) {
         if (file == null || file.isEmpty()) return null;
         String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "";
         boolean looksLikePdf = "application/pdf".equals(file.getContentType())
@@ -94,6 +94,6 @@ public class CharacterSheetController {
         if (!looksLikePdf) {
             throw new IllegalArgumentException("A ficha só pode ser um arquivo PDF");
         }
-        return gcsService.uploadAttachment(file, "sheets/" + categoryId);
+        return gcsService.uploadAttachment(file, "sheets/" + serverId);
     }
 }

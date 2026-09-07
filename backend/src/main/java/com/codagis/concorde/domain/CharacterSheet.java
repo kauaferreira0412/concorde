@@ -6,18 +6,18 @@ import lombok.*;
 import java.time.Instant;
 
 // Personagem de uma mesa de RPG (villao, NPC, personagem de jogador - kit de RPG, ver
-// CharacterSheetService/CharacterSheetsModal.jsx). Vive numa CATEGORIA inteira (a mesa/
-// campanha), nao num canal especifico. SO' O MESTRE (quem criou a categoria, ver
-// ChannelCategory.createdBy) cria personagens e decide "linkedUserId" - qual JOGADOR (se
-// algum) tem acesso aquela ficha (pedido explicito do usuario: "os jogadores nao criam
-// personagem... so' o mestre que cria... e' o mestre que vai dizer qual ficha cada jogador tem
-// acesso"). O jogador vinculado enxerga e EDITA essa ficha (nome/foto/PDF); quem nao esta'
-// vinculado (e nao e' o mestre) nem sabe que ela existe (ver CharacterSheetService.list).
-// Personagem sem "linkedUserId" (null) = so' o mestre ve (villao/NPC). Sem FK (mesmo padrao do
-// resto do projeto).
+// CharacterSheetService/CharacterSheetsModal.jsx). Vive no SERVIDOR inteiro agora (pedido
+// explicito do usuario: "desvincule as fichas dos personagens de uma categoria" - cada
+// servidor RPG e' uma mesa/campanha so'). SO' O MESTRE (o dono do servidor, ver
+// Server.ownerId/PermissionService.isOwnerOrGlobalAdmin) cria personagens e decide
+// "linkedUserId" - qual JOGADOR (se algum) tem acesso aquela ficha. O jogador vinculado
+// enxerga e EDITA essa ficha (nome/foto/PDF); quem nao esta' vinculado (e nao e' o mestre) nem
+// sabe que ela existe (ver CharacterSheetService.list). Personagem sem "linkedUserId" (null) =
+// so' o mestre ve (villao/NPC). Sem FK (mesmo padrao do resto do projeto).
 @Entity
 @Table(name = "character_sheets", indexes = {
         @Index(name = "idx_character_sheets_category_id", columnList = "categoryId"),
+        @Index(name = "idx_character_sheets_server_id", columnList = "serverId"),
         @Index(name = "idx_character_sheets_owner_user_id", columnList = "ownerUserId"),
         @Index(name = "idx_character_sheets_linked_user_id", columnList = "linkedUserId")
 })
@@ -32,13 +32,23 @@ public class CharacterSheet {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    // Coluna de uma versao anterior (ficha vivia numa CATEGORIA, nao no servidor todo) - nao
+    // usada mais em nenhuma consulta/regra (ver "serverId" abaixo), mantida so' pra nao precisar
+    // apagar a coluna do banco (nenhum dado se perde, so' fica sem uso).
+    @Column
     private Long categoryId;
 
-    // Quem CRIOU esse personagem - sempre o mestre da categoria (ver
-    // CharacterSheetService.create, que so' deixa o mestre chamar isso). Nome do campo ficou
-    // de uma versao anterior (jogadores subiam a propria ficha) - mantido pra nao precisar
-    // renomear a coluna no banco, mas o SIGNIFICADO agora e' sempre "criado pelo mestre".
+    // Servidor inteiro dono desse personagem (pedido explicito do usuario) - SEM
+    // "nullable = false" de proposito, coluna nova numa tabela que ja' tinha fichas de antes
+    // (mesmo motivo de sempre com ddl-auto:update e NOT NULL em tabela com dados, ver
+    // MapToken.imageUrl). Toda ficha NOVA sempre nasce com isso preenchido (ver
+    // CharacterSheetService.create).
+    private Long serverId;
+
+    // Quem CRIOU esse personagem - sempre o mestre (ver CharacterSheetService.create, que so'
+    // deixa o mestre chamar isso). Nome do campo ficou de uma versao anterior (jogadores
+    // subiam a propria ficha) - mantido pra nao precisar renomear a coluna no banco, mas o
+    // SIGNIFICADO agora e' sempre "criado pelo mestre".
     @Column(nullable = false)
     private Long ownerUserId;
 
