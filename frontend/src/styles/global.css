@@ -842,7 +842,8 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
 /* ============================================================
    Chat
    ============================================================ */
-.chat-window, .voice-channel { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-app); }
+.chat-window, .voice-channel, .battle-map-channel { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-app); }
+.battle-map-channel-body { flex: 1; overflow-y: auto; padding: 16px 20px; min-height: 0; }
 .chat-window.empty { align-items: center; justify-content: center; gap: 10px; color: var(--text-muted); font-size: 14px; }
 .chat-header {
   padding: 15px 20px;
@@ -3395,79 +3396,108 @@ h3.chat-heading {
   object-fit: cover;
 }
 
-/* Personagens de uma mesa de RPG (kit de RPG, ver CharacterSheetsModal.jsx). */
-.character-sheet-list { display: flex; flex-direction: column; gap: 6px; }
-.character-sheet-row {
+/* Personagens de uma mesa de RPG (kit de RPG, ver CharacterSheetsModal.jsx) - grade de cards
+   com retrato grande em cima, inspirado no "Journal" do Roll20 (pedido explicito do usuario:
+   "pesquise como o Roll20 e deixe parecido" - a lista anterior era uma linha fina soh com
+   icones pequenos, "muito mal feita" no feedback do usuario). */
+.character-sheets-modal { width: 820px; max-width: calc(100vw - 40px); }
+.character-sheets-content { padding: 16px 22px; }
+.character-sheets-hint { margin-top: 0; }
+.character-sheets-create-form { margin-bottom: 14px; }
+.character-sheets-create-btn { margin-bottom: 14px; }
+
+.character-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+.character-card {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+  flex-direction: column;
   background: var(--bg-panel-2);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-md);
+  overflow: hidden;
 }
-.character-sheet-photo {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  object-fit: cover;
+/* Retrato = o quadrado inteiro do topo, nao um circulo pequeno - e' o que da' o "jeito de
+   ficha de personagem" (Roll20 mostra assim na lista de personagens). !important pelo mesmo
+   motivo de sempre (".modal button:not(...)" forca width:100%/padding/background sem isso). */
+.character-card-portrait {
+  position: relative;
+  width: 100% !important;
+  aspect-ratio: 1;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none;
+  border-radius: 0 !important;
+  background: var(--bg-input) !important;
+  cursor: pointer;
+  display: block;
 }
-.character-sheet-photo-empty {
+.character-card-portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.character-card-portrait-empty {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-input);
   color: var(--text-muted);
 }
-.character-sheet-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.character-sheet-info strong {
+.character-card-pdf-badge {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.65);
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+.character-card-body { padding: 9px 10px 6px; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.character-card-name-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.character-card-name {
+  font-weight: 700;
   font-size: 13.5px;
+  cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
+.character-card-name:hover { text-decoration: underline; }
 .character-sheet-inline-edit { width: auto !important; padding: 2px !important; flex-shrink: 0; }
-.character-sheet-info span {
+.character-card-linked-tag { font-size: 11px; color: var(--accent-text); }
+.character-card-file-status {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.character-sheet-link-select {
-  width: auto !important;
+.character-card-link-select {
+  width: 100% !important;
   font-size: 11.5px !important;
-  padding: 2px 6px !important;
+  padding: 3px 6px !important;
   background: var(--bg-input);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
-  align-self: flex-start;
 }
-.character-sheet-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
-/* Foto/nome clicaveis abrem o popup com o PDF da ficha (ver CharacterSheetViewerModal em
-   CharacterSheetsModal.jsx) - !important pelo mesmo motivo de sempre (".modal button:not(...)"
-   forca width:100%/padding sem isso, ver historico de bugs identico com outros botoes dentro
-   de modal). */
-.character-sheet-photo-btn {
-  width: auto !important;
-  height: auto !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  background: none !important;
-  flex-shrink: 0;
-  border-radius: 50%;
-  cursor: pointer;
+.character-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border-top: 1px solid var(--border-soft);
 }
-.character-sheet-name-link { cursor: pointer; }
-.character-sheet-name-link:hover { text-decoration: underline; }
 
 /* Popup com o PDF embutido (ver CharacterSheetViewerModal) - bem maior que o modal de lista,
    pra dar espaco de verdade pra ler a ficha. */

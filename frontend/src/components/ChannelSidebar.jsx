@@ -22,6 +22,7 @@ import {
   ListIcon,
   LockIcon,
   LogOutIcon,
+  MapIcon,
   MegaphoneIcon,
   MicIcon,
   MicOffIcon,
@@ -303,7 +304,37 @@ export default function ChannelSidebar({
   }
 
   function renderChannel(c) {
-    return c.type === "VOICE" ? renderVoiceChannel(c) : renderTextChannel(c);
+    if (c.type === "VOICE") return renderVoiceChannel(c);
+    if (c.type === "MAP") return renderMapChannel(c);
+    return renderTextChannel(c);
+  }
+
+  /** Canal de MAPA (kit de RPG, ver BattleMap.jsx) - um lugar proprio pra abrir o mapa de
+   *  batalha, igual um canal de texto (nao precisa mais estar dentro de uma call de voz -
+   *  pedido explicito do usuario). Sem badge de nao-lido/mencao (nao tem chat aqui). */
+  function renderMapChannel(c) {
+    return (
+      <button
+        key={c.id}
+        className={"channel-item" + (c.id === selectedChannelId ? " active" : "") + (draggingChannelId === c.id ? " dragging" : "")}
+        onClick={() => onSelectChannel(c)}
+        onContextMenu={(e) => {
+          if (!canManageChannels) return;
+          e.preventDefault();
+          setChannelMenu({ id: c.id, name: c.name, x: e.clientX, y: e.clientY });
+        }}
+        draggable={canManageChannels}
+        onDragStart={() => setDraggingChannelId(c.id)}
+        onDragEnd={() => {
+          setDraggingChannelId(null);
+          setDragOverCategoryId(null);
+        }}
+        title={canManageChannels ? "Arraste pra uma categoria pra mover" : undefined}
+      >
+        <MapIcon size={16} className="channel-item-icon" />
+        {c.name}
+      </button>
+    );
   }
 
   useEffect(() => {
@@ -785,6 +816,11 @@ export default function ChannelSidebar({
                 <button className="channel-item add" onClick={() => onCreateChannel("VOICE")}>
                   + canal de voz
                 </button>
+                {server?.type === "RPG" && (
+                  <button className="channel-item add" onClick={() => onCreateChannel("MAP")}>
+                    + canal de mapa
+                  </button>
+                )}
               </>
             )}
 

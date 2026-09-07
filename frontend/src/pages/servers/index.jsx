@@ -2,6 +2,7 @@ import ServerSidebar from "../../components/ServerSidebar.jsx";
 import ChannelSidebar from "../../components/ChannelSidebar.jsx";
 import ChatWindow from "../../components/ChatWindow.jsx";
 import VoiceChannel from "../../components/VoiceChannel.jsx";
+import BattleMapChannel from "../../components/BattleMapChannel.jsx";
 import MemberList from "../../components/MemberList.jsx";
 import CreateServerModal from "../../components/CreateServerModal.jsx";
 import CreateChannelModal from "../../components/CreateChannelModal.jsx";
@@ -93,10 +94,11 @@ export default function ServerPage() {
           <VoiceChannel
             channel={selectedChannel}
             serverName={selectedServer?.name}
-            serverType={selectedServer?.type}
             stompClient={stompClient}
             stompConnected={stompConnected}
           />
+        ) : selectedChannel?.type === "MAP" ? (
+          <BattleMapChannel channel={selectedChannel} stompClient={stompClient} stompConnected={stompConnected} />
         ) : (
           <ChatWindow
             channel={selectedChannel}

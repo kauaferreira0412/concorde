@@ -109,7 +109,7 @@ export default function CharacterSheetsModal({ server, category, members, onClos
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal settings-modal" onClick={(e) => e.stopPropagation()} style={{ width: 520 }}>
+      <div className="modal settings-modal character-sheets-modal" onClick={(e) => e.stopPropagation()}>
         <div className="settings-modal-header">
           <h2>Personagens - {category.name}</h2>
           <button type="button" className="icon-btn" onClick={onClose}>
@@ -117,8 +117,8 @@ export default function CharacterSheetsModal({ server, category, members, onClos
           </button>
         </div>
 
-        <div className="settings-content" style={{ padding: "16px 22px" }}>
-          <p className="admin-hint" style={{ marginTop: 0 }}>
+        <div className="settings-content character-sheets-content">
+          <p className="admin-hint character-sheets-hint">
             {isMaster
               ? "Você é o mestre dessa mesa - crie os personagens (jogadores, vilões, NPCs) e vincule cada um a um jogador do servidor. Só quem estiver vinculado enxerga a própria ficha."
               : "Aqui aparecem só os personagens que o mestre vinculou a você."}
@@ -127,7 +127,7 @@ export default function CharacterSheetsModal({ server, category, members, onClos
           {isMaster && (
             <>
               {creating ? (
-                <form onSubmit={handleCreate} className="emoji-upload-row" style={{ marginBottom: 12 }}>
+                <form onSubmit={handleCreate} className="emoji-upload-row character-sheets-create-form">
                   <input
                     autoFocus
                     type="text"
@@ -145,7 +145,7 @@ export default function CharacterSheetsModal({ server, category, members, onClos
                   </button>
                 </form>
               ) : (
-                <button type="button" className="channel-item add" style={{ marginBottom: 12 }} onClick={() => setCreating(true)}>
+                <button type="button" className="channel-item add character-sheets-create-btn" onClick={() => setCreating(true)}>
                   <PlusIcon size={13} /> Criar personagem
                 </button>
               )}
@@ -161,9 +161,9 @@ export default function CharacterSheetsModal({ server, category, members, onClos
               {isMaster ? "Nenhum personagem criado ainda." : "Nenhum personagem vinculado a você ainda."}
             </p>
           ) : (
-            <div className="character-sheet-list">
+            <div className="character-sheet-grid">
               {sheets.map((sheet) => (
-                <CharacterRow
+                <CharacterCard
                   key={sheet.id}
                   server={server}
                   category={category}
@@ -185,10 +185,12 @@ export default function CharacterSheetsModal({ server, category, members, onClos
   );
 }
 
-/** Uma linha (um personagem) - foto, nome, quem esta' vinculado, PDF, e os controles de
- *  edicao (so' aparecem se "sheet.canEdit" - mestre OU o jogador vinculado, ver
- *  CharacterSheetService no backend). Estado de edicao proprio, isolado por linha. */
-function CharacterRow({ server, category, sheet, members, isMaster, onChanged, onDelete, onOpen }) {
+/** Um card (um personagem) - retrato grande em cima (estilo "Journal" do Roll20, pedido
+ *  explicito do usuario: "pesquise como o Roll20 e deixe parecido"), nome, quem esta'
+ *  vinculado, status do PDF, e os controles de edicao embaixo (so' aparecem se
+ *  "sheet.canEdit" - mestre OU o jogador vinculado, ver CharacterSheetService no backend).
+ *  Estado de edicao proprio, isolado por card. */
+function CharacterCard({ server, category, sheet, members, isMaster, onChanged, onDelete, onOpen }) {
   const { showAlert } = useAlert();
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(sheet.characterName);
@@ -253,18 +255,23 @@ function CharacterRow({ server, category, sheet, members, isMaster, onChanged, o
   }
 
   return (
-    <div className="character-sheet-row">
-      <button type="button" className="character-sheet-photo-btn" onClick={onOpen} title="Abrir ficha">
+    <div className="character-card">
+      <button type="button" className="character-card-portrait" onClick={onOpen} title="Abrir ficha">
         {sheet.imageUrl ? (
-          <img src={sheet.imageUrl} alt="" className="character-sheet-photo" />
+          <img src={sheet.imageUrl} alt="" />
         ) : (
-          <span className="character-sheet-photo character-sheet-photo-empty">
-            <FileIcon size={16} />
+          <span className="character-card-portrait-empty">
+            <FileIcon size={30} />
+          </span>
+        )}
+        {sheet.fileUrl && (
+          <span className="character-card-pdf-badge" title="Tem PDF">
+            <FileIcon size={11} /> PDF
           </span>
         )}
       </button>
 
-      <div className="character-sheet-info">
+      <div className="character-card-body">
         {editingName ? (
           <div className="settings-inline-save">
             <input
@@ -279,8 +286,8 @@ function CharacterRow({ server, category, sheet, members, isMaster, onChanged, o
             </button>
           </div>
         ) : (
-          <strong>
-            <span className="character-sheet-name-link" onClick={onOpen} title="Abrir ficha">
+          <div className="character-card-name-row">
+            <span className="character-card-name" onClick={onOpen} title={sheet.characterName}>
               {sheet.characterName}
             </span>
             {sheet.canEdit && (
@@ -288,11 +295,11 @@ function CharacterRow({ server, category, sheet, members, isMaster, onChanged, o
                 <PencilIcon size={12} />
               </button>
             )}
-          </strong>
+          </div>
         )}
 
         {isMaster ? (
-          <select value={sheet.linkedUserId || ""} onChange={handleLinkChange} disabled={busy} className="character-sheet-link-select">
+          <select value={sheet.linkedUserId || ""} onChange={handleLinkChange} disabled={busy} className="character-card-link-select">
             <option value="">Sem jogador vinculado</option>
             {members.map((m) => (
               <option key={m.userId} value={m.userId}>
@@ -301,17 +308,21 @@ function CharacterRow({ server, category, sheet, members, isMaster, onChanged, o
             ))}
           </select>
         ) : (
-          <span>Personagem vinculado a você</span>
+          <span className="character-card-linked-tag">Vinculado a você</span>
         )}
 
-        {sheet.fileName && (
-          <span>
-            <FileIcon size={12} /> {sheet.fileName} · {formatFileSize(sheet.fileSize)}
-          </span>
-        )}
+        <span className="character-card-file-status">
+          {sheet.fileName ? (
+            <>
+              <FileIcon size={12} /> {sheet.fileName} · {formatFileSize(sheet.fileSize)}
+            </>
+          ) : (
+            "Sem PDF ainda"
+          )}
+        </span>
       </div>
 
-      <div className="character-sheet-actions">
+      <div className="character-card-actions">
         {sheet.fileUrl && (
           <a href={sheet.fileUrl} target="_blank" rel="noopener noreferrer" className="icon-btn" title="Baixar/abrir PDF">
             <DownloadIcon size={16} />
