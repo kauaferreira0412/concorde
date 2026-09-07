@@ -30,7 +30,13 @@ function CharacterSheetViewerModal({ sheet, onClose }) {
         </div>
         <div className="character-sheet-viewer-body">
           {sheet.fileUrl ? (
-            <iframe src={sheet.fileUrl} title={`Ficha de ${sheet.characterName}`} />
+            // "#navpanes=0" esconde o painel de miniaturas do visualizador nativo do
+            // navegador (Chrome/Edge) e "#view=FitH" ajusta o zoom pra largura em vez do
+            // padrao "ajustar a pagina inteira" - sem isso, o PDF aparecia pequeno com uma
+            // faixa grande de espaco morto do lado (reportado pelo usuario). So' funciona em
+            // navegadores baseados em Chromium (o app inteiro roda em cima de um, Electron
+            // incluso) - Firefox ignora os parametros e mostra do jeito padrao dele, sem quebrar.
+            <iframe src={`${sheet.fileUrl}#navpanes=0&view=FitH`} title={`Ficha de ${sheet.characterName}`} />
           ) : (
             <p className="admin-hint" style={{ padding: 20 }}>
               {sheet.canEdit ? "Nenhum PDF subido ainda pra esse personagem - use o ícone de arquivo pra subir um." : "O mestre ainda não subiu o PDF dessa ficha."}
