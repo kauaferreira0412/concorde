@@ -45,6 +45,15 @@ contextBridge.exposeInMainWorld("concordeDesktop", {
 
   /** Abre um link no navegador padrao do SO (nao dentro do proprio Concorde). */
   openExternal: (url) => ipcRenderer.invoke("concorde:open-external", url),
+
+  /**
+   * Baixar/copiar uma imagem (ver ImageLightbox.jsx) - rodam no processo principal, sem as
+   * restricoes de CORS/contexto do renderer (o app carrega via file://, sem "mesma origem"
+   * com o bucket de storage - por isso o <a download>/Clipboard API comuns nao funcionavam
+   * dentro do app desktop, so' no navegador). {ok:boolean, error?:string}
+   */
+  downloadImage: (url) => ipcRenderer.invoke("concorde:download-image", url),
+  copyImage: (url) => ipcRenderer.invoke("concorde:copy-image", url),
   /** Dispara o desinstalador do Windows e fecha o app. {ok:boolean, error?:string} */
   uninstall: () => ipcRenderer.invoke("concorde:uninstall"),
 

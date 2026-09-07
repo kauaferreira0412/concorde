@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol, ipcMain, desktopCapturer, net, shell, globalShortcut, Menu } = require("electron");
+const { app, BrowserWindow, protocol, ipcMain, desktopCapturer, net, shell, globalShortcut, Menu, clipboard, nativeImage } = require("electron");
 const path = require("path");
 const { pathToFileURL } = require("url");
 const { spawn } = require("child_process");
@@ -339,6 +339,47 @@ ipcMain.handle("concorde:zoom-reset", () => {
 // (e que a pessoa esta prestes a desinstalar).
 ipcMain.handle("concorde:open-external", (_event, url) => {
   if (typeof url === "string" && /^https:\/\//.test(url)) shell.openExternal(url);
+});
+
+// Baixar/copiar uma imagem do chat/ficha (ver ImageLightbox.jsx) - dentro do app desktop o
+// clique num <a download> nao baixa de verdade (o app carrega a pagina via file://, sem
+// "mesma origem" com o bucket de storage - o navegador so' navega em vez de baixar, ou o
+// clique simplesmente nao faz nada) e o Clipboard API do navegador falhava (fetch cross-origin
+// barrado). Os dois daqui rodam no processo PRINCIPAL (Node/Electron, sem as mesmas restricoes
+// de CORS/contexto seguro do renderer) - baixar usa a sessao de download nativa do Electron
+// (session.downloadURL, mesmo fluxo "Salvar como" de qualquer download normal do SO), copiar
+// usa o modulo "clipboard" nativo do Electron em vez do Clipboard API da pagina.
+ipcMain.handle("concorde:download-image", (_event, url) => {
+  if (typeof url !== "string" || !/^https:\/\//.test(url) || !mainWindow) {
+    return { ok: false, error: "URL inválida" };
+  }
+  try {
+    mainWindow.webContents.session.downloadURL(url);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  }
+});
+
+ipcMain.handle("concorde:copy-image", async (_event, url) => {
+  if (typeof url !== "string" || !/^https:\/\//.test(url)) {
+    return { ok: false, error: "URL inválida" };
+  }
+  try {
+    const response = await net.fetch(url);
+    if (!response.ok) {
+      return { ok: false, error: `HTTP ${response.status}` };
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const image = nativeImage.createFromBuffer(buffer);
+    if (image.isEmpty()) {
+      return { ok: false, error: "Formato de imagem não suportado" };
+    }
+    clipboard.writeImage(image);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  }
 });
 
 // Dispara o desinstalador do NSIS (gerado pelo electron-builder, ver "nsis" em package.json) -

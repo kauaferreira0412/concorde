@@ -67,17 +67,31 @@ export default function ImageLightbox({ src, alt, onClose }) {
     panStateRef.current = null;
   }
 
-  // Copia a imagem de verdade pra area de transferencia (dá pra colar em outro app/chat) - so'
-  // funciona se o navegador permitir "fetch" da imagem (mesma origem, ou o servidor de onde ela
-  // veio libera CORS) e o formato for compativel com o Clipboard API (png/jpeg/webp - gif nao é
-  // suportado por nenhum navegador ainda). Se falhar por qualquer motivo, avisa em vez de
-  // fingir que funcionou.
+  // window.concordeDesktop so' existe DENTRO do app Electron (ver electron/preload.cjs) - la'
+  // ele carrega a pagina via file://, sem "mesma origem" com o bucket de storage de onde a
+  // imagem vem, entao tanto o Clipboard API quanto o <a download>/target="_blank" do navegador
+  // falhavam silenciosamente (reportado pelo usuario: "não faz download"/"não foi possível
+  // copiar"). Rodar isso no processo PRINCIPAL do Electron (via IPC) evita essas restricoes
+  // por completo - no navegador normal (isElectronDesktop false) continua tudo pelo caminho de
+  // sempre (fetch+Clipboard API, <a download>/target=_blank), sem mudar nada.
+  const isElectronDesktop = typeof window !== "undefined" && !!window.concordeDesktop;
+
+  // Copia a imagem de verdade pra area de transferencia (dá pra colar em outro app/chat). No
+  // navegador, so' funciona se ele permitir "fetch" da imagem (mesma origem, ou o servidor de
+  // onde ela veio libera CORS) e o formato for compativel com o Clipboard API (png/jpeg/webp -
+  // gif nao é suportado por nenhum navegador ainda). Se falhar por qualquer motivo, avisa em
+  // vez de fingir que funcionou.
   async function handleCopy() {
     setCopyState("copying");
     try {
-      const res = await fetch(src);
-      const blob = await res.blob();
-      await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+      if (isElectronDesktop) {
+        const result = await window.concordeDesktop.copyImage(src);
+        if (!result?.ok) throw new Error(result?.error || "falhou");
+      } else {
+        const res = await fetch(src);
+        const blob = await res.blob();
+        await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+      }
       setCopyState("done");
       setTimeout(() => setCopyState("idle"), 1500);
     } catch (err) {
@@ -85,6 +99,14 @@ export default function ImageLightbox({ src, alt, onClose }) {
       setCopyState("error");
       setTimeout(() => setCopyState("idle"), 2000);
     }
+  }
+
+  function handleDownload() {
+    window.concordeDesktop.downloadImage(src);
+  }
+
+  function handleOpenExternal() {
+    window.concordeDesktop.openExternal(src);
   }
 
   return (
@@ -99,15 +121,27 @@ export default function ImageLightbox({ src, alt, onClose }) {
         <button type="button" className="icon-btn" onClick={handleCopy} title="Copiar imagem">
           <CopyIcon size={18} />
         </button>
-        {/* "download" so' funciona de verdade pra imagens da mesma origem - em imagens de
-            outro dominio (ex: bucket de storage) o navegador pode abrir em vez de baixar,
-            mas nunca quebra: e' so' um link normal por baixo. */}
-        <a className="icon-btn" href={src} download title="Baixar imagem">
-          <DownloadIcon size={18} />
-        </a>
-        <a className="icon-btn" href={src} target="_blank" rel="noreferrer" title="Abrir em nova aba">
-          <ExternalLinkIcon size={18} />
-        </a>
+        {isElectronDesktop ? (
+          <button type="button" className="icon-btn" onClick={handleDownload} title="Baixar imagem">
+            <DownloadIcon size={18} />
+          </button>
+        ) : (
+          // "download" so' funciona de verdade pra imagens da mesma origem - em imagens de
+          // outro dominio (ex: bucket de storage) o navegador pode abrir em vez de baixar,
+          // mas nunca quebra: e' so' um link normal por baixo.
+          <a className="icon-btn" href={src} download title="Baixar imagem">
+            <DownloadIcon size={18} />
+          </a>
+        )}
+        {isElectronDesktop ? (
+          <button type="button" className="icon-btn" onClick={handleOpenExternal} title="Abrir no navegador">
+            <ExternalLinkIcon size={18} />
+          </button>
+        ) : (
+          <a className="icon-btn" href={src} target="_blank" rel="noreferrer" title="Abrir em nova aba">
+            <ExternalLinkIcon size={18} />
+          </a>
+        )}
         <button type="button" className="icon-btn" onClick={onClose} title="Fechar (Esc)">
           <XIcon size={18} />
         </button>
