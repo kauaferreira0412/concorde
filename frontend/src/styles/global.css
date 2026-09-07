@@ -2696,6 +2696,13 @@ h3.chat-heading {
 }
 .lightbox-toolbar .icon-btn { color: var(--text-secondary); }
 .lightbox-toolbar .icon-btn:hover { color: var(--text-primary); }
+/* No app desktop, a barra de titulo customizada (ver DesktopTitleBar.jsx) fica FIXA no topo,
+   por cima de tudo (z-index bem mais alto que o do lightbox) - sem esse ajuste, a barra de
+   ferramentas (e o aviso de "copiado") nasciam parcialmente ATRAS dela, cortadas (reportado
+   pelo usuario: "os botões de interação com uma imagem" bugados so' no desktop). No navegador
+   normal (sem essa barra) nada muda. */
+html[data-desktop-titlebar="true"] .lightbox-toolbar { top: 54px; }
+html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 
 /* ============================================================
    Modal
