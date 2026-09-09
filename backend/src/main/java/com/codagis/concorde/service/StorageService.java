@@ -7,6 +7,7 @@ import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -88,6 +89,13 @@ public class StorageService {
                 .region(Region.of("auto"))
                 .endpointOverride(URI.create("https://" + accountId + ".r2.cloudflarestorage.com"))
                 .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKeyId, secretAccessKey)))
+                // Explicito de proposito (nao deixa o SDK "adivinhar" via classpath) - o
+                // cliente HTTP padrao (Apache HttpClient 5) batia de frente com outra versao
+                // dessa mesma lib ja' presente no projeto e derrubava o backend inteiro assim
+                // que esse bean era criado (ClassNotFoundException: TlsSocketStrategy). Esse
+                // aqui e' bem mais simples (so' usa java.net.HttpURLConnection por baixo) e
+                // suficiente pra so' fazer upload (PUT) de arquivo.
+                .httpClientBuilder(UrlConnectionHttpClient.builder())
                 .build();
     }
 
