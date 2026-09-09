@@ -2654,6 +2654,12 @@ h3.chat-heading {
   justify-content: center;
   overflow: hidden;
   touch-action: none;
+  /* Sem isso, uma imagem grande o suficiente pra chegar perto dos cantos desenhava POR CIMA da
+     barra de ferramentas/aviso de copiado (que vem antes no HTML, mas nenhum dos tres tinha
+     z-index explicito - a ordem de empilhamento ficava so' por ordem do DOM, e esse container
+     vem depois). Um z-index mais baixo aqui (ver .lightbox-toolbar/.lightbox-copy-toast
+     abaixo, que ficam mais alto) garante que os controles sempre ficam acessiveis por cima. */
+  z-index: 1;
 }
 .lightbox-image {
   max-width: 100%;
@@ -2668,6 +2674,7 @@ h3.chat-heading {
    ImageLightbox.jsx). */
 .lightbox-copy-toast {
   position: fixed;
+  z-index: 2;
   top: 64px;
   right: 16px;
   margin: 0;
@@ -2683,6 +2690,7 @@ h3.chat-heading {
 .lightbox-copy-toast.error { color: var(--danger); border-color: var(--danger); }
 .lightbox-toolbar {
   position: fixed;
+  z-index: 2;
   top: 16px;
   right: 16px;
   display: flex;
