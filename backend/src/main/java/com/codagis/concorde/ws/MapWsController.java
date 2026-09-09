@@ -20,7 +20,7 @@ import java.security.Principal;
  * explicito do usuario), por isso é WebSocket (não REST) igual o resto do chat em tempo real
  * (ver ChatController, mesmo padrão - inclusive o tokenId vai no CORPO da mensagem, não no
  * destino STOMP, igual ToggleReactionRequest/PinMessageRequest ja' fazem). Upload da imagem do
- * mapa em si é REST, ver MapController (precisa de multipart/GcsService).
+ * mapa em si é REST, ver MapController (precisa de multipart/StorageService).
  */
 @Controller
 public class MapWsController {

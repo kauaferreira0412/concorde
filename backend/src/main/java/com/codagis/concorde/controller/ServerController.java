@@ -6,7 +6,7 @@ import com.codagis.concorde.dto.ServerDtos.*;
 import com.codagis.concorde.dto.ServerRoleDtos.*;
 import com.codagis.concorde.security.CurrentUser;
 import com.codagis.concorde.service.AuditLogService;
-import com.codagis.concorde.service.GcsService;
+import com.codagis.concorde.service.StorageService;
 import com.codagis.concorde.service.ServerService;
 import com.codagis.concorde.dto.VoiceDtos.VoiceParticipantInfo;
 import jakarta.validation.Valid;
@@ -22,14 +22,14 @@ public class ServerController {
 
     private final ServerService serverService;
     private final CurrentUser currentUser;
-    private final GcsService gcsService;
+    private final StorageService storageService;
     private final AuditLogService auditLogService;
 
-    public ServerController(ServerService serverService, CurrentUser currentUser, GcsService gcsService,
+    public ServerController(ServerService serverService, CurrentUser currentUser, StorageService storageService,
                              AuditLogService auditLogService) {
         this.serverService = serverService;
         this.currentUser = currentUser;
-        this.gcsService = gcsService;
+        this.storageService = storageService;
         this.auditLogService = auditLogService;
     }
 
@@ -55,7 +55,7 @@ public class ServerController {
 
     @PostMapping(value = "/{serverId}/icon", consumes = "multipart/form-data")
     public ServerResponse uploadIcon(@PathVariable Long serverId, @RequestParam("file") MultipartFile file) {
-        String url = gcsService.upload(file, "servers/" + serverId);
+        String url = storageService.upload(file, "servers/" + serverId);
         return serverService.updateServerIcon(currentUser.id(), serverId, url);
     }
 

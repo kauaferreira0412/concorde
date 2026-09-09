@@ -6,7 +6,7 @@ import com.codagis.concorde.dto.AuthDtos.StatusRequest;
 import com.codagis.concorde.dto.AuthDtos.UserResponse;
 import com.codagis.concorde.repository.UserRepository;
 import com.codagis.concorde.security.CurrentUser;
-import com.codagis.concorde.service.GcsService;
+import com.codagis.concorde.service.StorageService;
 import com.codagis.concorde.ws.OnlinePresenceService;
 import jakarta.validation.Valid;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,14 +17,14 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/users/me")
 public class AvatarController {
 
-    private final GcsService gcsService;
+    private final StorageService storageService;
     private final UserRepository userRepository;
     private final CurrentUser currentUser;
     private final OnlinePresenceService presenceService;
 
-    public AvatarController(GcsService gcsService, UserRepository userRepository, CurrentUser currentUser,
+    public AvatarController(StorageService storageService, UserRepository userRepository, CurrentUser currentUser,
                              OnlinePresenceService presenceService) {
-        this.gcsService = gcsService;
+        this.storageService = storageService;
         this.userRepository = userRepository;
         this.currentUser = currentUser;
         this.presenceService = presenceService;
@@ -34,7 +34,7 @@ public class AvatarController {
     @Transactional
     public UserResponse uploadAvatar(@RequestParam("file") MultipartFile file) {
         Long userId = currentUser.id();
-        String url = gcsService.upload(file, "avatars/" + userId);
+        String url = storageService.upload(file, "avatars/" + userId);
 
         User user = userRepository.findById(userId).orElseThrow(() -> new IllegalStateException("Usuario nao encontrado"));
         user.setAvatarUrl(url);

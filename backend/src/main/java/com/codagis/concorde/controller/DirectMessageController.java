@@ -6,7 +6,7 @@ import com.codagis.concorde.dto.MessageDtos.AttachmentResponse;
 import com.codagis.concorde.dto.MessageDtos.FileAttachmentResponse;
 import com.codagis.concorde.security.CurrentUser;
 import com.codagis.concorde.service.DirectMessageService;
-import com.codagis.concorde.service.GcsService;
+import com.codagis.concorde.service.StorageService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,12 +17,12 @@ import java.util.List;
 public class DirectMessageController {
 
     private final DirectMessageService directMessageService;
-    private final GcsService gcsService;
+    private final StorageService storageService;
     private final CurrentUser currentUser;
 
-    public DirectMessageController(DirectMessageService directMessageService, GcsService gcsService, CurrentUser currentUser) {
+    public DirectMessageController(DirectMessageService directMessageService, StorageService storageService, CurrentUser currentUser) {
         this.directMessageService = directMessageService;
-        this.gcsService = gcsService;
+        this.storageService = storageService;
         this.currentUser = currentUser;
     }
 
@@ -49,16 +49,16 @@ public class DirectMessageController {
     @PostMapping(value = "/channels/{channelId}/attachments", consumes = "multipart/form-data")
     public AttachmentResponse uploadAttachment(@PathVariable Long channelId, @RequestParam("file") MultipartFile file) {
         directMessageService.assertParticipant(channelId, currentUser.id());
-        String url = gcsService.upload(file, "dm/" + channelId);
+        String url = storageService.upload(file, "dm/" + channelId);
         return new AttachmentResponse(url);
     }
 
     // Anexo generico (video, documento, audio - inclusive mensagem de voz gravada) - mesmo par
-    // com AttachmentController (chat de servidor), ver GcsService.uploadAttachment.
+    // com AttachmentController (chat de servidor), ver StorageService.uploadAttachment.
     @PostMapping(value = "/channels/{channelId}/files", consumes = "multipart/form-data")
     public FileAttachmentResponse uploadFile(@PathVariable Long channelId, @RequestParam("file") MultipartFile file) {
         directMessageService.assertParticipant(channelId, currentUser.id());
-        GcsService.FileUploadResult result = gcsService.uploadAttachment(file, "dm/" + channelId);
+        StorageService.FileUploadResult result = storageService.uploadAttachment(file, "dm/" + channelId);
         return new FileAttachmentResponse(result.url(), result.name(), result.contentType(), result.size());
     }
 }

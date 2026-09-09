@@ -14,13 +14,13 @@ import java.util.List;
 public class SoundboardService {
 
     private final SoundboardClipRepository soundboardClipRepository;
-    private final GcsService gcsService;
+    private final StorageService storageService;
     private final SimpMessagingTemplate messagingTemplate;
 
-    public SoundboardService(SoundboardClipRepository soundboardClipRepository, GcsService gcsService,
+    public SoundboardService(SoundboardClipRepository soundboardClipRepository, StorageService storageService,
                               SimpMessagingTemplate messagingTemplate) {
         this.soundboardClipRepository = soundboardClipRepository;
-        this.gcsService = gcsService;
+        this.storageService = storageService;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -36,7 +36,7 @@ public class SoundboardService {
         if (cleanName.length() > 60) {
             cleanName = cleanName.substring(0, 60);
         }
-        String url = gcsService.uploadAudio(file, "soundboard/" + userId);
+        String url = storageService.uploadAudio(file, "soundboard/" + userId);
         SoundboardClip clip = soundboardClipRepository.save(SoundboardClip.builder()
                 .userId(userId)
                 .name(cleanName)

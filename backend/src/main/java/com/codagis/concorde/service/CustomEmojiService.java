@@ -18,14 +18,14 @@ public class CustomEmojiService {
     private static final long MAX_EMOJI_BYTES = 512L * 1024;
 
     private final CustomEmojiRepository customEmojiRepository;
-    private final GcsService gcsService;
+    private final StorageService storageService;
     private final ServerService serverService;
     private final PermissionService permissionService;
 
-    public CustomEmojiService(CustomEmojiRepository customEmojiRepository, GcsService gcsService,
+    public CustomEmojiService(CustomEmojiRepository customEmojiRepository, StorageService storageService,
                                ServerService serverService, PermissionService permissionService) {
         this.customEmojiRepository = customEmojiRepository;
-        this.gcsService = gcsService;
+        this.storageService = storageService;
         this.serverService = serverService;
         this.permissionService = permissionService;
     }
@@ -56,7 +56,7 @@ public class CustomEmojiService {
             throw new IllegalArgumentException("Imagem muito grande - o máximo é 512KB pra um emoji");
         }
 
-        String url = gcsService.upload(file, "emoji/" + serverId);
+        String url = storageService.upload(file, "emoji/" + serverId);
         CustomEmoji emoji = customEmojiRepository.save(CustomEmoji.builder()
                 .serverId(serverId)
                 .name(name)

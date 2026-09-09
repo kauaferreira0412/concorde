@@ -210,3 +210,104 @@ Esses cookies expiram/o YouTube pode invalidar de vez em quando (não tem uma va
 se o bloqueio voltar depois de um tempo, é só repetir os passos 1-3 com cookies novos. **Nunca
 compartilhe esse arquivo** (ele equivale à sua sessão logada) nem cole o conteúdo dele no chat -
 mande só via `scp` direto pra VPS.
+
+## Migrando o armazenamento do Google Cloud Storage pro Cloudflare R2
+
+O upload de avatar/imagens/anexos trocou do GCS pro Cloudflare R2 (mesma API do S3 - ver
+`StorageService.java`). Os arquivos que já existiam no bucket antigo **não vêm sozinhos** - view
+os passos abaixo pra copiar tudo sem perder nada.
+
+### 1. Configurar o bucket novo no R2
+
+No painel da Cloudflare (R2 → seu bucket): ative a **Public Development URL** (ou aponte um
+domínio seu pro bucket) - é essa URL que vai virar `R2_PUBLIC_BASE_URL`. Em "Manage API Tokens",
+crie um token com permissão de leitura/escrita nesse bucket - ele te dá o `R2_ACCESS_KEY_ID` e
+`R2_SECRET_ACCESS_KEY`. O `R2_ACCOUNT_ID` aparece na URL do painel do Cloudflare (o pedaço antes
+de `.cloudflarestorage.com`) ou em R2 → Overview, no canto direito.
+
+### 2. Copiar os arquivos do bucket antigo pro novo (sem passar pelo app)
+
+Usa o [rclone](https://rclone.org/downloads/) - suporta ler do Google Cloud Storage e escrever
+num bucket S3-compatível (R2) direto, sem baixar/subir manualmente. Instale e rode:
+
+```bash
+rclone config
+```
+
+Crie dois remotes:
+- `gcs` → tipo `Google Cloud Storage`, cole o JSON da conta de serviço que você já usava
+  (`GCS_CREDENTIALS_JSON`) quando pedir as credenciais.
+- `r2` → tipo `s3`, provider `Cloudflare`, endpoint `https://SEU_ACCOUNT_ID.r2.cloudflarestorage.com`,
+  `access_key_id`/`secret_access_key` do token criado no passo 1.
+
+Depois, copia tudo mantendo a MESMA estrutura de pastas (importante - é isso que permite só
+trocar o prefixo da URL no banco, sem precisar recalcular o caminho de cada arquivo):
+
+```bash
+rclone sync gcs:SEU_BUCKET_ANTIGO r2:SEU_BUCKET_NOVO --progress
+```
+
+Confere se bateu tudo:
+
+```bash
+rclone size gcs:SEU_BUCKET_ANTIGO
+rclone size r2:SEU_BUCKET_NOVO
+```
+
+(Os dois devem mostrar a mesma quantidade de arquivos/tamanho total.)
+
+### 3. Configurar as variáveis novas e subir o backend
+
+No `.env.prod` da VPS (e localmente, se for testar antes), preencha (ver `.env.prod.example`):
+
+```
+R2_ACCOUNT_ID=...
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+R2_BUCKET=SEU_BUCKET_NOVO
+R2_PUBLIC_BASE_URL=https://pub-xxxxxxxx.r2.dev
+```
+
+Depois do deploy normal (`docker compose ... up -d --build backend gateway`), qualquer upload
+NOVO já vai pro R2. As `GCS_CREDENTIALS_JSON`/`GCS_BUCKET` antigas podem ser removidas do
+`.env.prod` (não são mais lidas por nada).
+
+### 4. Reescrever as URLs antigas no banco (local e VPS)
+
+Os arquivos JÁ enviados antes da troca continuam com a URL antiga (`storage.googleapis.com`)
+gravada no banco - como o passo 2 copiou pro R2 com o MESMO caminho, é só trocar o prefixo em
+todas as colunas que guardam uma URL de imagem/arquivo. Troque `SEU_BUCKET_ANTIGO` e
+`https://pub-xxxxxxxx.r2.dev` pelos valores reais antes de rodar (no psql, local e na VPS):
+
+```sql
+DO $$
+DECLARE
+    old_prefix text := 'https://storage.googleapis.com/SEU_BUCKET_ANTIGO/';
+    new_prefix text := 'https://pub-xxxxxxxx.r2.dev/';
+BEGIN
+    UPDATE users SET avatar_url = new_prefix || substring(avatar_url from length(old_prefix)+1) WHERE avatar_url LIKE old_prefix || '%';
+    UPDATE servers SET icon_url = new_prefix || substring(icon_url from length(old_prefix)+1) WHERE icon_url LIKE old_prefix || '%';
+    UPDATE messages SET image_url = new_prefix || substring(image_url from length(old_prefix)+1) WHERE image_url LIKE old_prefix || '%';
+    UPDATE messages SET file_url = new_prefix || substring(file_url from length(old_prefix)+1) WHERE file_url LIKE old_prefix || '%';
+    UPDATE direct_messages SET image_url = new_prefix || substring(image_url from length(old_prefix)+1) WHERE image_url LIKE old_prefix || '%';
+    UPDATE direct_messages SET file_url = new_prefix || substring(file_url from length(old_prefix)+1) WHERE file_url LIKE old_prefix || '%';
+    UPDATE battle_maps SET image_url = new_prefix || substring(image_url from length(old_prefix)+1) WHERE image_url LIKE old_prefix || '%';
+    UPDATE map_tokens SET image_url = new_prefix || substring(image_url from length(old_prefix)+1) WHERE image_url LIKE old_prefix || '%';
+    UPDATE character_sheets SET image_url = new_prefix || substring(image_url from length(old_prefix)+1) WHERE image_url LIKE old_prefix || '%';
+    UPDATE character_sheets SET file_url = new_prefix || substring(file_url from length(old_prefix)+1) WHERE file_url LIKE old_prefix || '%';
+    UPDATE custom_emojis SET image_url = new_prefix || substring(image_url from length(old_prefix)+1) WHERE image_url LIKE old_prefix || '%';
+    UPDATE music_bot_settings SET avatar_url = new_prefix || substring(avatar_url from length(old_prefix)+1) WHERE avatar_url LIKE old_prefix || '%';
+    UPDATE soundboard_bot_settings SET avatar_url = new_prefix || substring(avatar_url from length(old_prefix)+1) WHERE avatar_url LIKE old_prefix || '%';
+    UPDATE soundboard_clips SET file_url = new_prefix || substring(file_url from length(old_prefix)+1) WHERE file_url LIKE old_prefix || '%';
+END $$;
+```
+
+Depois de rodar, dá uma conferida (não precisa reiniciar nada - é só dado):
+
+```sql
+SELECT avatar_url FROM users WHERE avatar_url IS NOT NULL LIMIT 5;
+```
+
+Se aparecer `pub-xxxxxxxx.r2.dev` em vez de `storage.googleapis.com`, deu certo. Só depois de
+confirmar que tudo carrega (avatares, imagens do chat, mapas, fichas...) é seguro desativar o
+bucket antigo do GCS - até lá ele continua existindo e não custa nada mantê-lo como backup.

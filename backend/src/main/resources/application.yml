@@ -41,10 +41,14 @@ app:
     api-key: ${LIVEKIT_API_KEY:devkey}
     api-secret: ${LIVEKIT_API_SECRET:devsecret1234567890devsecret1234567890}
     token-ttl-minutes: 60
-  gcs:
-    credentials-json: ${GCS_CREDENTIALS_JSON:}
-    bucket: ${GCS_BUCKET:venda-lume-storage}
-    base-folder: ${GCS_BASE_FOLDER:potato}
+  storage:
+    r2:
+      account-id: ${R2_ACCOUNT_ID:}
+      access-key-id: ${R2_ACCESS_KEY_ID:}
+      secret-access-key: ${R2_SECRET_ACCESS_KEY:}
+      bucket: ${R2_BUCKET:}
+      public-base-url: ${R2_PUBLIC_BASE_URL:}
+    base-folder: ${STORAGE_BASE_FOLDER:potato}
   spotify:
     client-id: ${SPOTIFY_CLIENT_ID:}
     client-secret: ${SPOTIFY_CLIENT_SECRET:}

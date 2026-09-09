@@ -57,7 +57,7 @@ public class MapService {
     }
 
     /** Versao PUBLICA de assertCanUseMap - usada pelo MapController antes de subir a imagem de
-     *  um token pro GCS (mesma regra de "pode usar o mapa desse canal", nao precisa ser o
+     *  um token pro storage (mesma regra de "pode usar o mapa desse canal", nao precisa ser o
      *  mestre pra isso - qualquer jogador customiza o proprio token). */
     public void assertCanUploadTokenImage(Long channelId, Long userId) {
         assertCanUseMap(channelId, userId);

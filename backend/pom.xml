@@ -81,11 +81,12 @@
       <optional>true</optional>
     </dependency>
 
-    <!-- Upload de avatar e imagens do chat para o Google Cloud Storage -->
+    <!-- Upload de avatar/imagens/anexos - Cloudflare R2 (compativel com a API do S3, ver
+         StorageService.java) - trocado do Google Cloud Storage, pedido explicito do usuario. -->
     <dependency>
-      <groupId>com.google.cloud</groupId>
-      <artifactId>google-cloud-storage</artifactId>
-      <version>2.44.0</version>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <version>2.46.18</version>
     </dependency>
 
     <dependency>

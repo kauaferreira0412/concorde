@@ -46,7 +46,7 @@ public class MessageDtos {
 
     public record AttachmentResponse(String url) {}
 
-    // Anexo generico (video/documento/audio, ver GcsService.uploadAttachment) - resposta do
+    // Anexo generico (video/documento/audio, ver StorageService.uploadAttachment) - resposta do
     // upload SEPARADA de AttachmentResponse (que continua so' pra imagem, sem mudar nada nela)
     // pra nao arriscar quebrar o fluxo de imagem que ja' funciona.
     public record FileAttachmentResponse(String url, String name, String contentType, long size) {}

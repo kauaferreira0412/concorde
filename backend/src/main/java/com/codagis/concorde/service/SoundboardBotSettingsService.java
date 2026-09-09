@@ -11,12 +11,12 @@ import org.springframework.web.multipart.MultipartFile;
 public class SoundboardBotSettingsService {
 
     private final SoundboardBotSettingsRepository repository;
-    private final GcsService gcsService;
+    private final StorageService storageService;
     private final AdminGuard adminGuard;
 
-    public SoundboardBotSettingsService(SoundboardBotSettingsRepository repository, GcsService gcsService, AdminGuard adminGuard) {
+    public SoundboardBotSettingsService(SoundboardBotSettingsRepository repository, StorageService storageService, AdminGuard adminGuard) {
         this.repository = repository;
-        this.gcsService = gcsService;
+        this.storageService = storageService;
         this.adminGuard = adminGuard;
     }
 
@@ -27,7 +27,7 @@ public class SoundboardBotSettingsService {
     @Transactional
     public SoundboardBotSettings uploadAvatar(Long requesterId, MultipartFile file) {
         adminGuard.assertAdmin(requesterId);
-        String url = gcsService.upload(file, "soundboard-bot");
+        String url = storageService.upload(file, "soundboard-bot");
         SoundboardBotSettings settings = repository.findById(1L).orElseGet(SoundboardBotSettings::new);
         settings.setAvatarUrl(url);
         return repository.save(settings);

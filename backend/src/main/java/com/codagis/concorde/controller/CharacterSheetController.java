@@ -4,7 +4,7 @@ import com.codagis.concorde.dto.CharacterSheetDtos.CharacterSheetResponse;
 import com.codagis.concorde.dto.CharacterSheetDtos.LinkPlayerRequest;
 import com.codagis.concorde.security.CurrentUser;
 import com.codagis.concorde.service.CharacterSheetService;
-import com.codagis.concorde.service.GcsService;
+import com.codagis.concorde.service.StorageService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -23,12 +23,12 @@ import java.util.Locale;
 public class CharacterSheetController {
 
     private final CharacterSheetService characterSheetService;
-    private final GcsService gcsService;
+    private final StorageService storageService;
     private final CurrentUser currentUser;
 
-    public CharacterSheetController(CharacterSheetService characterSheetService, GcsService gcsService, CurrentUser currentUser) {
+    public CharacterSheetController(CharacterSheetService characterSheetService, StorageService storageService, CurrentUser currentUser) {
         this.characterSheetService = characterSheetService;
-        this.gcsService = gcsService;
+        this.storageService = storageService;
         this.currentUser = currentUser;
     }
 
@@ -42,8 +42,8 @@ public class CharacterSheetController {
                                           @RequestParam("characterName") String characterName,
                                           @RequestParam(value = "photo", required = false) MultipartFile photo,
                                           @RequestParam(value = "file", required = false) MultipartFile file) {
-        String imageUrl = photo != null && !photo.isEmpty() ? gcsService.upload(photo, "sheets/" + serverId + "/photos") : null;
-        GcsService.FileUploadResult uploaded = uploadPdfIfPresent(file, serverId);
+        String imageUrl = photo != null && !photo.isEmpty() ? storageService.upload(photo, "sheets/" + serverId + "/photos") : null;
+        StorageService.FileUploadResult uploaded = uploadPdfIfPresent(file, serverId);
         return characterSheetService.create(serverId, currentUser.id(), characterName, imageUrl,
                 uploaded != null ? uploaded.url() : null, uploaded != null ? uploaded.name() : null,
                 uploaded != null ? uploaded.size() : null);
@@ -58,7 +58,7 @@ public class CharacterSheetController {
                                           @RequestParam(value = "removeFile", required = false, defaultValue = "false") boolean removeFile) {
         String imageUrl = null; // null = nao mexe
         if (removePhoto) imageUrl = "";
-        else if (photo != null && !photo.isEmpty()) imageUrl = gcsService.upload(photo, "sheets/" + serverId + "/photos");
+        else if (photo != null && !photo.isEmpty()) imageUrl = storageService.upload(photo, "sheets/" + serverId + "/photos");
 
         String fileUrl = null;
         String fileName = null;
@@ -66,7 +66,7 @@ public class CharacterSheetController {
         if (removeFile) {
             fileUrl = "";
         } else {
-            GcsService.FileUploadResult uploaded = uploadPdfIfPresent(file, serverId);
+            StorageService.FileUploadResult uploaded = uploadPdfIfPresent(file, serverId);
             if (uploaded != null) {
                 fileUrl = uploaded.url();
                 fileName = uploaded.name();
@@ -86,7 +86,7 @@ public class CharacterSheetController {
         characterSheetService.delete(serverId, currentUser.id(), sheetId);
     }
 
-    private GcsService.FileUploadResult uploadPdfIfPresent(MultipartFile file, Long serverId) {
+    private StorageService.FileUploadResult uploadPdfIfPresent(MultipartFile file, Long serverId) {
         if (file == null || file.isEmpty()) return null;
         String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "";
         boolean looksLikePdf = "application/pdf".equals(file.getContentType())
@@ -94,6 +94,6 @@ public class CharacterSheetController {
         if (!looksLikePdf) {
             throw new IllegalArgumentException("A ficha só pode ser um arquivo PDF");
         }
-        return gcsService.uploadAttachment(file, "sheets/" + serverId);
+        return storageService.uploadAttachment(file, "sheets/" + serverId);
     }
 }

@@ -51,7 +51,7 @@ public class Message {
 
     // Anexo generico (video, documento, audio - inclusive mensagem de voz gravada) - separado de
     // imageUrl de proposito, pra nao mexer no fluxo de imagem que ja' funciona (preview/lightbox).
-    // fileName e' o nome ORIGINAL do arquivo (ver GcsService.uploadAttachment), fileType e' o
+    // fileName e' o nome ORIGINAL do arquivo (ver StorageService.uploadAttachment), fileType e' o
     // mime type (decide se renderiza <video>/<audio>/card de download, ver DmChatWindow.jsx).
     @Column(length = 1000)
     private String fileUrl;
