@@ -5,6 +5,7 @@ import com.codagis.concorde.enums.ChannelType;
 import com.codagis.concorde.repository.ChannelRepository;
 import com.codagis.concorde.repository.MembershipRepository;
 import com.codagis.concorde.security.CurrentUser;
+import com.codagis.concorde.service.SpotifyService;
 import com.codagis.concorde.ws.VoicePresenceService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
@@ -24,16 +25,18 @@ public class MusicController {
     private final MembershipRepository membershipRepository;
     private final VoicePresenceService voicePresenceService;
     private final CurrentUser currentUser;
+    private final SpotifyService spotifyService;
     private final String musicBotUrl;
     private final RestTemplate restTemplate = new RestTemplate();
 
     public MusicController(ChannelRepository channelRepository, MembershipRepository membershipRepository,
                             VoicePresenceService voicePresenceService, CurrentUser currentUser,
-                            @Value("${app.music-bot.url}") String musicBotUrl) {
+                            SpotifyService spotifyService, @Value("${app.music-bot.url}") String musicBotUrl) {
         this.channelRepository = channelRepository;
         this.membershipRepository = membershipRepository;
         this.voicePresenceService = voicePresenceService;
         this.currentUser = currentUser;
+        this.spotifyService = spotifyService;
         this.musicBotUrl = musicBotUrl;
     }
 
@@ -49,7 +52,15 @@ public class MusicController {
         if (req.query() == null || req.query().isBlank()) {
             throw new IllegalArgumentException("Informe um link ou o nome da música");
         }
-        Map<String, Object> body = Map.of("channelId", channelId, "query", req.query());
+        // Link de FAIXA do Spotify (pedido explicito do usuario: "colar o link da música... o
+        // bot deve pesquisar no YouTube") - o yt-dlp do bot nao sabe baixar do Spotify (nem
+        // existe isso, e' tudo protegido/DRM), entao troca o link pelo "Artista - Nome" real
+        // ANTES de mandar pro bot; ele mesmo ja' trata qualquer coisa que nao seja link como
+        // busca no YouTube (ver resolveQuery em ytdlp.js). Se nao for um link do Spotify,
+        // resolveIfSpotifyTrack devolve null e a query original segue sem mudar nada.
+        String resolvedQuery = spotifyService.resolveIfSpotifyTrack(req.query());
+        String query = resolvedQuery != null ? resolvedQuery : req.query();
+        Map<String, Object> body = Map.of("channelId", channelId, "query", query);
         Map<?, ?> response = callBot("/play", body);
         Object durationRaw = response.get("durationSec");
         Integer durationSec = durationRaw == null ? null : ((Number) durationRaw).intValue();
