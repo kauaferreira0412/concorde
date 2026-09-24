@@ -1,33 +1,23 @@
-# Segredos - NUNCA versionar (a chave do GCS vai como variavel de ambiente GCS_CREDENTIALS_JSON,
-# nao como arquivo, mas por seguranca qualquer .json de credencial que aparecer aqui e' ignorado)
 *service-account*.json
 *credentials*.json
 
-# Backend
 backend/target/
 backend/data/
 backend/.mvn/
 
-# Frontend
 frontend/node_modules/
 frontend/dist/
 frontend/.env
 
-# App desktop (Electron) - instaladores gerados, nao versionar binario (ver
-# frontend/scripts/package-desktop.mjs)
 frontend/release/
 frontend/public/downloads/
 
-# Bot de musica (Node.js separado, ver music-bot/)
 music-bot/node_modules/
-# cookies.txt do YouTube (ver DEPLOY.md) - credencial de sessao de verdade, NUNCA versionar.
 music-bot/data/*
 !music-bot/data/.gitkeep
 
-# Deploy (producao)
 .env.prod
 
-# IDE / SO
 .idea/
 *.iml
 .vscode/

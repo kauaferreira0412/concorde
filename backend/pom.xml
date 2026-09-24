@@ -44,7 +44,6 @@
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
 
-    <!-- Banco: H2 em arquivo para rodar sem instalar nada. Troque para Postgres em produção. -->
     <dependency>
       <groupId>com.h2database</groupId>
       <artifactId>h2</artifactId>
@@ -56,7 +55,6 @@
       <scope>runtime</scope>
     </dependency>
 
-    <!-- JWT (auth da API e tokens do LiveKit) -->
     <dependency>
       <groupId>io.jsonwebtoken</groupId>
       <artifactId>jjwt-api</artifactId>
@@ -81,14 +79,6 @@
       <optional>true</optional>
     </dependency>
 
-    <!-- Upload de avatar/imagens/anexos - Cloudflare R2 (compativel com a API do S3, ver
-         StorageService.java) - trocado do Google Cloud Storage, pedido explicito do usuario.
-         Exclui o cliente HTTP padrao do modulo "s3" (Apache HttpClient 5) - ele conflitava com
-         outra versao de httpclient5 ja' no classpath (ClassNotFoundException:
-         TlsSocketStrategy, so' existe nas versoes mais novas), derrubando o backend inteiro
-         (crash-loop) assim que tentava criar o S3Client. Troca pelo "url-connection-client" -
-         bem mais simples/sem essas dependencias transitivas propensas a conflito, suficiente
-         pra so' fazer upload/PUT de arquivo (ver StorageService.init). -->
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>s3</artifactId>

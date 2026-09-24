@@ -9,31 +9,12 @@ function randomColor() {
   return TOKEN_COLORS[Math.floor(Math.random() * TOKEN_COLORS.length)];
 }
 
-/**
- * Mapa(s) de batalha do canal de voz - kit de RPG (pedido explicito do usuario: "algo muito
- * parecido com o Roll20", sem precisar ser tão complexo). O mestre pode subir VARIOS mapas
- * (mapa 1, mapa 2...) - cada um nasce INATIVO (so' o mestre enxerga), pra dar tempo dele
- * preparar a cena (posicionar os inimigos, etc) ANTES dos jogadores verem (pedido explicito do
- * usuario). "viewingMapId" e' o mapa que ESSE cliente esta' olhando agora: pro mestre, e' livre
- * (ele escolhe no menu "Mapas", sem afetar ninguem) - pros jogadores, e' sempre travado no mapa
- * ATIVO (activeMapId), que so' o mestre troca (botao "olho" no menu, ver handleActivateMap) e
- * que atualiza a visao de TODOS ao vivo (WebSocket). Cada mapa guarda o PROPRIO conjunto de
- * tokens, entao trocar de mapa e voltar restaura os tokens exatamente onde estavam. So' o mestre
- * adiciona/apaga um token ou um mapa; qualquer jogador pode mover/renomear/apagar um token que
- * ja' existe (ao vivo de verdade, via WebSocket com throttle - pedido explicito do usuario).
- * Posicao de cada token e' salva como FRACAO da imagem (0..1), nao pixel, entao bate certinho
- * pra todo mundo independente do zoom/tamanho de tela de cada um (ver MapToken.java).
- */
 export default function BattleMap({ channelId, serverId, categoryId, stompClient, stompConnected }) {
   const { showAlert } = useAlert();
   const [maps, setMaps] = useState([]);
   const [activeMapId, setActiveMapId] = useState(null);
-  // Mapa que ESSE cliente esta' vendo agora - ver comentario acima do componente.
   const [viewingMapId, setViewingMapId] = useState(null);
   const [tokens, setTokens] = useState([]);
-  // So' quem criou a categoria desse canal (o "mestre" - ver ChannelCategory.createdBy no
-  // backend) pode gerenciar mapas/tokens - pedido explicito do usuario. O backend confere de
-  // novo (de verdade) em cada acao; isso aqui e' so' pra mostrar ou nao os botoes.
   const [canManageMap, setCanManageMap] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -42,44 +23,32 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [addMode, setAddMode] = useState(false);
-  const [editingToken, setEditingToken] = useState(null); // { id, label, color, imageUrl, x, y (tela) }
+  const [editingToken, setEditingToken] = useState(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [uploadingTokenImage, setUploadingTokenImage] = useState(false);
-  // Personagens da mesa (categoria) pra criar um token ja' com a foto certa - ver
-  // CharacterSheetsModal.jsx/handlePickCharacter abaixo (pedido explicito do usuario: "a foto
-  // pode ser transformada em um token"). So' os personagens que ESSE usuario enxerga (o mestre
-  // ve todos, o jogador so' os vinculados a ele - ver CharacterSheetService.list no backend).
   const [characters, setCharacters] = useState([]);
   const [showCharacterPicker, setShowCharacterPicker] = useState(false);
-  const [pendingTokenTemplate, setPendingTokenTemplate] = useState(null); // { label, color, imageUrl } | null
+  const [pendingTokenTemplate, setPendingTokenTemplate] = useState(null);
 
   const activeMap = maps.find((m) => m.id === activeMapId) || null;
   const viewingMap = maps.find((m) => m.id === viewingMapId) || null;
-  // So' o mestre pode "espiar" um mapa diferente do ativo - pra jogador os dois sao sempre o
-  // mesmo (viewingMapId e' travado em activeMapId, ver loadSnapshot).
   const isPreviewingUnpublished = canManageMap && viewingMap && viewingMap.id !== activeMapId;
 
   const imageRef = useRef(null);
   const viewportRef = useRef(null);
   const fileInputRef = useRef(null);
   const tokenImageInputRef = useRef(null);
-  const panStateRef = useRef(null); // { startX, startY, originX, originY, moved }
-  const dragTokenRef = useRef(null); // { id, lastSentAt }
+  const panStateRef = useRef(null);
+  const dragTokenRef = useRef(null);
   const editorRef = useRef(null);
   const mapsMenuRef = useRef(null);
   const characterPickerRef = useRef(null);
 
-  // Reposiciona o popover de editar token com a ALTURA/LARGURA REAIS dele (medidas depois de
-  // renderizado) em vez de um numero fixo chutado - senao, quando o conteudo cresce (rename +
-  // cores + imagem customizada + remover), o popover podia nascer perto da borda da tela e ficar
-  // cortado com uma barra de rolagem (reportado pelo usuario: "está cortando e ficando com uma
-  // barra de lateral"). Mesma tecnica ja' usada pro popover de moderacao de participante (ver
-  // ChannelSidebar.jsx).
   useLayoutEffect(() => {
     if (!editingToken || !editorRef.current) return;
     const el = editorRef.current;
     const margin = 8;
-    const offset = 14; // afasta um pouco do ponto clicado, senao o popover nasce EM CIMA do proprio token
+    const offset = 14;
     const rect = el.getBoundingClientRect();
     let left = Math.min(editingToken.anchorX + offset, window.innerWidth - rect.width - margin);
     let top = Math.min(editingToken.anchorY + offset, window.innerHeight - rect.height - margin);
@@ -89,8 +58,6 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     el.style.top = `${top}px`;
   }, [editingToken?.id, editingToken?.imageUrl, editingToken?.anchorX, editingToken?.anchorY]);
 
-  // Fecha o popover de editar token ao clicar fora - mesmo padrao usado no resto do app (ver
-  // ChannelSidebar.jsx/MemberList.jsx).
   useEffect(() => {
     if (!editingToken) return;
     function handlePointerDown(e) {
@@ -107,8 +74,6 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     };
   }, [editingToken]);
 
-  // Fecha o seletor de personagem/o menu de mapas ao clicar fora - mesmo padrao do popover de
-  // editar token acima.
   useEffect(() => {
     if (!showCharacterPicker) return;
     function handlePointerDown(e) {
@@ -127,11 +92,6 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [showMapsMenu]);
 
-  // So' recarrega a LISTA de mapas/qual esta' ativo (nunca os tokens - isso fica por conta do
-  // efeito que busca o detalhe de "viewingMapId", ver abaixo). Pra jogador, "o que estou vendo"
-  // sempre vira o mapa ativo. Pro mestre, mantem o que ele ja' estava preparando (se esse mapa
-  // ainda existir) - senao um simples evento de outro mapa mudando de ativo interromperia o
-  // preparo dele.
   function loadSnapshot() {
     return api.get(`/api/channels/${channelId}/map`).then(({ data }) => {
       setMaps(data.maps);
@@ -156,12 +116,8 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
 
-  // Busca o mapa+tokens do mapa que esse cliente esta' vendo AGORA (ver comentario no topo do
-  // componente) - dispara de novo toda vez que "viewingMapId" muda (o mestre trocou de mapa no
-  // menu, ou o mapa ativo mudou e o jogador foi arrastado junto).
   useEffect(() => {
     if (!viewingMapId) {
       setTokens([]);
@@ -185,8 +141,6 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     if (!stompClient || !stompConnected) return;
     const sub = subscribeToMap(stompClient, channelId, (event) => {
       if (event.type === "MAPS_CHANGED") {
-        // Mudanca estrutural (mapa criado/ativado/apagado) - recarrega a lista, mais simples
-        // que tentar remontar o estado a partir do proprio evento.
         loadSnapshot().catch(() => {});
       } else if (event.type === "TOKEN_ADDED") {
         setTokens((prev) => (event.token.mapId === viewingMapId ? [...prev, event.token] : prev));
@@ -200,7 +154,6 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
       }
     });
     return () => sub.unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stompClient, stompConnected, channelId, viewingMapId]);
 
   async function handleUpload(e) {
@@ -214,8 +167,6 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
       if (newMapName.trim()) formData.append("name", newMapName.trim());
       await api.post(`/api/channels/${channelId}/map/image`, formData);
       setNewMapName("");
-      // O mapa novo nasce INATIVO (so' o mestre ve) - o WS avisa a lista pra atualizar, mas
-      // ninguem e' "arrastado" pra ele automaticamente (ver loadSnapshot).
     } catch (err) {
       showAlert(err.response?.data?.error || "Não foi possível subir o mapa");
     } finally {
@@ -223,8 +174,6 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     }
   }
 
-  // Torna um mapa "ativo" - o que TODOS os jogadores passam a ver, ao vivo (pedido explicito do
-  // usuario: o mestre prepara em privado e so' revela quando quiser).
   async function handleActivateMap(mapId) {
     try {
       await api.put(`/api/channels/${channelId}/map/${mapId}/activate`);
@@ -242,12 +191,6 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     }
   }
 
-  // Listener NATIVO (nao "onWheel" do React) e' de proposito - o React registra "onWheel" como
-  // listener PASSIVO por padrao, entao um "e.preventDefault()" ali dentro nao faz NADA de
-  // verdade (o navegador ignora, sem nem avisar) - por isso o scroll do mouse em cima do mapa
-  // rolava a SIDEBAR por baixo ao mesmo tempo que dava zoom no mapa (reportado pelo usuario).
-  // "{ passive: false }" aqui e' o que faz o preventDefault valer e travar o scroll da pagina
-  // por trás enquanto o mouse estiver em cima do mapa.
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
@@ -274,7 +217,7 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
   function handleContainerPointerUp(e) {
     const wasPan = panStateRef.current;
     panStateRef.current = null;
-    if (wasPan?.moved) return; // foi arrastar o mapa, nao clicar pra adicionar token
+    if (wasPan?.moved) return;
     if (!addMode || !imageRef.current || !stompClient || !stompConnected || !viewingMapId) return;
     const rect = imageRef.current.getBoundingClientRect();
     const fracX = (e.clientX - rect.left) / rect.width;
@@ -286,18 +229,12 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     } else {
       addMapToken(stompClient, channelId, { mapId: viewingMapId, label: "Token", color: randomColor(), x: fracX, y: fracY });
     }
-    // Um clique = um token so', sempre - o botao "desliga" sozinho depois de colocar (pedido
-    // explicito do usuario: senao o mestre pode se confundir e adicionar varios sem querer).
-    // Pra colocar outro, precisa clicar em "Adicionar token"/"Usar personagem" de novo.
     setAddMode(false);
   }
 
   function openCharacterPicker() {
     setShowCharacterPicker((v) => !v);
     if (serverId) {
-      // Personagens sao do SERVIDOR inteiro agora, nao mais de uma categoria (ver
-      // CharacterSheetService no backend) - so' os que ESSE usuario enxerga (o mestre ve
-      // todos, o jogador so' os vinculados a ele).
       api
         .get(`/api/servers/${serverId}/sheets`)
         .then(({ data }) => setCharacters(data))
@@ -331,25 +268,17 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     const { x, y } = tokenFracFromEvent(e);
     setTokens((prev) => prev.map((t) => (t.id === token.id ? { ...t, x, y } : t)));
     const now = Date.now();
-    // Throttle - manda no MAXIMO a cada ~80ms enquanto arrasta, senao um arraste de 1s vira
-    // dezenas de mensagens WS por segundo (pedido explicito: precisa ser ao vivo, mas nao
-    // precisa ser CADA pixel).
     if (stompClient && stompConnected && now - dragTokenRef.current.lastSentAt > 80) {
       dragTokenRef.current.lastSentAt = now;
       moveMapToken(stompClient, channelId, token.id, x, y);
     }
   }
   function handleTokenPointerUp(e, token) {
-    // Sem isso, soltar o arraste de um token "vazava" pro container do mapa por baixo (que
-    // escuta o MESMO pointerup pra criar um token novo quando "addMode" esta' ligado) - soltar
-    // um arraste enquanto "Adicionar token" estava ativo criava um token extra do nada no
-    // ponto onde voce largou o mouse (reportado: "quando clico pra mexer um token, ele acaba
-    // criando outro").
     e.stopPropagation();
     if (dragTokenRef.current?.id === token.id) {
       if (dragTokenRef.current.moved && imageRef.current && stompClient && stompConnected) {
         const { x, y } = tokenFracFromEvent(e);
-        moveMapToken(stompClient, channelId, token.id, x, y); // garante a posicao FINAL certinha
+        moveMapToken(stompClient, channelId, token.id, x, y);
       } else if (!dragTokenRef.current.moved) {
         openEditor(token, e);
       }
@@ -376,10 +305,6 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
     }
   }
 
-  // Imagem CUSTOMIZADA do token (retrato do personagem, etc - pedido explicito do usuario) -
-  // qualquer um pode subir uma pro PROPRIO token, nao precisa ser o mestre (diferente de
-  // adicionar/apagar um token). Sobe pro GCS primeiro (REST), depois manda a URL junto com o
-  // resto via WebSocket - mesmo caminho que trocar nome/cor usa (ver renameMapToken).
   async function handleTokenImageUpload(e) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -556,8 +481,6 @@ export default function BattleMap({ channelId, serverId, categoryId, stompClient
         )}
       </div>
 
-      {/* Avisa o mestre quando ele esta' olhando um mapa que os jogadores AINDA NAO veem (pedido
-          explicito do usuario) - com um atalho pra ativar sem precisar reabrir o menu "Mapas". */}
       {isPreviewingUnpublished && (
         <div className="battle-map-preview-banner">
           <EyeIcon size={13} />

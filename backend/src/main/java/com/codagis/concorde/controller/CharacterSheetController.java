@@ -11,13 +11,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Personagens de uma mesa de RPG (villoes, NPCs, personagens de jogador - kit de RPG, ver
- * CharacterSheetService). Um servidor inteiro = uma mesa (pedido explicito do usuario). So' o
- * mestre (dono do servidor) cria/apaga/vincula jogador; o mestre e o jogador vinculado editam.
- * PDF da ficha e' opcional e restrito a PDF de proposito (diferente do anexo generico do chat -
- * pedido explicito do usuario: "fichas de RPG em PDF").
- */
 @RestController
 @RequestMapping("/api/servers/{serverId}/sheets")
 public class CharacterSheetController {
@@ -56,7 +49,7 @@ public class CharacterSheetController {
                                           @RequestParam(value = "removePhoto", required = false, defaultValue = "false") boolean removePhoto,
                                           @RequestParam(value = "file", required = false) MultipartFile file,
                                           @RequestParam(value = "removeFile", required = false, defaultValue = "false") boolean removeFile) {
-        String imageUrl = null; // null = nao mexe
+        String imageUrl = null;
         if (removePhoto) imageUrl = "";
         else if (photo != null && !photo.isEmpty()) imageUrl = storageService.upload(photo, "sheets/" + serverId + "/photos");
 

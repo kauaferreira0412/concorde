@@ -131,9 +131,6 @@ router.post("/soundboard/play", async (req, res) => {
   }
 });
 
-// Espelham /stop, /move e /mute acima, so' que pro Batera (bot do soundboard, ver
-// soundboardSession.js) - chamados pela mesma moderação de voz do backend
-// (VoiceModerationController) quando o alvo e' o Batera em vez do Melodion.
 router.post("/soundboard/stop", async (req, res) => {
   const { channelId } = req.body || {};
   if (!channelId) return res.status(400).json({ error: "channelId é obrigatório" });

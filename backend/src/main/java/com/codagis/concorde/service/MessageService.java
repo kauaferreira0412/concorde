@@ -233,10 +233,6 @@ public class MessageService {
                 throw new IllegalStateException("Só administradores podem postar nesse canal");
             }
         }
-        // Categoria com acesso restrito (ver CategoryAccessEntry/ServerService.
-        // setCategoryAccess) - quem nao esta' na lista nem consegue VER o canal na barra
-        // lateral (listChannels ja' filtra), mas isso aqui e' o que impede alguem que descobriu
-        // o id do canal por fora (ou tinha acesso e perdeu) de continuar postando.
         if (channel.getCategoryId() != null) {
             var entries = categoryAccessRepository.findByCategoryId(channel.getCategoryId());
             boolean restricted = !entries.isEmpty();

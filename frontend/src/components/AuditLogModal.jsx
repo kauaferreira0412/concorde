@@ -2,9 +2,6 @@ import { useEffect, useState } from "react";
 import api from "../api/client";
 import { XIcon } from "./icons.jsx";
 
-/** Rotulo em portugues pra cada "action" gravada pelo backend (ver AuditLogService.log em
- *  ServerService/VoiceModerationController) - a string crua fica como fallback se um dia
- *  surgir uma acao nova aqui sem rotulo ainda. */
 const ACTION_LABELS = {
   CREATE_CHANNEL: "criou o canal",
   DELETE_CHANNEL: "excluiu o canal",
@@ -36,7 +33,7 @@ function describe(entry) {
 }
 
 export default function AuditLogModal({ server, onClose }) {
-  const [entries, setEntries] = useState(null); // null = carregando
+  const [entries, setEntries] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {

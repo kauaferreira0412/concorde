@@ -1,10 +1,3 @@
-/**
- * Emojis do picker de reacao (ver EmojiPicker.jsx) - organizados em categorias, igual o
- * Discord faz (pedido explicito do usuario com print comparando: "o Concorde tem muito
- * pouco"). Curado a mao (nao e' o unicode CLDR inteiro, que passa de 3000 - mas cobre bem mais
- * que os 32 fixos de antes) - sem modificador de tom de pele nem combinacoes ZWJ complexas de
- * proposito, pra renderizar igual em qualquer fonte/SO sem risco de "quadradinho".
- */
 export const EMOJI_CATEGORIES = [
   {
     key: "frequentes",

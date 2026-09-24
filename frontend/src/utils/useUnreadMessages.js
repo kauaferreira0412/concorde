@@ -16,22 +16,8 @@ function saveLastRead(channelId, messageId) {
   localStorage.setItem(LAST_READ_PREFIX + channelId, String(messageId));
 }
 
-/**
- * Contagem de mensagens nao lidas por canal de texto + notificacao no PC quando chega uma
- * nova (se o usuario tiver ligado isso em Configuracoes). "Nao lido" e' rastreado so' no
- * navegador (localStorage por canal) - nao existe conceito disso no backend, entao nao
- * sincroniza entre dispositivos diferentes, mas evita precisar de infra nova pra isso.
- *
- * onSelectChannel e currentUsername vem de fora pra decidir o que NAO deve contar/notificar:
- * mensagem no canal que voce ja esta olhando, ou escrita por voce mesmo. serverName so' e'
- * usado pra dar contexto na notificacao (ver notifyDesktop).
- */
 export function useUnreadMessages(textChannels, selectedChannelId, stompClient, stompConnected, currentUsername, onNotificationClick, serverName) {
-  const [unreadCounts, setUnreadCounts] = useState({}); // channelId -> quantidade
-  // channelId -> true se alguma mensagem NAO LIDA daquele canal menciona voce (@seu_username) -
-  // mostra um "@" destacado do lado do numerozinho de nao lidas (ver ChannelSidebar.jsx), pedido
-  // explicito do usuario pra ficar mais em destaque que uma mencao normal em meio a outras
-  // mensagens nao lidas.
+  const [unreadCounts, setUnreadCounts] = useState({});
   const [mentionedChannels, setMentionedChannels] = useState({});
 
   const selectedChannelIdRef = useRef(selectedChannelId);
@@ -51,8 +37,6 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
     setMentionedChannels((prev) => (prev[channelId] ? { ...prev, [channelId]: false } : prev));
   }
 
-  // Assim que a lista de canais aparece, calcula o nao-lido inicial comparando o historico
-  // (ultimas 50 mensagens) com o que ja foi marcado como lido antes.
   useEffect(() => {
     let cancelled = false;
     textChannels.forEach((c) => {
@@ -69,13 +53,8 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [textChannels.map((c) => c.id).join(","), currentUsername]);
 
-  // Zera na hora ao abrir um canal (nao espera a proxima mensagem chegar pra sumir o numero)
-  // E salva no localStorage ate' onde voce leu - sem isso o numero soh sumia da tela por
-  // enquanto (estado em memoria), mas voltava do mesmo jeito no proximo login/F5, porque o
-  // "ultimo lido" salvo nunca tinha sido atualizado de verdade.
   useEffect(() => {
     if (!selectedChannelId) return;
     setUnreadCounts((prev) => (prev[selectedChannelId] ? { ...prev, [selectedChannelId]: 0 } : prev));
@@ -88,11 +67,8 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChannelId]);
 
-  // Um WebSocket por canal de texto - assim sabe de mensagem nova mesmo em canal que voce
-  // nao esta olhando agora (precisa pra contar/notificar).
   useEffect(() => {
     if (!stompClient || !stompConnected || textChannels.length === 0) return;
     const subs = textChannels.map((c) =>
@@ -113,44 +89,26 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
       })
     );
     return () => subs.forEach((s) => s.unsubscribe());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [textChannels.map((c) => c.id).join(","), stompClient, stompConnected, currentUsername]);
 
-  /** Resume o texto igual o Discord faz na propria notificacao/preview - corta com "…" em vez
-   *  de deixar a notificacao gigante (o SO ja trunca sozinho, mas de um jeito feio, no meio de
-   *  qualquer palavra e sem aviso nenhum). */
   function summarize(text, max = 120) {
     const clean = text.replace(/\s+/g, " ").trim();
     return clean.length > max ? clean.slice(0, max).trimEnd() + "…" : clean;
   }
 
   function notifyDesktop(channelId, message) {
-    // O som toca SEMPRE que chega mensagem nova (nao depende do toggle "notificar sobre
-    // mensagens" nem de permissao do navegador) - esse toggle so' controla o POPUP visual do SO;
-    // exigir os dois pro som tambem tocar deixava o som mudo pra quem nunca ligou o popup, que
-    // e' desligado por padrao (bug reportado: "mandei o audio mas nao ouço nada").
     playMessageSound();
     if (!getDesktopNotificationsEnabled()) return;
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     const channelName = channelNameById.current.get(channelId) || "canal";
-    // Linha 1 = de ONDE vem (canal + servidor), linha 2 = a mensagem resumida - igual
-    // Discord/Slack/Telegram mostram remetente + canal + preview do texto, nao so' o texto cru.
     const origin = serverName ? `#${channelName} · ${serverName}` : `#${channelName}`;
     const preview = summarize(attachmentSummary(message));
     try {
       const notification = new Notification(message.authorUsername, {
         body: `${origin}\n${preview}`,
-        // import.meta.env.BASE_URL: "/" no site, "./" no app desktop (ver vite.config.js) -
-        // caminho absoluto puro nao acha o icone dentro do pacote Electron (file://). O avatar
-        // de quem mandou vira o icone GRANDE (igual Discord/Telegram) - o icone PEQUENO/"dono
-        // da notificacao" (o logo do Concorde de verdade) e' o app.setAppUserModelId no Windows
-        // (ver main.cjs), que o SO usa sozinho, sem precisar passar nada aqui.
         icon: message.authorAvatarUrl || `${import.meta.env.BASE_URL}icon-192.png`,
         badge: `${import.meta.env.BASE_URL}icon-192.png`,
-        tag: `chat-${channelId}`, // agrupa notificacoes do mesmo canal em vez de empilhar
-        // Sem isso, o SO toca o BIP PADRAO dele em cima do nosso som (playMessageSound acima) -
-        // "silent" pede pro navegador nao tocar o som proprio dele nessa notificacao especifica
-        // (respeitado no Chrome/Edge/Electron - reportado pelo usuario: "tocam os dois juntos").
+        tag: `chat-${channelId}`,
         silent: true,
       });
       notification.onclick = () => {
@@ -159,7 +117,6 @@ export function useUnreadMessages(textChannels, selectedChannelId, stompClient, 
         notification.close();
       };
     } catch {
-      // alguns navegadores/SO bloqueiam silenciosamente - nao ha o que fazer alem de ignorar
     }
   }
 

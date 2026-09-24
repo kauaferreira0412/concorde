@@ -3,7 +3,6 @@ import api from "../api/client";
 import { subscribeToMusicQueue } from "../ws/chatSocket";
 import { TrashIcon, PlusIcon, XIcon, MusicNoteIcon, SkipForwardIcon } from "./icons.jsx";
 
-/** "125" -> "2:05", "3725" -> "1:02:05". null (duracao desconhecida, ex: live) -> "?". */
 function formatDuration(sec) {
   if (sec == null) return "?";
   const h = Math.floor(sec / 3600);
@@ -14,25 +13,8 @@ function formatDuration(sec) {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
-/**
- * Cartao ao vivo da fila de musica (ver /fila em ChatWindow.jsx) - carrega o estado atual na
- * hora que abre (GET) e depois so' ouve o WebSocket (ver subscribeToMusicQueue), que o bot
- * atualiza sozinho toda vez que algo muda (musica trocou, alguem adicionou/removeu - ver
- * music-bot/index.js broadcastQueue). channelId aqui e' o canal de VOZ onde o bot toca, nao o
- * canal de texto onde essa mensagem apareceu (podem ser diferentes).
- *
- * queueId e' o id da fila que existia na hora que ESSE card foi criado (embutido no marcador da
- * mensagem, ver ChatWindow.jsx) - TODOS os cards do mesmo canal escutam o MESMO broadcast ao
- * vivo, entao sem isso um card antigo (de uma fila ja encerrada) viraria a fila NOVA na tela
- * sozinho assim que alguem abrisse outra. Se o broadcast trouxer um queueId DIFERENTE do que
- * esse card guarda, ele se tranca pra sempre como "encerrada", ignorando qualquer atualizacao
- * futura daquela fila (que agora e' de outro card).
- *
- * A fila e' PUBLICA (pedido explicito do usuario) - qualquer membro conectado nessa call pode
- * adicionar, tirar, pular ou encerrar a fila inteira, sem exigir nenhuma permissao de moderacao.
- */
 export default function MusicQueueCard({ channelId, queueId, stompClient, stompConnected }) {
-  const [state, setState] = useState(null); // { active, nowPlaying, queue } | null (carregando)
+  const [state, setState] = useState(null);
   const [removingIndex, setRemovingIndex] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [skipping, setSkipping] = useState(false);
@@ -66,8 +48,6 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
     setRemovingIndex(index);
     try {
       await api.post(`/api/channels/${channelId}/music/queue/remove`, { index });
-      // Nao precisa atualizar o state na mao - o bot avisa a remocao de volta pelo WebSocket
-      // (ver subscribeToMusicQueue acima), essa chamada so' dispara a acao.
     } catch (err) {
       setError(err.response?.data?.error || "Não foi possível remover essa música");
     } finally {
@@ -92,7 +72,6 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
     setSkipping(true);
     try {
       await api.post(`/api/channels/${channelId}/music/skip`);
-      // Estado (nowPlaying/queue) atualiza sozinho pelo WebSocket, igual as outras acoes.
     } catch (err) {
       setError(err.response?.data?.error || "Não foi possível pular essa música");
     } finally {
@@ -126,10 +105,6 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
 
   const { name, nowPlaying, queue } = state;
   const title = name || "Fila de música";
-  // Uma fila NOVA substituiu essa (queueId diferente) - esse card e' historico, se tranca como
-  // encerrado pra sempre, mesmo que o broadcast continue chegando (e' o estado da fila NOVA, nao
-  // da dele). Sem queueId nenhum (mensagem antiga, de antes dessa funcionalidade existir) so'
-  // confia no "active" normal.
   const superseded = queueId && state.queueId && state.queueId !== queueId;
   const closed = superseded || !state.active;
 
@@ -194,9 +169,6 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
           ))}
         </ol>
       ) : (
-        // Separado do "nada tocando" acima de proposito - sao coisas diferentes: pode MUITO
-        // bem ter uma musica tocando agora e a fila (o que vem DEPOIS) estar vazia, que e' o
-        // caso normal quando a ultima da fila acabou de comecar a tocar.
         <p className="music-queue-empty">Não há mais músicas na fila.</p>
       )}
 

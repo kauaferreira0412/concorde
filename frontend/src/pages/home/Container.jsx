@@ -5,24 +5,12 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { useDmNotifications } from "../../context/DmNotificationsContext.jsx";
 import { createChatClient, subscribeToFriends } from "../../ws/chatSocket";
 
-/**
- * Home ("/channels/@me", equivalente ao clique na logo do Concorde) - amigos + chats privados,
- * fora de qualquer servidor. Mesma ideia de pages/servers/Container.jsx (fetch de servidores +
- * cliente STOMP proprios), so' que o conteudo principal e' Amigos/DM em vez de canal/servidor -
- * arquivo/rota SEPARADOS de proposito (ver pages/home/index.jsx), pra nao empurrar estado de DM
- * pra dentro do Container de servidor que ja' e' grande o suficiente.
- */
 export function useHomeContainer() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, token, logout } = useAuth();
   const { unreadDmIds, latestDmMessages, markDmRead, setActiveDmChannel } = useDmNotifications();
 
-  // Ao SAIR da Home (fechar a aba, trocar de servidor) a conversa que estava aberta deixa de
-  // estar "sendo vista" - senao mensagem nova nela nunca mais contaria como nao lida, mesmo
-  // com o usuario navegando pra outro lugar (ver DmNotificationsContext.jsx, provider GLOBAL
-  // que sobrevive a troca de pagina).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => () => setActiveDmChannel(null), []);
 
   const [servers, setServers] = useState([]);
@@ -30,18 +18,14 @@ export function useHomeContainer() {
   const [stompConnected, setStompConnected] = useState(false);
   const [stompError, setStompError] = useState("");
 
-  const [view, setView] = useState("friends"); // "friends" | "dm"
+  const [view, setView] = useState("friends");
   const [friends, setFriends] = useState([]);
   const [requests, setRequests] = useState({ incoming: [], outgoing: [] });
   const [dmChannels, setDmChannels] = useState([]);
   const [blocked, setBlocked] = useState([]);
-  const [activeDm, setActiveDm] = useState(null); // { channelId, otherUserId, otherUsername, ... }
+  const [activeDm, setActiveDm] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
 
-  // Chegou aqui vindo do botao "Enviar mensagem" no perfil de um membro (ver ProfileModal.jsx,
-  // "goToDm") - ja abre a conversa direto, sem precisar clicar de novo na lista depois de
-  // navegar. Limpa o state logo em seguida (replace) pra nao reabrir sozinho de novo se o
-  // usuario der F5 ou voltar por aqui de outro jeito.
   useEffect(() => {
     const openDm = location.state?.openDm;
     if (!openDm) return;
@@ -51,7 +35,6 @@ export function useHomeContainer() {
     markDmRead(openDm.channelId);
     setDmChannels((prev) => (prev.some((c) => c.channelId === openDm.channelId) ? prev : [{ ...openDm, lastMessage: null }, ...prev]));
     navigate(location.pathname, { replace: true, state: null });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -98,9 +81,6 @@ export function useHomeContainer() {
     reloadBlocked();
   }, [reloadFriends, reloadDmChannels, reloadBlocked]);
 
-  // Pedido/aceite/recusa/bloqueio de amizade em QUALQUER uma das minhas sessoes (ver
-  // FriendshipService.notify no backend) - recarrega tudo de novo, mais simples e sem risco de
-  // o estado local dessincronizar do banco.
   useEffect(() => {
     if (!stompClient || !stompConnected) return;
     const sub = subscribeToFriends(stompClient, () => {
@@ -111,9 +91,6 @@ export function useHomeContainer() {
     return () => sub.unsubscribe();
   }, [stompClient, stompConnected, reloadFriends, reloadDmChannels, reloadBlocked]);
 
-  // Rede de seguranca alem do WebSocket acima - se por qualquer motivo esse evento nao chegar
-  // (rede instavel, reconexao no meio, etc), a lista de qualquer forma se atualiza sozinha em
-  // no maximo 15s, sem precisar de F5 (reportado pelo usuario: "so' atualiza se der F5").
   useEffect(() => {
     const interval = setInterval(() => {
       reloadFriends();
@@ -165,10 +142,6 @@ export function useHomeContainer() {
     reloadBlocked();
   }
 
-  /** Abre a conversa com esse amigo - o backend ja' garante que o DirectChannel existe desde
-   *  que a amizade foi aceita (ver FriendshipService.acceptInternal), entao aqui e' so' montar
-   *  o objeto de canal a partir do que a lista de amigos ja' trouxe (sem round-trip extra) e
-   *  fazer ele aparecer na lista de conversas na hora, mesmo antes do proximo reloadDmChannels. */
   function openDmWithFriend(friend) {
     const channel = {
       channelId: friend.dmChannelId,
@@ -207,10 +180,6 @@ export function useHomeContainer() {
     setActiveDmChannel(null);
   }
 
-  // Mescla a ultima mensagem AO VIVO (ver DmNotificationsContext.jsx) por cima do que veio da
-  // API - sem isso, o texto embaixo do nome na lista de conversas so' atualizava dando F5
-  // (reportado pelo usuario). Reordena pra' conversa com mensagem nova sempre subir, igual
-  // Discord faz.
   const displayedDmChannels = useMemo(() => {
     return dmChannels
       .map((c) => (latestDmMessages[c.channelId] ? { ...c, lastMessage: latestDmMessages[c.channelId] } : c))

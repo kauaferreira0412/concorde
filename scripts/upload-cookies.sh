@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-# Envia um cookies.txt (exportado do YouTube, ver DEPLOY.md "Bot de música sendo bloqueado")
-# pra VPS e reinicia so' o music-bot pra ele pegar o arquivo novo. Nunca comita esse arquivo -
-# ele equivale a uma sessao logada de verdade.
-#
-# Uso:
-#   scripts/upload-cookies.sh caminho/pro/cookies.txt
 
 set -euo pipefail
 VPS_HOST="root@187.127.37.101"

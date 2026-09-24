@@ -6,21 +6,9 @@ import { MusicNoteIcon, PlusIcon, TrashIcon, XIcon } from "./icons.jsx";
 
 const ACCEPTED_TYPES = "audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/mp4,audio/aac";
 
-/**
- * Banco de sons PESSOAL de cada usuario (ver SoundboardController/SoundboardClip no backend) -
- * ninguem mais ve quais sons voce upou nem a lista deles, so' voce. Clicar num som toca ele
- * PRA TODO MUNDO que estiver nessa call agora (o bot de musica publica esse audio no LiveKit,
- * ver music-bot/src/soundboard.js) - diferente do VoiceMod (que so' usa atalho de teclado), aqui
- * e' clique + escolha na hora mesmo (pedido explicito do usuario). O nome do som vem direto do
- * nome do arquivo (sem extensao) - arrastar/soltar ou clicar ja envia na hora, sem formulario.
- *
- * A lista tambem chega ao vivo via WebSocket (ver subscribeToSoundboard/SoundboardService.
- * broadcastList no backend) - sem isso, subir um som no navegador nao aparecia no app desktop
- * (nem vice-versa) ate' fechar e abrir o painel de novo (reportado pelo usuario).
- */
 export default function SoundboardPanel({ channelId, stompClient, stompConnected }) {
   const { showAlert } = useAlert();
-  const [clips, setClips] = useState(null); // null = carregando
+  const [clips, setClips] = useState(null);
   const [playingId, setPlayingId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
@@ -68,10 +56,6 @@ export default function SoundboardPanel({ channelId, stompClient, stompConnected
       formData.append("file", file);
       formData.append("name", file.name.replace(/\.[^/.]+$/, ""));
       const { data } = await api.post("/api/soundboard", formData);
-      // A atualizacao ao vivo por WebSocket (ver subscribeToSoundboard abaixo) pode chegar
-      // ANTES dessa resposta do proprio upload resolver (e' outro caminho, sem ordem
-      // garantida) - sem essa checagem, o som acabava entrando duas vezes na lista: uma
-      // pelo push, outra por aqui.
       setClips((prev) => {
         const list = prev || [];
         return list.some((c) => c.id === data.id) ? list : [data, ...list];

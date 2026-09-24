@@ -1,9 +1,5 @@
-/* Mesmo .app-shell de pages/servers/style.css (duplicado de proposito - CSS por pagina, so' um
-   seletor, ver mesmo padrao la'). */
 .app-shell { display: flex; height: 100%; }
 
-/* Coluna do meio da Home - mesmas medidas do .channel-sidebar (ver global.css), so' que lista
-   conversas diretas em vez de canais. */
 .home-sidebar {
   width: 252px;
   background: var(--bg-panel);
@@ -71,9 +67,6 @@
 .home-dm-item-info { display: flex; flex-direction: column; min-width: 0; gap: 2px; flex: 1; }
 .home-dm-item-info strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-dm-item-preview { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Conversa com mensagem nao lida - nome fica branco/em destaque (igual Discord: conversa lida
-   fica cinza-fosco, nao-lida "acende"), mais o pontinho vermelho do lado - ver
-   DmNotificationsContext.jsx pra' quando isso liga/desliga. */
 .home-dm-item.unread .home-dm-item-info strong { color: var(--text-primary); }
 .home-dm-item-unread-dot {
   width: 9px;

@@ -25,8 +25,6 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     private final JwtService jwtService;
     private final DirectChannelRepository directChannelRepository;
 
-    // "/topic/dm.<id>" (mensagens) ou "/topic/dm.<id>.typing" (digitando) - qualquer coisa
-    // depois do id tambem cai na mesma checagem de participante.
     private static final Pattern DM_TOPIC = Pattern.compile("^/topic/dm\\.(\\d+)(?:\\..*)?$");
 
     public StompAuthChannelInterceptor(JwtService jwtService, DirectChannelRepository directChannelRepository) {
@@ -50,13 +48,6 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                 throw new IllegalArgumentException("Token ausente na conexao WebSocket");
             }
         } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
-            // Chat privado: so' os dois participantes da conversa podem sequer ASSINAR o
-            // topico dela - sem isso, qualquer socket autenticado (mesmo de outro usuario)
-            // conseguiria se inscrever num "/topic/dm.<id>" adivinhado/enumerado e ler mensagens
-            // privadas de outras pessoas ao vivo (pedido explicito do usuario: "outros usuarios
-            // nao podem ver os chats privados de outros usuarios"). Canais de servidor nao tem
-            // essa checagem aqui (dependem so' da API REST) - DM e' o unico lugar onde vazar por
-            // essa via teria consequencia real de privacidade.
             String destination = accessor.getDestination();
             if (destination != null) {
                 Matcher m = DM_TOPIC.matcher(destination);

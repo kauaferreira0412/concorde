@@ -5,13 +5,6 @@ import lombok.*;
 
 import java.time.Instant;
 
-// Um mapa de batalha de um canal de VOZ (kit de RPG, ver MapService/BattleMap.jsx). Um canal
-// pode ter VARIOS mapas agora (mapa 1, mapa 2...) - pedido explicito do usuario: "o mestre deve
-// ter a opcao de adicionar varios mapas". "active" marca qual desses mapas esta' sendo mostrado
-// pra todo mundo agora (so' um por canal deveria estar true por vez - garantido no MapService,
-// nao no banco). Boolean (nao "boolean" primitivo) e sem "nullable = false" de proposito -
-// coluna nova, evita o problema de sempre com ddl-auto:update e NOT NULL em tabela que ja' tem
-// dados (ver MapToken.imageUrl). Sem FK (mesmo padrao do resto do projeto).
 @Entity
 @Table(name = "battle_maps", indexes = {
         @Index(name = "idx_battle_maps_channel_id", columnList = "channelId"),

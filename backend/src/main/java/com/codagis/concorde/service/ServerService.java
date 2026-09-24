@@ -76,10 +76,6 @@ public class ServerService {
                 .toList();
     }
 
-    // Qualquer usuario autenticado pode criar um servidor agora (pedido explicito do usuario -
-    // antes era exclusivo do admin). Quem cria vira o dono (Server.ownerId) e ganha TODAS as
-    // permissoes nesse servidor de graca (ver PermissionService.isOwnerOrGlobalAdmin) - ele
-    // decide depois quem mais entra, convidando amigos (ver inviteFriend abaixo).
     @Transactional
     public ServerResponse createServer(Long ownerId, CreateServerRequest req) {
         ServerType type = req.type() != null ? req.type() : ServerType.NORMAL;
@@ -92,10 +88,6 @@ public class ServerService {
         membershipRepository.save(Membership.builder().serverId(server.getId()).userId(ownerId).build());
 
         channelRepository.save(Channel.builder().serverId(server.getId()).name("geral").type(ChannelType.TEXT).build());
-        // RPG: o canal de voz padrao vira "Sessão" (a primeira sessao de jogo) em vez de
-        // "Geral" - o mestre cria mais sessoes depois do mesmo jeito que cria qualquer outro
-        // canal de voz (ver ChannelSidebar.jsx "+ canal de voz"), so' muda o nome padrao pra
-        // deixar claro o proposito (pedido explicito do usuario).
         String voiceChannelName = type == ServerType.RPG ? "Sessão" : "Geral";
         channelRepository.save(Channel.builder().serverId(server.getId()).name(voiceChannelName).type(ChannelType.VOICE).build());
         channelRepository.save(Channel.builder().serverId(server.getId()).name("Atualizações").type(ChannelType.TEXT).adminOnly(true).build());
@@ -103,9 +95,6 @@ public class ServerService {
         return toResponse(server);
     }
 
-    // O admin global enxerga TODOS os servidores que existem, mesmo sem ser membro de nenhum
-    // deles (pedido explicito do usuario: "o usuario adm deve ter acesso a todos os
-    // servidores") - todo mundo mais so' ve os que participa (Membership), como sempre.
     public List<ServerResponse> listServersOfUser(Long userId) {
         boolean isGlobalAdmin = userRepository.findById(userId).map(u -> u.getRole() == Role.ADMIN).orElse(false);
         if (isGlobalAdmin) {
@@ -132,13 +121,6 @@ public class ServerService {
         }
     }
 
-    /** Concede acesso a um servidor pra um AMIGO (aceito nos chats privados, ver
-     *  FriendshipService.areFriends) - pedido explicito do usuario: "conceder acesso aos amigos
-     *  adicionados". Exige MANAGE_MEMBERS (o dono ja' tem de graca, ver
-     *  PermissionService.isOwnerOrGlobalAdmin - mas tambem pode ser dado a outros membros via
-     *  Perfis, mesma permissao que remover/renomear membro ja' usa). Diferente do
-     *  "grantAccessAsAdmin" (admin global, QUALQUER usuario, sem checar amizade nenhuma) - esse
-     *  aqui e' o caminho normal, pra gente de verdade. */
     @Transactional
     public void inviteFriend(Long requesterId, Long serverId, Long targetUserId) {
         assertMember(serverId, requesterId);
@@ -156,9 +138,6 @@ public class ServerService {
         auditLogService.log(serverId, requesterId, "INVITE_FRIEND", targetUserId, "MEMBER", targetUserId, null);
     }
 
-    // O admin global (e o dono do servidor) sempre passam por aqui, mesmo sem uma linha de
-    // Membership de verdade - pedido explicito do usuario: "o usuario adm deve ter acesso a
-    // todos os servidores", inclusive um que ele nunca entrou/foi convidado.
     public void assertMember(Long serverId, Long userId) {
         if (membershipRepository.existsByServerIdAndUserId(serverId, userId)) {
             return;
@@ -251,9 +230,6 @@ public class ServerService {
     public List<ChannelResponse> listChannels(Long serverId, Long userId) {
         assertMember(serverId, userId);
         List<Channel> channels = channelRepository.findByServerIdOrderByIdAsc(serverId);
-        // So' precisa ir no banco pelas categorias RESTRITAS (a maioria dos servidores nunca
-        // configurou nenhuma) - ver canAccessCategory/setCategoryAccess. Categoria sem nenhuma
-        // linha em CategoryAccessEntry continua aberta pra todo mundo, comportamento de sempre.
         List<Long> categoryIds = channels.stream().map(Channel::getCategoryId).filter(java.util.Objects::nonNull).distinct().toList();
         Set<Long> restrictedCategoryIds = categoryIds.isEmpty() ? Set.of() : categoryAccessRepository.findRestrictedCategoryIds(categoryIds);
         return channels.stream()
@@ -319,17 +295,12 @@ public class ServerService {
         List<Long> categoryIds = categories.stream().map(ChannelCategory::getId).toList();
         Set<Long> restrictedCategoryIds = categoryIds.isEmpty() ? Set.of() : categoryAccessRepository.findRestrictedCategoryIds(categoryIds);
         return categories.stream()
-                // Categoria restrita que esse usuario nao tem acesso simplesmente NAO aparece -
-                // nem o nome dela vaza (mesma logica de listChannels acima).
                 .filter(c -> !restrictedCategoryIds.contains(c.getId())
                         || categoryAccessRepository.existsByCategoryIdAndUserId(c.getId(), userId))
                 .map(c -> toResponse(c, restrictedCategoryIds.contains(c.getId())))
                 .toList();
     }
 
-    /** Quem tem acesso HOJE a essa categoria (lista de userId) - so' pra quem pode gerenciar
-     *  canais montar a UI de "restringir acesso" (ver CategoryAccessModal.jsx). Lista vazia
-     *  quer dizer "sem restricao nenhuma configurada" (aberta pra todo mundo). */
     public List<Long> getCategoryAccess(Long serverId, Long userId, Long categoryId) {
         assertMember(serverId, userId);
         permissionService.assertHas(serverId, userId, ServerPermission.MANAGE_CHANNELS);
@@ -339,10 +310,6 @@ public class ServerService {
                 .toList();
     }
 
-    /** Substitui a lista de quem pode ver essa categoria - lista vazia REMOVE a restricao (fica
-     *  aberta de novo pra todo mundo do servidor), sem precisar de um endpoint separado pra
-     *  "desfazer". Ignora silenciosamente qualquer userId que nao seja membro do servidor (ex:
-     *  alguem que saiu entre a busca da lista e o salvar). */
     @Transactional
     public void setCategoryAccess(Long serverId, Long userId, Long categoryId, List<Long> allowedUserIds) {
         assertMember(serverId, userId);

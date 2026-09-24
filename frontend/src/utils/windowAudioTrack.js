@@ -1,16 +1,3 @@
-// Constroi uma MediaStreamTrack de audio a partir da captura nativa de audio de UMA janela
-// (Windows - biblioteca "process-audio-capture", ver electron/main.cjs). Diferente da
-// tentativa anterior (modulo C++ escrito na mao, que nunca funcionou nessa maquina por um
-// motivo que nao foi totalmente identificado), essa biblioteca de terceiros usa a mesma API
-// do Windows (WASAPI Process Loopback) mas com uma implementacao ligeiramente diferente que
-// funciona de verdade aqui - testado e confirmado com dois sons simultaneos, so' o do
-// processo escolhido aparece na captura.
-//
-// Como funciona: os chunks PCM (Float32Array, ja' pronto, sem precisar reinterpretar bytes)
-// chegam por IPC do processo principal. Um AudioWorklet funciona como "sintetizador" -
-// enfileira esses pedacos e vai tocando eles no ritmo certo, alimentando um
-// MediaStreamDestination (o jeito padrao da Web Audio API de transformar audio "de fora" numa
-// MediaStreamTrack de verdade, publicavel no LiveKit igual qualquer outra).
 const WORKLET_SOURCE = `
 class WindowAudioProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -50,7 +37,6 @@ class WindowAudioProcessor extends AudioWorkletProcessor {
 registerProcessor("window-audio-processor", WindowAudioProcessor);
 `;
 
-/** hwnd: number (ver id da fonte do desktopCapturer, formato "window:<hwnd>:0"). */
 export async function startWindowAudioTrack(hwnd) {
   const desktop = window.concordeDesktop;
   if (!desktop?.startWindowAudioCapture) return null;
@@ -87,14 +73,11 @@ export async function startWindowAudioTrack(hwnd) {
   });
 
   const track = destNode.stream.getAudioTracks()[0];
-  // Pendurado no proprio track pra quem for parar (stopElectronScreenShare) saber como
-  // desligar tudo isso (captura nativa + worklet + audio context), nao so' track.stop().
   track._concordeCleanup = async () => {
     removeChunkListener();
     try {
       await desktop.stopWindowAudioCapture();
     } catch {
-      /* processo ja' pode ter fechado */
     }
     workletNode.disconnect();
     await audioContext.close();

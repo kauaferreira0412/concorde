@@ -2,7 +2,7 @@ const INPUT_KEY = "audioInputDeviceId";
 const OUTPUT_KEY = "audioOutputDeviceId";
 const VIDEO_INPUT_KEY = "videoInputDeviceId";
 const SOUND_EFFECTS_KEY = "voiceSoundEffectsEnabled";
-const NOISE_SUPPRESSION_KEY = "voiceNoiseSuppressionEnabled"; // legado (boolean) - migrado abaixo
+const NOISE_SUPPRESSION_KEY = "voiceNoiseSuppressionEnabled";
 const NOISE_SUPPRESSION_MODE_KEY = "voiceNoiseSuppressionMode";
 
 export function getSavedAudioInput() {
@@ -29,7 +29,6 @@ export function setSavedVideoInput(deviceId) {
   else localStorage.removeItem(VIDEO_INPUT_KEY);
 }
 
-/** Som ao alguem entrar/sair da call - ligado por padrao, como no Discord. */
 export function getSoundEffectsEnabled() {
   const raw = localStorage.getItem(SOUND_EFFECTS_KEY);
   return raw === null ? true : raw === "true";
@@ -38,16 +37,9 @@ export function setSoundEffectsEnabled(enabled) {
   localStorage.setItem(SOUND_EFFECTS_KEY, String(enabled));
 }
 
-/**
- * Supressao de ruido do microfone - "off" | "rnnoise" | "gtcrn" (ver
- * utils/noiseSuppression.js pras duas opcoes de IA de verdade, no lugar da constraint nativa
- * fraca do navegador que tinha antes). Vale a partir da proxima vez que entrar numa call.
- */
 export function getNoiseSuppressionMode() {
   const raw = localStorage.getItem(NOISE_SUPPRESSION_MODE_KEY);
   if (raw === "off" || raw === "rnnoise" || raw === "gtcrn") return raw;
-  // Migra o valor antigo (checkbox liga/desliga a supressao nativa do navegador) - "ligado"
-  // vira RNNoise (a opcao leve, mais parecida com o que existia), "desligado" vira "off".
   const legacyRaw = localStorage.getItem(NOISE_SUPPRESSION_KEY);
   if (legacyRaw !== null) return legacyRaw === "true" ? "rnnoise" : "off";
   return "rnnoise";
@@ -56,13 +48,6 @@ export function setNoiseSuppressionMode(mode) {
   localStorage.setItem(NOISE_SUPPRESSION_MODE_KEY, mode);
 }
 
-// Volume individual de cada pessoa (voz e audio de transmissao de tela, separados) - por
-// PESSOA (userId), nao por sessao de call. Antes isso vivia so' num Map em memoria
-// (VoiceCallContext.jsx) - funcionava emquanto voce continuava na MESMA call, mas resetava pro
-// padrao (100%) sempre que a pessoa saia/reconectava a call ou parava/comecava a compartilhar
-// de novo (um Map novo em memoria, sem nenhum jeito de saber "ah, isso aqui eu tinha baixado
-// antes"). Gravando no localStorage, a preferencia agora sobrevive a qualquer coisa - a pessoa
-// sair e entrar, voce sair e entrar, ate' fechar e abrir o app de novo.
 const PARTICIPANT_VOLUME_PREFIX = "voiceParticipantVolume_";
 const STREAM_VOLUME_PREFIX = "voiceStreamVolume_";
 
@@ -81,13 +66,6 @@ export function setSavedStreamVolume(userId, percent) {
   localStorage.setItem(STREAM_VOLUME_PREFIX + userId, String(percent));
 }
 
-// Volume do SEU PROPRIO microfone (o que sai pra fora, pros outros - pedido explicito do
-// usuario: "quero baixar o volume do meu microfone, caso eu queira que ele saia mais baixo").
-// Diferente do volume individual acima (como VOCE ouve cada pessoa) - esse aqui afeta como
-// TODO MUNDO ouve VOCE. Ganho aplicado via GainNode (ver utils/noiseSuppression.js), nao e' so'
-// a constraint nativa do navegador - por isso da pra passar de 100% (ate' 200%, mesmo teto do
-// volume individual). Vale a partir da proxima vez que o microfone (re)publica (desmutar,
-// trocar de dispositivo, ver applyNoiseSuppression em VoiceCallContext.jsx).
 const MIC_GAIN_KEY = "micGainPercent";
 
 export function getMicGain() {
@@ -98,12 +76,6 @@ export function setMicGain(percent) {
   localStorage.setItem(MIC_GAIN_KEY, String(percent));
 }
 
-// Volume MESTRE (alto-falante) - multiplica por CIMA de todo volume individual (voz e
-// transmissao de tela de cada pessoa, ver participantVolumes/streamVolumes em
-// VoiceCallContext.jsx) - um "volume geral da call" independente do volume do Windows/app,
-// pedido explicito do usuario ("o mesmo e' o volume de alto-falante"). 100% = nao muda nada
-// (comportamento de sempre); baixar isso abafa todo mundo de uma vez, sem perder as
-// preferencias individuais de cada pessoa (elas continuam guardadas do jeito que estavam).
 const MASTER_VOLUME_KEY = "masterVolumePercent";
 
 export function getMasterVolume() {

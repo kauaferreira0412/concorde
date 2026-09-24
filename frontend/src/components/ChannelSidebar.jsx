@@ -114,43 +114,26 @@ export default function ChannelSidebar({
   );
   const [connectedExpanded, setConnectedExpanded] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  // Popover em cima do avatar de alguem na lista de "quem esta na call" (aninhada sob o
-  // canal de voz) - volume (so' se voce estiver na MESMA call, e' o LiveKit que controla
-  // isso) e/ou moderacao (mover/mutar/ensurdecer/expulsar, funciona mesmo sem voce estar
-  // na call, so' depende de permissao - ver ServerPermission no backend).
-  const [participantMenu, setParticipantMenu] = useState(null); // { channelId, userId, identity, username, x, y }
+  const [participantMenu, setParticipantMenu] = useState(null);
   const participantMenuRef = useRef(null);
-  // Menu de botao direito num CANAL (texto ou voz) - so' tem uma opcao (excluir), oferecida
-  // pra quem tem MANAGE_CHANNELS (ver canManageChannels acima). Segue o mesmo padrao do
-  // participantMenu (fecha ao clicar fora/Esc), so' que mais simples.
-  const [channelMenu, setChannelMenu] = useState(null); // { id, name, x, y }
+  const [channelMenu, setChannelMenu] = useState(null);
   const channelMenuRef = useRef(null);
-  const [deletingChannel, setDeletingChannel] = useState(null); // canal com o ConfirmModal aberto
+  const [deletingChannel, setDeletingChannel] = useState(null);
   const [myServerPermissions, setMyServerPermissions] = useState(new Set());
-  // Categorias (pastas de canal, ver ChannelCategory no backend) - carregadas e geridas aqui
-  // mesmo (mesmo padrao de myServerPermissions acima), sem passar pelo Container.jsx.
   const [categories, setCategories] = useState([]);
   const [collapsedCategories, setCollapsedCategories] = useState(new Set());
-  const [categoryMenu, setCategoryMenu] = useState(null); // { id, name, x, y }
+  const [categoryMenu, setCategoryMenu] = useState(null);
   const categoryMenuRef = useRef(null);
-  // Menu de "Configuracoes do servidor" (clique no nome do servidor, ver hasAnyServerSettings
-  // acima) - junta editar servidor/emojis/perfis/log de auditoria num so' lugar, em vez de um
-  // botao pra cada um la' no cabecalho (ficava apertado demais, espremia o nome do servidor).
-  const [serverMenu, setServerMenu] = useState(null); // { x, y } | null
+  const [serverMenu, setServerMenu] = useState(null);
   const serverMenuRef = useRef(null);
   const [creatingCategory, setCreatingCategory] = useState(false);
-  const [editingCategory, setEditingCategory] = useState(null); // { id, name } | null
+  const [editingCategory, setEditingCategory] = useState(null);
   const [deletingCategory, setDeletingCategory] = useState(null);
-  const [accessCategory, setAccessCategory] = useState(null); // categoria com o modal de "Restringir acesso" aberto
-  const [showCharacterSheets, setShowCharacterSheets] = useState(false); // modal de "Personagens" (servidor inteiro, ver CharacterSheetsModal.jsx)
-  // O "mestre" de uma mesa RPG e' o DONO do servidor (ou admin global) - mesma regra do
-  // backend (ver CharacterSheetService.isMaster/PermissionService.isOwnerOrGlobalAdmin).
+  const [accessCategory, setAccessCategory] = useState(null);
+  const [showCharacterSheets, setShowCharacterSheets] = useState(false);
   const isCharacterMaster = isAdmin || (server && user?.id === server.ownerId);
   const [showInviteFriends, setShowInviteFriends] = useState(false);
-  const [movingChannel, setMovingChannel] = useState(false); // abre o submenu "Mover para categoria" no channelMenu
-  // Criar/apagar canal (ver "+ canal de texto/voz" mais abaixo e o menu de botao direito em
-  // cada canal) - mesma permissao MANAGE_CHANNELS pros dois, pode ser concedida pra qualquer
-  // membro via Perfis (ver ServerRolesModal.jsx), nao e' so' o admin/dono.
+  const [movingChannel, setMovingChannel] = useState(false);
   const canManageChannels = isAdmin || myServerPermissions.has("MANAGE_CHANNELS");
   const canMove = myServerPermissions.has("MOVE_MEMBERS");
   const hasAnyModPermission =
@@ -158,21 +141,14 @@ export default function ChannelSidebar({
     myServerPermissions.has("MUTE_MEMBERS") ||
     myServerPermissions.has("DEAFEN_MEMBERS") ||
     myServerPermissions.has("KICK_VOICE");
-  // Controla se o nome do servidor vira um botao clicavel (abre o menu de Configuracoes do
-  // servidor, ver serverMenu abaixo) - pra quem nao tem NENHUMA dessas, o nome fica so' texto.
   const hasAnyServerSettings =
     isAdmin ||
     myServerPermissions.has("MANAGE_SERVER") ||
     myServerPermissions.has("MANAGE_ROLES") ||
     myServerPermissions.has("VIEW_AUDIT_LOG") ||
     myServerPermissions.has("MANAGE_MEMBERS");
-  // Arrastar alguem da lista de "quem esta na call" pra outro canal de voz (ver
-  // draggable/onDrop abaixo) - so' existe enquanto o arraste esta rolando.
-  const [draggingParticipant, setDraggingParticipant] = useState(null); // { channelId, userId }
+  const [draggingParticipant, setDraggingParticipant] = useState(null);
   const [dragOverChannelId, setDragOverChannelId] = useState(null);
-  // Arrastar um canal de TEXTO pra dentro de uma categoria (pedido explicito do usuario) -
-  // draggingChannelId e' o canal sendo arrastado, dragOverCategoryId e' o cabecalho de
-  // categoria com o mouse em cima agora (so' pra destacar visualmente onde vai cair).
   const [draggingChannelId, setDraggingChannelId] = useState(null);
   const [dragOverCategoryId, setDragOverCategoryId] = useState(null);
 
@@ -271,22 +247,12 @@ export default function ChannelSidebar({
     try {
       await api.delete(`/api/servers/${server.id}/categories/${category.id}`);
       setCategories((prev) => prev.filter((c) => c.id !== category.id));
-      // O backend so' solta os canais dessa categoria (categoryId vira null), nunca apaga eles -
-      // mas o "channels" de fora (pages/servers/Container.jsx) continuava com o categoryId
-      // velho ate' um F5, entao esses canais sumiam da tela sozinhos (reportado pelo usuario
-      // como "os chats foram deletados junto"). Espelha aqui o que ja' aconteceu de verdade.
       onCategoryDeleted?.(category.id);
     } catch (err) {
       showAlert(err.response?.data?.error || "Não foi possível excluir essa categoria");
     }
   }
 
-  /** Agrupa TODOS os canais (texto e voz misturados, igual Discord) por categoria - cada
-   *  categoria vira UM bloco so' com seus canais de texto e voz juntos (por "position", que ja'
-   *  e' compartilhado entre os dois tipos dentro de uma mesma categoria - ver
-   *  ServerService.createChannel no backend), em vez das antigas secoes fixas "CANAIS DE
-   *  TEXTO"/"CANAIS DE VOZ" que duplicavam o cabecalho de cada categoria (uma vez em cada
-   *  secao). Canais sem categoria ficam soltos, sem cabecalho nenhum, no topo da lista. */
   function groupByCategory() {
     const byCategory = new Map();
     const uncategorized = [];
@@ -312,9 +278,6 @@ export default function ChannelSidebar({
     return renderTextChannel(c);
   }
 
-  /** Canal de MAPA (kit de RPG, ver BattleMap.jsx) - um lugar proprio pra abrir o mapa de
-   *  batalha, igual um canal de texto (nao precisa mais estar dentro de uma call de voz -
-   *  pedido explicito do usuario). Sem badge de nao-lido/mencao (nao tem chat aqui). */
   function renderMapChannel(c) {
     return (
       <button
@@ -356,12 +319,6 @@ export default function ChannelSidebar({
     };
   }, [participantMenu]);
 
-  // O popover de moderacao (mutar/ensurdecer/"mover para"/expulsar) tem altura VARIAVEL - fica
-  // bem mais alto quando tem varios canais de voz pra listar em "mover para" (relatado pelo
-  // usuario, com print mostrando ele cortado embaixo da tela). Como so' da' pra saber a altura
-  // de verdade depois de renderizado, o left/top inicial e' so' o ponto do clique (sem clamp -
-  // ver estilo inline abaixo) e esse efeito reposiciona direto no DOM, ja' clampado pro
-  // tamanho real, ANTES do proximo paint (useLayoutEffect, evita o usuario ver o popover pular).
   useLayoutEffect(() => {
     if (!participantMenu || !participantMenuRef.current) return;
     const el = participantMenuRef.current;
@@ -389,9 +346,6 @@ export default function ChannelSidebar({
     };
   }, [channelMenu]);
 
-  // ConfirmModal fecha sozinho assim que onConfirm() e' chamado (nao espera ele terminar, ver
-  // ConfirmModal.jsx) - por isso o erro, se der, aparece num alerta em vez de dentro do modal
-  // (que ja' nao esta mais na tela quando o "await" resolve).
   async function handleConfirmDeleteChannel(channel) {
     try {
       await onDeleteChannel(channel.id);
@@ -400,8 +354,6 @@ export default function ChannelSidebar({
     }
   }
 
-  // Painel inteiro (canais, call, icones) pode recolher pra dar mais espaco pro chat -
-  // fica lembrado entre sessoes.
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("channelSidebarCollapsed") === "true");
 
   function toggleCollapsed() {
@@ -417,9 +369,6 @@ export default function ChannelSidebar({
     onLogout();
   }
 
-  // "Quem esta conectado" e' visivel pra qualquer membro do servidor, mesmo sem ter
-  // entrado na call - diferente do indicador de "quem esta falando", que so aparece
-  // dentro da propria call (ver VoiceChannel.jsx).
   const [presenceByChannel, setPresenceByChannel] = useState({});
 
   useEffect(() => {
@@ -446,15 +395,6 @@ export default function ChannelSidebar({
       });
     }
 
-    // Reforco: de vez em quando (relatado pelo usuario, com prints) a lista de "quem esta
-    // conectado" trava desatualizada pra um cliente especifico - o STOMP continua "conectado"
-    // do ponto de vista dele (chat/audio da call continuam funcionando 100% normal, ele
-    // escuta e fala com todo mundo), mas os broadcasts de presenca desse canal simplesmente
-    // param de chegar (nunca detectamos um disconnect/reconnect de verdade pra disparar o
-    // resubscribe acima). Sem um jeito confiavel de saber QUANDO isso acontece, a solucao e'
-    // nao depender 100% do push: busca o snapshot de verdade via REST a cada 12s tambem,
-    // sobrescrevendo qualquer coisa que tenha ficado presa - o pior caso agora e' ficar
-    // desatualizado por alguns segundos, nunca mais "pra sempre ate' sair e entrar de novo".
     const interval = setInterval(refetchAll, 12000);
 
     return () => {
@@ -462,14 +402,10 @@ export default function ChannelSidebar({
       clearInterval(interval);
       subs.forEach((s) => s.unsubscribe());
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [server?.id, stompClient, stompConnected, voiceChannels.map((c) => c.id).join(",")]);
 
   const connectedList = voiceChannels.flatMap((c) => (presenceByChannel[c.id] || []).map((p) => ({ ...p, channelName: c.name })));
 
-  // Fecha o popover sozinho se a pessoa sair da call enquanto ele estava aberto - moderacao
-  // continua fazendo sentido mesmo sem ela estar mais lá (o backend so' ignora nesse caso),
-  // entao so' fecha se ela sumiu das DUAS fontes (LiveKit e presenca).
   useEffect(() => {
     if (
       participantMenu &&
@@ -480,8 +416,6 @@ export default function ChannelSidebar({
     }
   }, [participants, participantMenu, presenceByChannel]);
 
-  /** Um botao de canal de TEXTO - extraido pra funcao pra poder ser chamado tanto solto
-   *  (canais sem categoria) quanto dentro de um grupo de categoria, sem duplicar o JSX. */
   function renderTextChannel(c) {
     return (
       <button
@@ -523,8 +457,6 @@ export default function ChannelSidebar({
     );
   }
 
-  /** Um bloco de canal de VOZ (botao + lista de "quem esta conectado" aninhada) - mesma logica
-   *  de antes, so' extraida pra funcao pelo mesmo motivo do renderTextChannel acima. */
   function renderVoiceChannel(c) {
     return (
       <div key={c.id}>
@@ -569,10 +501,6 @@ export default function ChannelSidebar({
         {(presenceByChannel[c.id] || []).length > 0 && (
           <div className="channel-voice-participants">
             {presenceByChannel[c.id].map((p) => {
-              // Melodion (musica) e Batera (soundboard) sao bots SEPARADOS no LiveKit, cada um
-              // com seu proprio userId "falso" (ver VoicePresenceService.botUserId/
-              // soundboardBotUserId no backend) - dá pra distinguir os dois so' comparando com
-              // -c.id (so' o Melodion usa exatamente isso, o Batera usa um deslocamento).
               const identity = p.userId < 0 ? (p.userId === -c.id ? `musicbot-${c.id}` : `soundboardbot-${c.id}`) : `user-${p.userId}`;
               const isMe = p.userId === user?.id;
               const canAdjustVolume = activeChannel?.id === c.id && !isMe;
@@ -627,13 +555,6 @@ export default function ChannelSidebar({
     );
   }
 
-  /** Cabecalho de uma categoria dentro de uma secao (texto OU voz) - clique recolhe/expande,
-   *  botao direito abre o menu de renomear/excluir (so' pra quem tem MANAGE_CHANNELS). O botao
-   *  de "Personagens" ao lado, diferente do menu, aparece pra QUALQUER membro (nao so' quem
-   *  gerencia canais) - sem isso, um jogador comum (sem MANAGE_CHANNELS) nunca conseguia nem
-   *  abrir o botao direito da categoria, entao nunca tinha como ver o proprio personagem
-   *  vinculado (reportado pelo usuario: "onde que o Anderson vai ver essa ficha?"). Fica
-   *  visivel mesmo fora de qualquer call de voz, ja' que mora aqui na barra lateral. */
   function renderCategoryHeader(category) {
     const isCollapsed = collapsedCategories.has(category.id);
     return (
@@ -746,10 +667,6 @@ export default function ChannelSidebar({
       <div className="channel-list">
         {!server ? (
           serversLoadError ? (
-            // Distingue de "voce nao tem servidor nenhum" (abaixo) - isso aqui e' FALHA DE
-            // CARREGAR (soluco de rede, ver fetchWithRetry.js), nao falta de acesso de verdade.
-            // Antes disso mostrava a mesma mensagem de "sem acesso" pros dois casos, deixando a
-            // tela vazia pra sempre ate' deslogar/logar de novo (reportado pelo usuario).
             <div className="channel-list-error">
               <p className="channel-group-title">Não foi possível carregar seus servidores agora.</p>
               <button type="button" className="link-btn" onClick={onRetryLoadServers}>
@@ -835,8 +752,6 @@ export default function ChannelSidebar({
         )}
       </div>
 
-      {/* Barra de status de voz - so aparece quando conectado, fica presente mesmo
-          navegando por outros canais (a call continua ativa em segundo plano). */}
       {activeChannel && (
         <div className="voice-status-bar">
           <div className="voice-status-top">
@@ -907,8 +822,6 @@ export default function ChannelSidebar({
           </span>
         </button>
         <div className="user-bar-actions">
-          {/* Painel do admin agora mora dentro de Configuracoes (aba "Administração", ver
-              SettingsModal.jsx) - nao precisa mais desse atalho separado aqui. */}
           <button className="icon-btn" onClick={onOpenSettings} title="Configurações de áudio">
             <SettingsIcon />
           </button>
@@ -1174,19 +1087,11 @@ export default function ChannelSidebar({
           const p = participants.find((pp) => pp.identity === participantMenu.identity);
           const canAdjustVolume = !!p && activeChannel?.id === participantMenu.channelId;
           const otherVoiceChannels = voiceChannels.filter((vc) => vc.id !== participantMenu.channelId);
-          // Lido AO VIVO de presenceByChannel (a MESMA fonte que alimenta o icone de mudo na
-          // lista) - nunca de um snapshot antigo, senao o rotulo "Mutar"/"Desmutar" ficava
-          // preso no que era verdade quando o menu abriu, nao no que e' verdade agora.
           const presenceEntry = (presenceByChannel[participantMenu.channelId] || []).find(
             (pp) => pp.userId === participantMenu.userId
           );
           const isForceMuted = presenceEntry?.forceMuted || false;
           const isForceDeafened = presenceEntry?.forceDeafened || false;
-          // Bot de musica usa sempre um userId sintetico NEGATIVO nesse canal (ver
-          // VoicePresenceService.joinBot) - nunca colide com um usuario de verdade (id sempre
-          // positivo, gerado pelo banco). Ele nao ouve nada (ver music-bot/index.js,
-          // canSubscribe:false), entao "ensurdecer" ele nao faz sentido nenhum - some com essa
-          // opcao so' pra ele.
           const isBot = participantMenu.userId < 0;
           if (!canAdjustVolume && !hasAnyModPermission) return null;
           return (

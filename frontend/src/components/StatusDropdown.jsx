@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDownIcon } from "./icons.jsx";
 
-/** Mesmos 4 status do Discord - "Invisível" nunca aparece como tal pros outros, so' como
-    offline (ver PresenceStatus.java no backend). O proprio usuario sempre ve seu status
-    real aqui, mesmo invisível. */
 export const STATUS_OPTIONS = [
   { value: "ONLINE", label: "Online", hint: "Aparece disponível pros outros", dotClass: "online" },
   { value: "AWAY", label: "Ausente", hint: "Aparece com um ícone de ausente", dotClass: "away" },
@@ -16,8 +13,6 @@ export const STATUS_OPTIONS = [
   },
 ];
 
-/** Dropdown estilizado (bolinha colorida + rótulo, abre um menu com as 4 opções) - troca a
-    lista antiga de botões empilhados por algo mais compacto, igual ao seletor do Discord. */
 export default function StatusDropdown({ value, onChange, disabled }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);

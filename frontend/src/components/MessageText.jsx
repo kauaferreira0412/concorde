@@ -1,12 +1,5 @@
 import { parseMarkdownBlocks, renderInline } from "../utils/markdown.jsx";
 
-/** Renderiza o conteudo da mensagem com markdown "estilo Discord" (negrito/italico/sublinhado/
- *  tachado/codigo/citacao/listas/titulos/links, ver utils/markdown.jsx) + @mencoes clicaveis
- *  (mesmo pipeline - so' reconhece quem e' de verdade membro do servidor). Extraido de
- *  ChatWindow.jsx pra ser reaproveitado tambem no chat privado (ver DmChatWindow.jsx) - o
- *  markdown/emoji customizado funciona igual nos dois, so' que DM nunca tem "members"/
- *  "memberUsernames" (nao existe @mencao numa conversa 1:1, so' faz sentido em servidor).
- */
 export default function MessageText({ content, memberUsernames, myUsername, members, openProfile, customEmojis }) {
   if (!content) return null;
   const ctx = { memberUsernames, myUsername, members, openProfile, customEmojis };

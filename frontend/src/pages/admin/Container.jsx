@@ -25,9 +25,6 @@ export function useAdminContainer() {
   const [botAvatarError, setBotAvatarError] = useState("");
   const botAvatarInputRef = useRef(null);
 
-  // Foto do Batera (bot do soundboard) - mesmo esquema do Melodion acima, so' que num bot
-  // separado (ver soundboardSession.js no music-bot e SoundboardBotSettingsController no
-  // backend).
   const [batAvatarUrl, setBatAvatarUrl] = useState(null);
   const [batAvatarUploading, setBatAvatarUploading] = useState(false);
   const [batAvatarError, setBatAvatarError] = useState("");

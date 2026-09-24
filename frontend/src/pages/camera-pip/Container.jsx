@@ -54,7 +54,6 @@ export function useCameraPipContainer() {
       cancelled = true;
       room.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
 
   return { cameraTracks, error };

@@ -2,14 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { PlusIcon, TrashIcon, XIcon } from "./icons.jsx";
 
-/**
- * Gerencia os emojis customizados do SERVIDOR (ver CustomEmojiController/CustomEmoji no
- * backend) - visiveis e usaveis por qualquer membro (:nome: no chat, ou como reacao), mas so'
- * quem tem MANAGE_SERVER pode subir/apagar. Nome vira minusculo automaticamente (mesma regra
- * do backend: 2-30 letras/numeros/underscore).
- */
 export default function CustomEmojiModal({ server, onClose }) {
-  const [emojis, setEmojis] = useState(null); // null = carregando
+  const [emojis, setEmojis] = useState(null);
   const [name, setName] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -47,9 +41,6 @@ export default function CustomEmojiModal({ server, onClose }) {
       const { data } = await api.post(`/api/servers/${server.id}/emojis`, formData);
       setEmojis((prev) => [...(prev || []), data].sort((a, b) => a.name.localeCompare(b.name)));
       setName("");
-      // Avisa o ChatWindow (que busca a lista so' uma vez, ao entrar no servidor) que mudou -
-      // sem isso o emoji novo so' aparecia no picker/:nome: depois de um F5 (relatado pelo
-      // usuario, com print do picker sem o emoji recem-criado).
       window.dispatchEvent(new CustomEvent("concorde:custom-emojis-updated", { detail: { serverId: server.id } }));
     } catch (err) {
       setError(err.response?.data?.error || "Não foi possível criar esse emoji");

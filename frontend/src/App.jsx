@@ -19,13 +19,7 @@ function PrivateRoute({ children }) {
 
 export default function App() {
   return (
-    // Bem por fora de tudo (inclusive do roteamento) - versao desatualizada nem chega a ver
-    // a tela de login, ver UpdateRequiredGate.jsx. So' bloqueia dentro do app desktop
-    // (Electron); no navegador sempre libera na hora.
     <UpdateRequiredGate>
-      {/* window.concordeDesktop so' existe dentro do app instalado (ver preload.cjs) - no
-          navegador normal isso e' undefined e a pagina usa a barra de titulo de verdade do
-          proprio navegador, sem nenhuma mudanca. */}
       {window.concordeDesktop && <DesktopTitleBar />}
       <AlertProvider>
         <ProfileProvider>
@@ -33,10 +27,6 @@ export default function App() {
         <GlobalVoiceCallProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            {/* Janela SEPARADA das cameras, so' no app desktop (ver CameraPipPage.jsx pro
-                motivo/electron/main.cjs que abre isso) - fora de PrivateRoute de proposito,
-                o token do app vem pela propria URL (janela nova, sem sessionStorage
-                compartilhado), nao do fluxo normal de login. */}
             <Route path="/camera-pip/:channelId" element={<CameraPipPage />} />
             <Route
               path="/channels/@me"

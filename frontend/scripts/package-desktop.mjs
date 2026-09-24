@@ -1,56 +1,15 @@
-// Gera o instalador do app desktop (Windows, por padrao) e deixa ele pronto pra download
-// dentro do proprio site, em /downloads/Concorde-Setup.exe - e' assim que o botao "Baixar
-// para Windows" da LoginPage funciona (ver src/pages/LoginPage.jsx): o instalador vira so'
-// mais um arquivo estatico dentro de public/, que o Vite copia pro dist/ e o Caddy ja serve
-// (mesmo catch-all que serve o resto do site - ver Caddyfile).
-//
-// Uso:
-//   npm run package:desktop            -> Windows (nsis), plataforma padrao pra maioria dos usuarios
-//   npm run package:desktop -- --mac   -> gera .dmg em vez de .exe
-//   npm run package:desktop -- --linux -> gera .AppImage em vez de .exe
-//
-// Passos:
-//   1. gera um "build id" novo (data/hora - ver BUILD_ID abaixo) e grava ele tanto DENTRO do
-//      instalador (embutido no bundle React, VITE_APP_BUILD_ID) quanto no backend
-//      (desktop-min-version.txt) - e' assim que o controle de versao obrigatoria funciona
-//      (ver DesktopVersionController/UpdateRequiredGate.jsx): TODA vez que voce roda esse
-//      script, o instalador novo automaticamente descontinua qualquer instalacao anterior,
-//      sem precisar mexer em nada na mao. So' precisa commitar/dar push (o
-//      desktop-min-version.txt atualizado vai junto, o deploy normal do backend ja aplica).
-//   2. vite build MIRANDO A VPS (ver DESKTOP_ORIGIN abaixo) - o app empacotado carrega o
-//      index.html via file:// dentro do Electron, sem "mesma origem" nenhuma pra aproveitar
-//      (diferente do navegador, que usa window.location sozinho - ver src/api/client.js e
-//      src/ws/chatSocket.js) - por isso so' esse build injeta VITE_API_URL/VITE_WS_URL fixos,
-//      apontando pro servidor de producao de verdade. O app desktop sempre fala com a MESMA
-//      VPS/banco que o site normal, nunca com localhost.
-//   3. electron-builder (empacota o Electron + esse dist/ num instalador, ver "build" no
-//      package.json pra config de icone/NSIS/etc)
-//   4. copia o instalador gerado (nome varia com plataforma/versao) pra
-//      public/downloads/Concorde-Setup.<ext> com nome fixo, pra o link de download nunca
-//      quebrar entre versoes
-//   5. vite build de novo, agora SEM as variaveis (build normal do site, mesma origem de
-//      sempre) - so' assim que public/downloads/ (agora com o instalador) entra no dist/
-//      que sera servido pelo Caddy. Se pulassemos esse passo o proprio SITE ficaria com as
-//      chamadas de API fixadas na VPS em vez de "mesma origem".
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, copyFileSync, statSync, rmSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = dirname(dirname(fileURLToPath(import.meta.url))); // frontend/
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
-// Dominio publico da VPS onde o Concorde roda de verdade (ver DEPLOY.md) - troque aqui se o
-// dominio mudar. O app desktop empacotado sempre aponta pra ca, e' o mesmo banco/backend do
-// site (https://187-127-37-101.sslip.io/servers/1).
 const DESKTOP_ORIGIN = "https://187-127-37-101.sslip.io";
 
 const releaseDir = join(root, "release");
 const downloadsDir = join(root, "public", "downloads");
 
-// Timestamp (nao o commit do git) de proposito - nesse fluxo o instalador e' sempre gerado
-// ANTES do commit/push da mudanca que ele carrega (ver DEPLOY.md), entao "git rev-parse HEAD"
-// pegaria o commit ERRADO (o anterior). Um timestamp e' sempre unico e sempre o mais novo,
-// sem depender de quando o commit acontece.
 const BUILD_ID = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "");
 const desktopMinVersionFile = join(root, "..", "backend", "src", "main", "resources", "desktop-min-version.txt");
 writeFileSync(desktopMinVersionFile, BUILD_ID + "\n");
@@ -69,24 +28,12 @@ function run(cmd, extraEnv) {
 
 console.log(`== Empacotando Concorde desktop (${platform}) - apontando pra ${DESKTOP_ORIGIN} ==`);
 
-// Se um instalador de uma execucao anterior ja estiver em public/downloads/, o vite build
-// abaixo copiaria ele pra dentro de dist/downloads/ - e o electron-builder empacotaria esse
-// instalador ANTIGO dentro do instalador NOVO (o app desktop nunca precisa do proprio
-// instalador dentro dele, so' o site precisa servir ele). Sem essa limpeza, cada execucao
-// dobraria de tamanho (aconteceu: 85MB -> 169MB -> 250MB antes desse fix). O "files" do
-// electron-builder (ver package.json) tambem exclui "dist/downloads/**/*" como segunda
-// camada de protecao, mas remover aqui evita ate esse dist/downloads/ intermediario existir.
 rmSync(downloadsDir, { recursive: true, force: true });
 
 run("npx vite build", {
   VITE_API_URL: DESKTOP_ORIGIN,
   VITE_WS_URL: `${DESKTOP_ORIGIN.replace(/^http/, "ws")}/ws`,
-  // Caminhos relativos (./assets/... em vez de /assets/...) - necessario pro app abrir via
-  // file:// sem dar tela branca (ver vite.config.js). O build do site (mais abaixo) NAO leva
-  // isso, continua com caminho absoluto de sempre.
   VITE_DESKTOP_BUILD: "true",
-  // Embutido no bundle (import.meta.env.VITE_APP_BUILD_ID, ver UpdateRequiredGate.jsx) - so'
-  // esse build (o que vai DENTRO do instalador) carrega isso, o build do site mais abaixo nao.
   VITE_APP_BUILD_ID: BUILD_ID,
 });
 run(`npx electron-builder ${builderFlag} --publish=never`);
@@ -95,8 +42,6 @@ if (!existsSync(releaseDir)) {
   throw new Error(`Pasta "release" nao foi criada - electron-builder falhou?`);
 }
 
-// electron-builder nomeia o arquivo com versao (ex: "Concorde Setup 0.1.0.exe") - pegamos o
-// instalador mais recente com a extensao certa, sem precisar acompanhar a versao na mao.
 const installer = readdirSync(releaseDir)
   .filter((f) => f.toLowerCase().endsWith(targetExt.toLowerCase()))
   .map((f) => ({ f, mtime: statSync(join(releaseDir, f)).mtimeMs }))
@@ -112,13 +57,6 @@ const destPath = join(downloadsDir, destName);
 copyFileSync(join(releaseDir, installer.f), destPath);
 console.log(`\nInstalador copiado: public/downloads/${destName}`);
 
-// So' no Windows, e so' PALIATIVO: o instalador nao e' assinado digitalmente (sem certificado
-// de assinatura de codigo), entao navegadores/Windows Defender tratam ".exe" desconhecido como
-// suspeito por padrao (reportado: bloqueado no download, ou removido pelo Defender depois -
-// "Trojan:Win32/Wacatac.C!ml", um falso positivo bem comum nesse tipo de app sem assinatura).
-// Embrulhar num .zip evita a checagem de reputacao que o navegador faz ESPECIFICAMENTE em
-// download de .exe cru - NAO elimina o alerta do Defender ao extrair/rodar depois, so' destrava
-// o download em si. O jeito de verdade de resolver os dois e' assinar o instalador.
 if (platform === "win") {
   const zipPath = join(downloadsDir, "Concorde-Setup.zip");
   run(
@@ -127,8 +65,6 @@ if (platform === "win") {
   console.log(`Zip paliativo gerado: public/downloads/Concorde-Setup.zip`);
 }
 
-// Build normal do SITE (sem VITE_API_URL/VITE_WS_URL) - continua usando "mesma origem",
-// igual sempre foi. So' entra aqui pra empacotar o instalador junto como arquivo estatico.
 run("npx vite build");
 
 console.log(

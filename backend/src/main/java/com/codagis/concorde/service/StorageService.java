@@ -17,17 +17,6 @@ import java.net.URI;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Upload de avatar/imagens/anexos - Cloudflare R2 (pedido explicito do usuario: "eu quero trocar
- * do Google Cloud para o Cloudflare Storage"). R2 fala a MESMA API do S3, entao da' pra usar o
- * SDK oficial da AWS (software.amazon.awssdk:s3) so' trocando o endpoint - nao precisa de
- * biblioteca especifica da Cloudflare. Chamava-se "GcsService" antes (Google Cloud Storage) -
- * renomeado pra nao ficar enganoso, mas a URL publica gravada no banco (ver upload()/
- * uploadAudio()/uploadAttachment()) e' so' "publicBaseUrl + / + nome-do-objeto", igual antes so'
- * que com prefixo do R2 em vez do "storage.googleapis.com" do GCS - arquivos e URLs de ANTES da
- * troca precisam ser migrados manualmente (copiar os objetos pro bucket novo + atualizar as
- * URLs gravadas no banco), ver DEPLOY.md.
- */
 @Service
 public class StorageService {
 
@@ -39,9 +28,6 @@ public class StorageService {
 
     private static final long MAX_AUDIO_BYTES = 3L * 1024 * 1024;
 
-    // Anexo generico de mensagem (video/audio/documento/etc, ver uploadAttachment) - deliberadamente
-    // sem lista de permitidos (Discord tambem aceita qualquer tipo), so' um bloqueio de extensoes
-    // executaveis/perigosas, ja' que quem envia precisa estar logado (nao e' upload publico).
     private static final Set<String> BLOCKED_ATTACHMENT_EXTENSIONS =
             Set.of("exe", "msi", "bat", "cmd", "com", "scr", "dll", "apk", "jar", "vbs", "vbe", "ps1", "sh", "app", "deb", "rpm");
 
@@ -67,8 +53,6 @@ public class StorageService {
         this.accessKeyId = accessKeyId;
         this.secretAccessKey = secretAccessKey;
         this.bucketName = bucketName;
-        // Sem "/" no final - "upload()" sempre monta a URL como "publicBaseUrl + / + objeto",
-        // uma barra dupla ("//") no meio nao quebra em HTTP mas fica feio/inconsistente.
         this.publicBaseUrl = publicBaseUrl.endsWith("/") ? publicBaseUrl.substring(0, publicBaseUrl.length() - 1) : publicBaseUrl;
         this.baseFolder = baseFolder;
     }
@@ -84,17 +68,9 @@ public class StorageService {
             return;
         }
         this.s3 = S3Client.builder()
-                // R2 nao tem "regiao" de verdade (e' distribuido globalmente) - "auto" e' o
-                // valor que a propria Cloudflare recomenda usar aqui pros SDKs da AWS.
                 .region(Region.of("auto"))
                 .endpointOverride(URI.create("https://" + accountId + ".r2.cloudflarestorage.com"))
                 .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKeyId, secretAccessKey)))
-                // Explicito de proposito (nao deixa o SDK "adivinhar" via classpath) - o
-                // cliente HTTP padrao (Apache HttpClient 5) batia de frente com outra versao
-                // dessa mesma lib ja' presente no projeto e derrubava o backend inteiro assim
-                // que esse bean era criado (ClassNotFoundException: TlsSocketStrategy). Esse
-                // aqui e' bem mais simples (so' usa java.net.HttpURLConnection por baixo) e
-                // suficiente pra so' fazer upload (PUT) de arquivo.
                 .httpClientBuilder(UrlConnectionHttpClient.builder())
                 .build();
     }
@@ -134,12 +110,6 @@ public class StorageService {
         return publicBaseUrl + "/" + objectName;
     }
 
-    /** Anexo generico de chat (video, documento, arquivo qualquer, ou audio - inclusive mensagem
-     *  de voz gravada no proprio app, ver useAudioRecorder.js no frontend) - diferente de upload()
-     *  (so' imagem) e uploadAudio() (so' pro soundboard, com lista fechada de tipos), aqui o nome
-     *  ORIGINAL do arquivo e' preservado no retorno (pra mostrar "relatorio.pdf" no chat, nao um
-     *  uuid ilegivel) - o nome no BUCKET continua sendo um uuid (evita colisao/nome com caracter
-     *  invalido em URL), so' o nome de exibicao que guarda o original. */
     public FileUploadResult uploadAttachment(MultipartFile file, String subFolder) {
         requireConfigured();
         if (file.isEmpty()) {

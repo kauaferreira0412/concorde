@@ -11,18 +11,9 @@ import ConfirmModal from "./ConfirmModal.jsx";
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", OFFLINE: "Offline" };
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
 
-/**
- * Lista de TODOS os membros do servidor (nao so' quem esta numa call de voz - isso ja e'
- * o "CONECTADOS AGORA" do ChannelSidebar), com o status de cada um (Online/Ausente/Nao
- * perturbe/Offline - ver PresenceStatus no backend). "Invisível" (escolha do proprio
- * usuario em Configuracoes) sempre aparece como Offline pra todo mundo, de propositio.
- */
 export default function MemberList({ serverId, stompClient, stompConnected }) {
   const members = useServerMembers(serverId, stompClient, stompConnected);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("memberListCollapsed") === "true");
-  // MANAGE_MEMBERS - controla se "Remover do servidor"/"Editar apelido" aparecem no clique
-  // direito de cada membro (ver MemberRow). O backend confere a permissao de novo em cada
-  // chamada, entao mesmo sem os botoes aparecerem ninguem sem permissao consegue nada.
   const [myServerPermissions, setMyServerPermissions] = useState(new Set());
 
   useEffect(() => {
@@ -54,13 +45,6 @@ export default function MemberList({ serverId, stompClient, stompConnected }) {
 
   const online = members.filter((m) => m.status !== "OFFLINE");
   const offline = members.filter((m) => m.status === "OFFLINE");
-  // "Ouvindo Spotify" de quem conectou a conta (opt-in, ver Configurações > Conexões) - so' os
-  // ONLINE entram no poll (quem esta' offline nao teria como estar ouvindo nada mesmo, e' inutil
-  // gastar chamada com eles). PRECISA vir antes do "if (!serverId) return null" abaixo - hook
-  // chamado depois de um return condicional quebra a ordem dos hooks entre renders (na primeira
-  // renderizacao, antes dos servidores carregarem, serverId ainda e' null) e derruba o React
-  // inteiro (tela em branco, sem erro nenhum visivel pro usuario - so' no console/DevTools:
-  // "Rendered fewer hooks than expected"). Reportado: "abro no desktop ou web, nada aparece".
   const nowPlayingByUser = useSpotifyNowPlaying(online.map((m) => m.userId));
 
   if (!serverId) return null;
@@ -116,22 +100,17 @@ export default function MemberList({ serverId, stompClient, stompConnected }) {
   );
 }
 
-/**
- * `serverId`/`canManage` sao opcionais - so' passados por MemberList (onde faz sentido
- * gerenciar). Em outros lugares que reaproveitam esse componente (ex: VoiceChannel.jsx,
- * "Membros com acesso a esse canal") o clique direito simplesmente nao faz nada.
- */
 export function MemberRow({ member, serverId, canManage, nowPlaying }) {
   const { openProfile } = useProfile();
   const { showAlert } = useAlert();
-  const [menu, setMenu] = useState(null); // { x, y }
+  const [menu, setMenu] = useState(null);
   const [editingNickname, setEditingNickname] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState(member.nickname || "");
   const [nicknameSaving, setNicknameSaving] = useState(false);
   const [nicknameError, setNicknameError] = useState("");
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const [removed, setRemoved] = useState(false); // otimista - some da lista sem esperar recarregar tudo
-  const [nicknameOverride, setNicknameOverride] = useState(undefined); // otimista - ver handleSaveNickname
+  const [removed, setRemoved] = useState(false);
+  const [nicknameOverride, setNicknameOverride] = useState(undefined);
   const menuRef = useRef(null);
   const displayNickname = nicknameOverride !== undefined ? nicknameOverride : member.nickname;
 
@@ -156,7 +135,7 @@ export function MemberRow({ member, serverId, canManage, nowPlaying }) {
     setNicknameError("");
     try {
       await api.put(`/api/servers/${serverId}/members/${member.userId}/nickname`, { nickname: nicknameDraft.trim() });
-      setNicknameOverride(nicknameDraft.trim() || null); // ajuste otimista - a lista de verdade so' atualiza no proximo fetch
+      setNicknameOverride(nicknameDraft.trim() || null);
       setEditingNickname(false);
     } catch (err) {
       setNicknameError(err.response?.data?.error || "Não foi possível salvar o apelido");
@@ -197,14 +176,9 @@ export function MemberRow({ member, serverId, canManage, nowPlaying }) {
         </div>
         <span className="member-row-info">
           <span className="member-row-name-line">
-            {/* Apelido DESSE servidor (ver Configurações > Perfil) tem prioridade sobre o
-                username - mesma logica do Discord: e' local aquele servidor, so' quem esta
-                nele ve. */}
             <span className="member-row-name">{displayNickname || member.username}</span>
             {member.role === "ADMIN" && <span className="admin-badge">ADMIN</span>}
           </span>
-          {/* "Ouvindo Spotify" (ver useSpotifyNowPlaying/Configurações > Conexões) - so' aparece
-              se essa pessoa CONECTOU a conta E esta' tocando algo agora mesmo. */}
           {nowPlaying && (
             <span className="member-row-spotify" title={`Ouvindo ${nowPlaying.trackName} — ${nowPlaying.artistNames}`}>
               <MusicNoteIcon size={11} />

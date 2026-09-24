@@ -11,8 +11,6 @@ import java.util.Set;
 
 public class ServerDtos {
 
-    // type nulo = NORMAL (ver ServerService.createServer) - opcional pra nao quebrar nenhum
-    // client antigo que ainda nao manda esse campo.
     public record CreateServerRequest(@NotBlank String name, ServerType type) {}
 
     public record ServerResponse(Long id, String name, Long ownerId, String iconUrl, String description, ServerType type) {}
@@ -35,21 +33,11 @@ public class ServerDtos {
 
     public record UpdateCategoryRequest(@NotBlank String name) {}
 
-    // restricted = tem alguma restricao de acesso configurada nessa categoria (ver
-    // CategoryAccessEntry/ServerService.setCategoryAccess) - so' um booleano aqui, a lista de
-    // quem tem acesso de verdade vem do GET /categories/{id}/access (so' quem pode gerenciar
-    // canais busca isso, nao faz sentido expor pra todo mundo).
-    // createdBy = "o mestre" dessa categoria (ver ChannelCategory.createdBy/MapService.
-    // assertCanManageMap) - null pra categoria criada antes dessa coluna existir.
     public record CategoryResponse(Long id, Long serverId, String name, int position, boolean restricted, Long createdBy) {}
 
     public record MoveChannelRequest(Long categoryId) {}
 
-    // Lista vazia = sem restricao (categoria aberta pra todo mundo do servidor) - e' assim que
-    // se remove uma restricao ja configurada, nao tem um endpoint separado de "desfazer".
     public record SetCategoryAccessRequest(List<Long> userIds) {}
 
-    // Convida um AMIGO (aceito nos chats privados) pra entrar no servidor - ver
-    // ServerService.inviteFriend/InviteFriendsModal.jsx.
     public record InviteFriendRequest(Long userId) {}
 }

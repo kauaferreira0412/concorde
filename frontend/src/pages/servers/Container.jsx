@@ -24,10 +24,6 @@ export function useServersContainer() {
   const [stompClient, setStompClient] = useState(null);
   const [stompConnected, setStompConnected] = useState(false);
   const [stompError, setStompError] = useState("");
-  // true so' quando o carregamento inicial da lista de servidores falhou de vez (depois de 3
-  // tentativas) - distingue de "voce realmente nao tem nenhum servidor ainda" (ver
-  // ChannelSidebar.jsx). Reportado pelo usuario: um soluco de rede deixava a tela vazia pra
-  // sempre, parecendo "sem acesso", sem jeito de saber que era so' falha de carregar.
   const [serversLoadError, setServersLoadError] = useState(false);
   const [channelsLoadError, setChannelsLoadError] = useState(false);
 
@@ -74,7 +70,6 @@ export function useServersContainer() {
 
   useEffect(() => {
     loadServers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function loadChannels() {
@@ -95,18 +90,13 @@ export function useServersContainer() {
 
   useEffect(() => {
     loadChannels();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedServerId]);
 
-  // Veio do Home (fora de qualquer servidor - la' nao tem onde abrir o modal, ver
-  // pages/home/index.jsx "onCreateServer") com "?create=1" - abre o modal aqui e limpa a
-  // query pra nao reabrir sozinho num F5.
   useEffect(() => {
     if (searchParams.get("create") === "1") {
       setShowCreateServer(true);
       setSearchParams({}, { replace: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   useEffect(() => {
@@ -160,11 +150,6 @@ export function useServersContainer() {
     setChannels((prev) => prev.map((c) => (c.id === channelId ? data : c)));
   }
 
-  /** Categoria excluida (ver ChannelSidebar.jsx) - o backend ja' solta os canais que estavam
-   *  dentro dela (so' zera categoryId, nao apaga ninguem, ver ServerService.deleteCategory), mas
-   *  o "channels" daqui continuava com o categoryId VELHO ate' o proximo F5 - os canais somem
-   *  da tela sozinhos (nenhum grupo mais os renderiza), parecendo que foram apagados junto com a
-   *  categoria (reportado pelo usuario). So' espelha aqui o que o backend ja' fez de verdade. */
   function handleCategoryDeleted(categoryId) {
     setChannels((prev) => prev.map((c) => (c.categoryId === categoryId ? { ...c, categoryId: null } : c)));
   }

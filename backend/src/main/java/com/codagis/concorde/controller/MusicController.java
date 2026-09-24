@@ -52,12 +52,6 @@ public class MusicController {
         if (req.query() == null || req.query().isBlank()) {
             throw new IllegalArgumentException("Informe um link ou o nome da música");
         }
-        // Link de FAIXA do Spotify (pedido explicito do usuario: "colar o link da música... o
-        // bot deve pesquisar no YouTube") - o yt-dlp do bot nao sabe baixar do Spotify (nem
-        // existe isso, e' tudo protegido/DRM), entao troca o link pelo "Artista - Nome" real
-        // ANTES de mandar pro bot; ele mesmo ja' trata qualquer coisa que nao seja link como
-        // busca no YouTube (ver resolveQuery em ytdlp.js). Se nao for um link do Spotify,
-        // resolveIfSpotifyTrack devolve null e a query original segue sem mudar nada.
         String resolvedQuery = spotifyService.resolveIfSpotifyTrack(req.query());
         String query = resolvedQuery != null ? resolvedQuery : req.query();
         Map<String, Object> body = Map.of("channelId", channelId, "query", query);

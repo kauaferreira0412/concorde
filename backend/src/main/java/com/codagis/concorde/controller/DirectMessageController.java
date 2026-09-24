@@ -53,8 +53,6 @@ public class DirectMessageController {
         return new AttachmentResponse(url);
     }
 
-    // Anexo generico (video, documento, audio - inclusive mensagem de voz gravada) - mesmo par
-    // com AttachmentController (chat de servidor), ver StorageService.uploadAttachment.
     @PostMapping(value = "/channels/{channelId}/files", consumes = "multipart/form-data")
     public FileAttachmentResponse uploadFile(@PathVariable Long channelId, @RequestParam("file") MultipartFile file) {
         directMessageService.assertParticipant(channelId, currentUser.id());

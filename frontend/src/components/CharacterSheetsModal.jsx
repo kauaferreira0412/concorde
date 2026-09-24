@@ -4,10 +4,6 @@ import { useAlert } from "../context/AlertContext.jsx";
 import { formatFileSize } from "../utils/fileSize";
 import { DownloadIcon, FileIcon, ImageIcon, PencilIcon, PlusIcon, TrashIcon, UsersIcon, XIcon } from "./icons.jsx";
 
-/** PDF embutido dentro do proprio sistema (pedido explicito do usuario: "deve abrir um popup
- *  com a ficha, o PDF da ficha no sistema") - iframe simples, o navegador ja' sabe renderizar
- *  PDF sozinho (Chrome/Edge/Firefox fazem isso nativamente). "Abrir em nova aba" continua
- *  disponivel como reforco, pro raro caso de alguem com isso desabilitado no navegador. */
 function CharacterSheetViewerModal({ sheet, onClose }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -30,12 +26,6 @@ function CharacterSheetViewerModal({ sheet, onClose }) {
         </div>
         <div className="character-sheet-viewer-body">
           {sheet.fileUrl ? (
-            // "#navpanes=0" esconde o painel de miniaturas do visualizador nativo do
-            // navegador (Chrome/Edge) e "#view=FitH" ajusta o zoom pra largura em vez do
-            // padrao "ajustar a pagina inteira" - sem isso, o PDF aparecia pequeno com uma
-            // faixa grande de espaco morto do lado (reportado pelo usuario). So' funciona em
-            // navegadores baseados em Chromium (o app inteiro roda em cima de um, Electron
-            // incluso) - Firefox ignora os parametros e mostra do jeito padrao dele, sem quebrar.
             <iframe src={`${sheet.fileUrl}#navpanes=0&view=FitH`} title={`Ficha de ${sheet.characterName}`} />
           ) : (
             <p className="admin-hint" style={{ padding: 20 }}>
@@ -48,18 +38,9 @@ function CharacterSheetViewerModal({ sheet, onClose }) {
   );
 }
 
-/**
- * Personagens de uma mesa de RPG (kit de RPG, pedido explicito do usuario) - villoes, NPCs,
- * personagens de jogador. O SERVIDOR INTEIRO e' a mesa agora (nao mais uma categoria - pedido
- * explicito: "desvincule as fichas dos personagens de uma categoria"). SO' O MESTRE (o dono do
- * servidor) cria personagens e vincula um JOGADOR a cada um; o jogador vinculado ve e EDITA a
- * propria ficha (nome/foto/PDF), mas nao cria nem apaga nada, nem ve os personagens de outros
- * jogadores/villoes sem vinculo. O backend ja' devolve so' o que ESSE usuario pode ver (ver
- * CharacterSheetService.list).
- */
 export default function CharacterSheetsModal({ server, isMaster, members, onClose }) {
   const { showAlert } = useAlert();
-  const [sheets, setSheets] = useState(null); // null = carregando
+  const [sheets, setSheets] = useState(null);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [creatingBusy, setCreatingBusy] = useState(false);
@@ -80,7 +61,6 @@ export default function CharacterSheetsModal({ server, isMaster, members, onClos
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [server.id]);
 
   async function handleCreate(e) {
@@ -190,11 +170,6 @@ export default function CharacterSheetsModal({ server, isMaster, members, onClos
   );
 }
 
-/** Um card (um personagem) - retrato grande em cima (estilo "Journal" do Roll20, pedido
- *  explicito do usuario: "pesquise como o Roll20 e deixe parecido"), nome, quem esta'
- *  vinculado, status do PDF, e os controles de edicao embaixo (so' aparecem se
- *  "sheet.canEdit" - mestre OU o jogador vinculado, ver CharacterSheetService no backend).
- *  Estado de edicao proprio, isolado por card. */
 function CharacterCard({ server, sheet, members, isMaster, onChanged, onDelete, onOpen }) {
   const { showAlert } = useAlert();
   const [editingName, setEditingName] = useState(false);

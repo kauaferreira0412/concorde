@@ -6,13 +6,6 @@ import lombok.*;
 
 import java.time.Instant;
 
-// Amizade entre dois usuarios - sem FK (mesmo padrao do resto do projeto), so' os ids. Sempre
-// gravado com userAId < userBId (normalizado no FriendshipService), pra nunca existir duas
-// linhas pro mesmo par (A,B) e (B,A) ao mesmo tempo. PENDING = pedido enviado, ainda nao
-// respondido; ACCEPTED = amigos de verdade (e' o que libera o chat privado, ver DirectChannel);
-// BLOCKED = um dos dois bloqueou o outro (ver "blockedBy" - so' quem bloqueou pode desbloquear,
-// impede pedido novo e mensagem nova nos dois sentidos, ver DirectMessageService). Recusar/
-// desfazer amizade/desbloquear so' APAGA a linha - nao existe um status "DECLINED" separado.
 @Entity
 @Table(name = "friendships", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"userAId", "userBId"})
@@ -50,15 +43,8 @@ public class Friendship {
     @Column(nullable = false)
     private Long requestedBy;
 
-    // So' preenchido quando status = BLOCKED - quem dos dois foi que bloqueou (o unico que pode
-    // desbloquear depois, ver FriendshipService.unblock).
     private Long blockedBy;
 
-    // So' preenchido quando status = BLOCKED - qual era o status ANTES de bloquear (ACCEPTED se
-    // ja' eram amigos, PENDING se so' tinha pedido no ar, null se eram estranhos). Desbloquear
-    // volta pra esse status automaticamente quando era ACCEPTED - sem isso, bloquear um amigo
-    // por engano e desbloquear em seguida desfazia a amizade de vez, sem jeito facil de voltar
-    // (reportado pelo usuario).
     @Enumerated(EnumType.STRING)
     @Column(length = 10)
     private FriendshipStatus previousStatus;

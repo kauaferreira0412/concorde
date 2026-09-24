@@ -1,9 +1,3 @@
-// Modulo nativo minusculo: so' converte HWND -> PID (GetWindowThreadProcessId), uma unica
-// chamada Win32 simples e sempre confiavel (nunca foi essa parte que deu problema em toda a
-// investigacao de audio - so' a ativacao WASAPI mais avancada). O id da fonte escolhida no
-// ScreenSharePicker.jsx vem no formato "window:<hwnd>:0" (ver desktopCapturer no main.cjs) -
-// esse HWND precisa virar PID pra process-audio-capture (ver package.json) saber qual
-// processo capturar.
 #include <napi.h>
 #include <windows.h>
 

@@ -3,16 +3,6 @@ import { AudioSource, LocalAudioTrack, Room, TrackPublishOptions, TrackSource } 
 import { CHANNELS, IDLE_DISCONNECT_MS, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_WS_URL, SAMPLE_RATE } from "./config.js";
 import { notifySoundboardBackendPresence } from "./backendClient.js";
 
-/**
- * Sessao do Batera - bot SEPARADO do Melodion, so' pra tocar os cliques do soundboard. Antes o
- * soundboard tocava numa segunda faixa publicada pelo PROPRIO Melodion (mesmo participante,
- * Track.Source.Microphone duas vezes) - o frontend so' sabe controlar UMA faixa de microfone
- * por participante (mutar/ensurdecer/volume, ver VoiceCallContext.jsx), entao a faixa "extra"
- * ficava tocando sem ninguem conseguir calar ela (bug reportado: "uso o soundboard, dps quero
- * tocar musica, nao consigo controlar o Melodion"). Com um participante de verdade separado no
- * LiveKit, os dois bots ficam cada um com o seu proprio controle de volume/mudo/ensurdecer, sem
- * disputar a mesma faixa - e dá pra mutar um sem afetar o outro.
- */
 export const soundboardSessions = new Map();
 
 async function connectToRoom(channelId) {
@@ -48,7 +38,7 @@ function createSessionState(channelId, connection) {
     track: connection.track,
     idleTimer: null,
     forceMuted: false,
-    clipQueue: null, // serializa os cliques desse canal (ver soundboard.js) - um de cada vez
+    clipQueue: null,
   };
 }
 

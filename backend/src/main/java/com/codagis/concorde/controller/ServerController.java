@@ -99,8 +99,6 @@ public class ServerController {
         serverService.removeMember(currentUser.id(), serverId, userId);
     }
 
-    // Convida um AMIGO (aceito nos chats privados, ver FriendController) pra entrar nesse
-    // servidor - ver ServerService.inviteFriend/InviteFriendsModal.jsx.
     @PostMapping("/{serverId}/invite-friend")
     public void inviteFriend(@PathVariable Long serverId, @RequestBody InviteFriendRequest req) {
         serverService.inviteFriend(currentUser.id(), serverId, req.userId());
@@ -171,8 +169,6 @@ public class ServerController {
         return serverService.moveChannelToCategory(serverId, currentUser.id(), channelId, req.categoryId());
     }
 
-    // Quem pode ver essa categoria/os canais dentro dela - ver CategoryAccessEntry no backend e
-    // CategoryAccessModal.jsx no frontend. Lista vazia = sem restricao (aberta pra todo mundo).
     @GetMapping("/{serverId}/categories/{categoryId}/access")
     public List<Long> getCategoryAccess(@PathVariable Long serverId, @PathVariable Long categoryId) {
         return serverService.getCategoryAccess(serverId, currentUser.id(), categoryId);

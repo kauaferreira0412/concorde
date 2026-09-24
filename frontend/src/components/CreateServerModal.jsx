@@ -2,9 +2,6 @@ import { useState } from "react";
 
 export default function CreateServerModal({ onClose, onCreate }) {
   const [name, setName] = useState("");
-  // "NORMAL" (padrao) ou "RPG" - RPG cria o canal de voz padrao ja' chamado "Sessão" (em vez de
-  // "Geral") e libera o kit de RPG desse servidor (mapa de batalha + fichas em PDF nos canais
-  // de voz, ver VoiceChannel.jsx) - pedido explicito do usuario, "muito parecido com o Roll20".
   const [type, setType] = useState("NORMAL");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");

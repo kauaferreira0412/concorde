@@ -33,8 +33,6 @@ public class FriendController {
         return friendshipService.listRequests(currentUser.id());
     }
 
-    // Estado da amizade com esse usuario (ver ProfileModal.jsx - decide entre "Adicionar
-    // amigo"/"Pedido enviado"/"Aceitar pedido"/"Enviar mensagem").
     @GetMapping("/status/{userId}")
     public FriendStatusResponse status(@PathVariable Long userId) {
         return friendshipService.status(currentUser.id(), userId);

@@ -28,9 +28,6 @@ public class UserProfileController {
         return toResponse(user);
     }
 
-    // Busca por nome de usuario EXATO - usado pelo card de previa ao digitar num campo de
-    // "adicionar amigo" (ver FriendsPanel.jsx), pra mostrar quem sera adicionado (foto/nome)
-    // ANTES de mandar o pedido de verdade.
     @GetMapping("/by-username/{username}")
     public PublicProfileResponse getByUsername(@PathVariable String username) {
         User user = userRepository.findByUsername(username)

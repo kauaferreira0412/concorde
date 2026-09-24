@@ -2,12 +2,6 @@ import { useEffect, useState } from "react";
 import api from "../api/client";
 import { subscribeToPresence } from "../ws/chatSocket";
 
-/**
- * Lista de membros de um servidor com status ao vivo (Online/Ausente/Nao perturbe/Offline) -
- * usado tanto pela MemberList (barra lateral) quanto pelo VoiceChannel ("quem tem acesso
- * a esse canal"). Cada tela que usar isso busca e assina por conta propria (e' leve - o
- * app e' pequeno, sem cadastro publico), mas a logica de merge fica so' aqui.
- */
 export function useServerMembers(serverId, stompClient, stompConnected) {
   const [members, setMembers] = useState([]);
 

@@ -27,22 +27,9 @@ import { CheckIcon, MicIcon, PencilIcon, PinIcon, PlusIcon, ReplyIcon, SearchIco
 
 const ROLL_COMMAND_RE = /^\/(?:roll|r)\s+(.+)$/i;
 const ROLL_NOTATION_RE = /^(\d{0,2})d(\d{1,3})\s*([+-]\s*\d{1,3})?$/i;
-// /spotify (VOCE) ou /spotify @outraPessoa - so' faz sentido essas duas opcoes numa DM (so' tem
-// voce e ela na conversa) - ver mesmo comando no ChatWindow.jsx (chat de servidor).
 const SPOTIFY_COMMAND_RE = /^\/spotify(?:\s+@?(\S+))?\s*$/i;
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
 
-/**
- * Chat PRIVADO (DM) - mesmo "esqueleto"/classes CSS do ChatWindow.jsx (chat de servidor), com o
- * mesmo conjunto essencial de recursos (texto, imagem, video/audio/arquivo, mensagem de voz
- * gravada, editar/apagar, responder, reações, fixar, "digitando...", busca, /roll) - pedido
- * explicito do usuario: "os chats devem ter as mesmas características dos chats dos servidores".
- * Fora do escopo de proposito (nao fazem sentido numa conversa 1:1 ou nao foram pedidos):
- * @mencao, emoji customizado de servidor, enquete, fila de música, /play e afins. Arquivo
- * SEPARADO do ChatWindow (nao compartilha estado/efeitos) pelo mesmo motivo de Melodion/Batera
- * serem bots separados nesta base - menor risco de mexer no chat de servidor que já funciona,
- * ver DirectMessageService no backend pro espelho do lado da API.
- */
 export default function DmChatWindow({ channel, stompClient, stompConnected, stompError }) {
   const { user } = useAuth();
   const { openProfile } = useProfile();
@@ -92,7 +79,6 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
     clearPendingImage();
     clearPendingFile();
     api.get(`/api/dm/channels/${channelId}/messages`).then(({ data }) => setMessages(data));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId]);
 
   useEffect(() => {
@@ -140,7 +126,6 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
       timers.forEach((t) => clearTimeout(t));
       timers.clear();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId, stompClient, stompConnected]);
 
   useEffect(() => {
@@ -248,8 +233,6 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
     }
   }
 
-  /** Insere o emoji escolhido no ponto do cursor - mesma logica de ChatWindow.jsx (chat de
-   *  servidor), manda como mensagem normal em vez de so' reagir numa mensagem ja existente. */
   function insertEmojiIntoDraft(emoji) {
     const input = draftInputRef.current;
     const caret = input?.selectionStart ?? draft.length;
@@ -285,8 +268,6 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
       return;
     }
 
-    // /spotify (ou /spotify @outraPessoa) - so' tem voce e ela nessa conversa, ver mesmo
-    // comando/motivo no ChatWindow.jsx.
     const spotifyMatch = SPOTIFY_COMMAND_RE.exec(draft.trim());
     if (spotifyMatch) {
       const targetUsername = spotifyMatch[1];

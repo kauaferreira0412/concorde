@@ -25,13 +25,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-/**
- * Mensagens do chat PRIVADO - mesma forma/comportamento de MessageService (server), so' que
- * "channel" aqui e' um DirectChannel (dois participantes fixos) em vez de um Channel de
- * servidor, e a permissao pra ler/postar/reagir/fixar e' simplesmente "voce e' um dos dois
- * participantes dessa conversa" (ver assertParticipant) - sem ServerPermission nem cargo
- * nenhum, e' privado por definicao.
- */
 @Service
 public class DirectMessageService {
 
@@ -190,8 +183,6 @@ public class DirectMessageService {
         return toDtos(messages);
     }
 
-    /** Uma linha por conversa, com o outro participante e a ultima mensagem - o que alimenta a
-     *  lista de DMs na Home (ver FriendsPage.jsx), mais recente primeiro. */
     public List<DmChannelInfo> listChannels(Long userId) {
         List<DirectChannel> channels = directChannelRepository.findAllForUser(userId);
         return channels.stream()
@@ -226,8 +217,6 @@ public class DirectMessageService {
         return channel;
     }
 
-    // So' barra MENSAGEM NOVA (texto/imagem/dado) - historico continua legivel pros dois, so'
-    // nao da mais pra mandar nada enquanto um bloqueou o outro (ver FriendshipService.block).
     private void assertNotBlocked(DirectChannel channel) {
         if (friendshipService.isBlocked(channel.getUserAId(), channel.getUserBId())) {
             throw new IllegalStateException("Não é possível enviar mensagem - conversa bloqueada");

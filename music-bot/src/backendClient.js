@@ -16,9 +16,6 @@ export function notifyBackendPresence(channelId, joined) {
   return postJson(`/internal/music-bot/${channelId}/presence`, { joined });
 }
 
-// Batera (bot do soundboard) e' um participante SEPARADO do Melodion - avisa o backend por uma
-// rota propria pra ele aparecer/sumir sozinho na lista de "quem esta na call" (ver
-// MusicBotInternalController.soundboardPresence no backend).
 export function notifySoundboardBackendPresence(channelId, joined) {
   return postJson(`/internal/music-bot/${channelId}/soundboard-presence`, { joined });
 }

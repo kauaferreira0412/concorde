@@ -3,11 +3,6 @@ import { AudioSource, LocalAudioTrack, Room, TrackPublishOptions, TrackSource } 
 import { CHANNELS, IDLE_DISCONNECT_MS, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_WS_URL, SAMPLE_RATE } from "./config.js";
 import { broadcastQueue, notifyBackendPresence } from "./backendClient.js";
 
-// Sessao do Melodion (bot de MUSICA). O soundboard e' um bot SEPARADO - Batera, ver
-// soundboardSession.js - com sua propria conexao/participante no LiveKit, pra nao dividir
-// faixa de audio com o Melodion (ver historico: os dois publicando Track.Source.Microphone
-// simultaneo fazia o frontend so' conseguir controlar UM dos dois - mutar/ensurdecer o bot
-// deixava de funcionar direito quando musica e soundboard tocavam junto).
 export const sessions = new Map();
 
 async function connectToRoom(channelId) {

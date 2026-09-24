@@ -1,12 +1,6 @@
 import { MapIcon } from "./icons.jsx";
 import BattleMap from "./BattleMap.jsx";
 
-/**
- * Canal do tipo MAPA (kit de RPG) - casca simples (cabecalho com o nome do canal, igual um
- * canal de texto) por cima do BattleMap.jsx de sempre. Antes o mapa vivia DENTRO de um canal
- * de voz; agora e' um canal proprio, que qualquer membro abre clicando na barra lateral, sem
- * precisar entrar numa call (pedido explicito do usuario).
- */
 export default function BattleMapChannel({ channel, stompClient, stompConnected }) {
   if (!channel) return <div className="chat-window empty">Selecione um canal</div>;
 

@@ -1,18 +1,8 @@
 import { useEffect, useState } from "react";
 import { MaximizeIcon, ScreenShareIcon } from "./icons.jsx";
 
-/**
- * Seletor de tela/janela customizado, so' usado dentro do app desktop (Electron - ver
- * preload.cjs/main.cjs). Existe pra dar mais controle do que o dialogo nativo do
- * navegador permite: "Tela Inteira" leva audio do sistema inteiro; "Janela" leva audio
- * isolado so' daquele processo (WASAPI Process Loopback por PID - ver
- * startElectronScreenShare/windowAudioTrack.js).
- *
- * No NAVEGADOR normal (sem Electron) esse componente nunca e' montado - o fluxo cai pro
- * getDisplayMedia padrao, sem nenhuma mudanca (ver toggleScreenShare em VoiceCallContext.jsx).
- */
 export default function ScreenSharePicker({ onSelect, onClose }) {
-  const [sources, setSources] = useState(null); // null = carregando ainda
+  const [sources, setSources] = useState(null);
   const [tab, setTab] = useState("screen");
   const [error, setError] = useState("");
 

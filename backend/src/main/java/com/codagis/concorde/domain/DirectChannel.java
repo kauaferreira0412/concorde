@@ -5,9 +5,6 @@ import lombok.*;
 
 import java.time.Instant;
 
-// A "conversa" entre dois amigos (equivalente a um Channel de servidor, so' que privado e sem
-// servidor nenhum por tras) - criada automaticamente quando os dois viram amigos (ver
-// FriendshipService.getOrCreateChannel). Sempre userAId < userBId, mesmo padrao de Friendship.
 @Entity
 @Table(name = "direct_channels", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"userAId", "userBId"})

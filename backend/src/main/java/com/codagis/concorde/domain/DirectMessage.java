@@ -6,10 +6,6 @@ import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
 
-// Mensagem de chat PRIVADO - mesma forma da Message de servidor (ver Message.java), so' que
-// "channelId" aponta pra um DirectChannel em vez de um Channel, e sem pollId (enquete e' so'
-// nos chats de servidor). Entidade separada de proposito (nao reaproveita a tabela messages) -
-// assim um id de DM nunca pode ser confundido com o id de uma mensagem de servidor.
 @Entity
 @Table(name = "direct_messages", indexes = {
         @Index(name = "idx_direct_messages_channel_id", columnList = "channelId"),
@@ -52,9 +48,6 @@ public class DirectMessage {
     @Column(length = 1000)
     private String imageUrl;
 
-    // Anexo generico (video, documento, audio - inclusive mensagem de voz gravada) - mesmo
-    // esquema de Message.java (chat de servidor), ver comentario la' pro motivo de ser separado
-    // de imageUrl.
     @Column(length = 1000)
     private String fileUrl;
 

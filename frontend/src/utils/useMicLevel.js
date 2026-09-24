@@ -1,10 +1,5 @@
 import { useCallback, useRef, useState } from "react";
 
-/**
- * Le o audio cru de uma MediaStreamTrack e devolve um nivel 0-100 em tempo real,
- * atualizado a cada frame. Usado tanto no teste de microfone das Configuracoes
- * quanto no medidor de volume dentro da call de voz.
- */
 export function useMicLevel() {
   const [level, setLevel] = useState(0);
   const stateRef = useRef({ audioContext: null, rafId: null });

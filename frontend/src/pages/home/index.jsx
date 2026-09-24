@@ -14,13 +14,6 @@ import "./style.css";
 
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
 
-/**
- * Home ("/channels/@me") - o que aparece ao clicar na logo do Concorde no topo da barra de
- * servidores (ver ServerSidebar.jsx): amigos + chats privados, fora de qualquer servidor. Mesma
- * composicao de pages/servers/index.jsx (ServerSidebar na barra da esquerda + uma coluna do
- * meio + o conteudo principal), so' que a coluna do meio e' a lista de conversas diretas em vez
- * de canais, e o conteudo principal e' o painel de Amigos ou uma DmChatWindow.
- */
 export default function HomePage() {
   const { user, isAdmin, logout } = useAuth();
   const { openProfile } = useProfile();
@@ -104,8 +97,6 @@ export default function HomePage() {
                       </span>
                     )}
                   </span>
-                  {/* Pontinho de mensagem nao lida - some ao abrir a conversa (ver
-                      DmNotificationsContext.jsx). */}
                   {isUnread && <span className="home-dm-item-unread-dot" />}
                 </button>
               );

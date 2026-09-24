@@ -4,11 +4,6 @@ import { CheckIcon, PlusIcon } from "./icons.jsx";
 
 const MAX_OPTIONS = 10;
 
-/**
- * Card da enquete no chat (ver PollController/PollService no backend). A enquete comeca so'
- * com a pergunta - so' quem CRIOU ela (poll.createdBy) ve o campo de adicionar opcao aqui
- * embaixo; todo mundo mais so' vota nas opcoes que ja existem (clique de novo tira o voto).
- */
 export default function PollCard({ poll, channelId, myUserId, stompClient, stompConnected }) {
   const [newOption, setNewOption] = useState("");
   const [adding, setAdding] = useState(false);

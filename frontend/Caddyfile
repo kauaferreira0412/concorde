@@ -1,7 +1,6 @@
 
 {$DOMAIN} {
 	encode gzip
-	# API REST e WebSocket STOMP do backend (mesma logica do proxy do Vite em dev).
 	handle /api/* {
 		reverse_proxy backend:8080
 	}
@@ -9,15 +8,10 @@
 		reverse_proxy backend:8080
 	}
 
-	# Sinalizacao do LiveKit (WebSocket). A midia (audio/video em si) NAO passa por aqui -
-	# ela vai direto entre o navegador e o container do livekit pelas portas UDP expostas
-	# no host (ver docker-compose.prod.yml), sem passar pelo Caddy.
 	handle /rtc* {
 		reverse_proxy livekit:7880
 	}
 
-	# Frontend estatico (React/Vite), com fallback de SPA (rotas do react-router
-	# recarregando a pagina caem tudo em index.html). Catch-all - so' roda se nada acima bateu.
 	handle {
 		root * /srv
 		try_files {path} /index.html
@@ -25,11 +19,6 @@
 	}
 }
 
-# VetFacility (outro projeto, mesma VPS) - subdominio proprio, mesmo Caddy/certificado
-# automatico. O container "frontend" e' do docker-compose.prod.yml do vetfacility-frontend,
-# alcancavel aqui porque os dois entram na rede externa "webproxy" (ver docker-compose.prod.yml
-# deste projeto). O proprio nginx daquele container ja resolve /api/* pro backend do
-# vetfacility sozinho (ver vetfacility-frontend/nginx.conf) - aqui so' precisa encaminhar tudo.
 vetfacility.{$DOMAIN} {
 	encode gzip
 	reverse_proxy frontend:80

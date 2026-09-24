@@ -15,9 +15,6 @@ public interface CategoryAccessRepository extends JpaRepository<CategoryAccessEn
 
     void deleteByCategoryId(Long categoryId);
 
-    // Usado pra saber, de uma tacada so', quais dessas categorias tem QUALQUER restricao
-    // configurada (ver ServerService.listCategories/listChannels) - sem isso seria uma query
-    // por categoria.
     @org.springframework.data.jpa.repository.Query("select distinct e.categoryId from CategoryAccessEntry e where e.categoryId in :categoryIds")
     Set<Long> findRestrictedCategoryIds(java.util.Collection<Long> categoryIds);
 }

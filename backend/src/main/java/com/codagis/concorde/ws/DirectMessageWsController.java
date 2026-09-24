@@ -20,19 +20,6 @@ import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
 
-/**
- * Espelha ChatController (chat de servidor), so' que sob "/app/dm.{channelId}.*" e broadcast em
- * "/topic/dm.{channelId}" - namespace SEPARADO de "channel.*" de proposito, pra nunca confundir
- * um id de DirectChannel com um id de Channel de servidor. A privacidade de verdade (so' os dois
- * participantes conseguem ASSINAR esse topico) e' garantida na entrada da conexao STOMP, ver
- * StompAuthChannelInterceptor - aqui cada acao tambem confere participante de novo do lado do
- * DirectMessageService (defesa em profundidade).
- */
-// Nome de classe DIFERENTE de controller.DirectMessageController (REST) de proposito - os dois
-// "DirectMessageController" (um aqui, um em controller/) geravam o MESMO nome de bean padrao
-// do Spring ("directMessageController"), batendo um no outro e derrubando o backend inteiro no
-// boot (ConflictingBeanDefinitionException) - erro so' aparece rodando de verdade, nao da pra
-// pegar so' lendo o codigo.
 @Controller
 public class DirectMessageWsController {
 

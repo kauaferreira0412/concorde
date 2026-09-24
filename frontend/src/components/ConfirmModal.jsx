@@ -1,4 +1,3 @@
-/** Modal de confirmacao generico - usado hoje pra apagar mensagem, mas serve pra qualquer "tem certeza?". */
 export default function ConfirmModal({ title, message, confirmLabel = "Confirmar", danger = false, onConfirm, onClose }) {
   function handleConfirm() {
     onConfirm();

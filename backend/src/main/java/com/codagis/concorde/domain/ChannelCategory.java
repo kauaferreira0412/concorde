@@ -34,11 +34,6 @@ public class ChannelCategory {
     @Builder.Default
     private int position = 0;
 
-    // Quem CRIOU a categoria - o "mestre" dela, pedido explicito do usuario: so' quem criou a
-    // categoria de um RPG pode subir o mapa de batalha dos canais de voz dentro dela (ver
-    // MapService.assertCanManageMap). Sem "nullable = false" de proposito - categoria criada
-    // ANTES dessa coluna existir fica com isso null (nao da' pra saber quem criou uma coisa que
-    // ja' existia), e nesse caso o upload de mapa cai pro fallback (MANAGE_CHANNELS).
     private Long createdBy;
 
     @Builder.Default

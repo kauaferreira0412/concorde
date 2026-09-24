@@ -21,12 +21,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Pedido de amizade + lista de amigos - so' amigos ACEITOS conseguem abrir um chat privado (ver
- * DirectChannel/DirectMessageService). Toda amizade/pedido e' guardado com userAId < userBId
- * (normalizado aqui, nunca confiar na ordem que chegou do requester/alvo) pra nunca existir duas
- * linhas pro mesmo par de gente.
- */
 @Service
 public class FriendshipService {
 
@@ -69,7 +63,6 @@ public class FriendshipService {
             if (existing.getRequestedBy().equals(requesterId)) {
                 throw new IllegalArgumentException("Você já enviou um pedido - espere a resposta");
             }
-            // O outro ja tinha te mandado um pedido - mandar de volta e' o mesmo que aceitar.
             acceptInternal(existing);
             return;
         }
@@ -97,8 +90,6 @@ public class FriendshipService {
         notify(f.getUserBId());
     }
 
-    /** Serve tanto pra recusar um pedido recebido quanto pra cancelar um que voce mandou -
-     *  simetrico, so' apaga a linha pendente de qualquer um dos dois lados. */
     @Transactional
     public void decline(Long requesterId, Long otherUserId) {
         Friendship f = requirePending(requesterId, otherUserId);
@@ -127,9 +118,6 @@ public class FriendshipService {
                 .orElseThrow(() -> new IllegalArgumentException("Não tem nenhum pedido pendente com esse usuário"));
     }
 
-    /** Estado da relacao entre "eu" e "esse outro usuario" - usado no perfil de um membro (ver
-     *  ProfileModal.jsx) pra decidir se mostra "Adicionar amigo", "Pedido enviado", "Aceitar
-     *  pedido" ou "Enviar mensagem". */
     @Transactional
     public FriendStatusResponse status(Long userId, Long otherUserId) {
         if (userId.equals(otherUserId)) {
@@ -164,13 +152,6 @@ public class FriendshipService {
                 .orElse(false);
     }
 
-    /** Bloquear substitui qualquer amizade/pedido que existisse entre os dois (some da lista de
-     *  amigos e de pedidos pendentes dos dois lados na hora) - so' quem bloqueou consegue
-     *  desbloquear depois (ver unblock). Enquanto bloqueado, nenhum dos dois consegue mandar
-     *  pedido de amizade nem mensagem novo pro outro (ver DirectMessageService). Guarda o status
-     *  de ANTES (ver Friendship.previousStatus) - se ja' eram amigos, desbloquear restaura a
-     *  amizade sozinho (pedido explicito do usuario: bloquear/desbloquear nao devia "perder" uma
-     *  amizade de verdade). */
     @Transactional
     public void block(Long requesterId, Long targetUserId) {
         if (targetUserId == null || targetUserId.equals(requesterId)) {
@@ -200,8 +181,6 @@ public class FriendshipService {
                 .filter(x -> x.getStatus() == FriendshipStatus.BLOCKED && requesterId.equals(x.getBlockedBy()))
                 .orElseThrow(() -> new IllegalArgumentException("Você não bloqueou esse usuário"));
         if (f.getPreviousStatus() == FriendshipStatus.ACCEPTED) {
-            // Eram amigos antes de bloquear - volta a ser amigo direto, sem precisar de pedido
-            // novo (o DirectChannel entre os dois nunca foi apagado, so' ficou "pausado").
             f.setStatus(FriendshipStatus.ACCEPTED);
             f.setPreviousStatus(null);
             f.setBlockedBy(null);
@@ -214,8 +193,6 @@ public class FriendshipService {
         notify(b);
     }
 
-    /** So' quem EU bloqueei (nao quem me bloqueou - isso o outro lado nem fica sabendo por
-     *  aqui). */
     public List<FriendRequestInfo> listBlocked(Long userId) {
         List<Friendship> rows = friendshipRepository.findAllForUserWithStatus(userId, FriendshipStatus.BLOCKED);
         List<FriendRequestInfo> result = new ArrayList<>();

@@ -37,9 +37,6 @@ public class Server {
     @Column(length = 300)
     private String description;
 
-    // Escolhido na criacao (ver ServerService.createServer/CreateServerModal.jsx) - RPG muda o
-    // canal de voz padrao ("Sessão" em vez de "Geral") e libera o kit de RPG (mapa de batalha,
-    // fichas em PDF). Nunca muda depois de criado.
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     @Builder.Default

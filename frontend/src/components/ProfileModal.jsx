@@ -10,32 +10,16 @@ import { CheckIcon, MessageSquareIcon, MusicNoteIcon, PlusIcon, ShieldIcon } fro
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", OFFLINE: "Offline" };
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
 
-/**
- * Cartao de perfil de QUALQUER usuario (clicavel a partir do chat, lista de membros, canal
- * de voz - ver useProfile/ProfileContext). E' so' leitura - quando e' o seu proprio perfil,
- * o botao manda pra Configuracoes > Perfil (ver openSettingsInstead), que e' onde a edicao
- * de verdade mora hoje (apelido, foto, bio, apelido por servidor - ver SettingsModal.jsx).
- *
- * Layout em secoes bem separadas (pedido explicito do usuario - antes era so' um paragrafo
- * solto): banner com o avatar "flutuando" por cima (estilo Discord), status como selo colorido,
- * depois um cartao "Sobre mim" com a bio e outro com informacoes (membro desde, cargo).
- */
 export default function ProfileModal({ userId, onClose }) {
   const { user: me } = useAuth();
   const { showAlert } = useAlert();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [loadError, setLoadError] = useState("");
-  // Relacao de amizade com essa pessoa (ver GET /api/friends/status/{userId} no backend) - so'
-  // busca quando NAO e' o proprio perfil, decide se mostra "Adicionar amigo"/"Pedido enviado"/
-  // "Aceitar pedido"/"Enviar mensagem" (pedido explicito do usuario: essas acoes direto no
-  // perfil de um membro do servidor, nao so' pela tela de Amigos).
   const [friendStatus, setFriendStatus] = useState(null);
   const [friendActionBusy, setFriendActionBusy] = useState(false);
 
   const isMe = me?.id === userId;
-  // "Ouvindo Spotify" dessa pessoa agora (ver useSpotifyNowPlaying.js/Configurações >
-  // Conexões) - so' aparece se ela CONECTOU a conta e esta' tocando algo nesse instante.
   const profileIds = useMemo(() => (profile ? [profile.id] : []), [profile]);
   const nowPlaying = useSpotifyNowPlaying(profileIds)[profile?.id];
 
@@ -50,7 +34,6 @@ export default function ProfileModal({ userId, onClose }) {
     if (me?.id !== userId) {
       api.get(`/api/friends/status/${userId}`).then(({ data }) => setFriendStatus(data));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   function openSettingsInstead() {
@@ -85,9 +68,6 @@ export default function ProfileModal({ userId, onClose }) {
     }
   }
 
-  /** Manda pra Home ja' abrindo a conversa com essa pessoa - a Home busca a lista de amigos
-   *  sozinha, mas passar tudo pronto no state evita esperar esse round-trip pra ver a
-   *  conversa abrir (ver pages/home/Container.jsx, le' location.state uma vez ao montar). */
   function goToDm() {
     if (!profile || !friendStatus?.dmChannelId) return;
     onClose();

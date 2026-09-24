@@ -122,10 +122,6 @@ public class VoicePresenceService {
         return -channelId;
     }
 
-    // Batera (bot do soundboard) e' um participante SEPARADO do Melodion (musica) - precisa de
-    // um userId "falso" proprio, senao os dois disputariam a mesma entrada no mapa de presenca
-    // (ver joinBot/leaveBot logo acima) e so' um deles apareceria pra quem esta' na call.
-    // Deslocado bem longe da faixa de channelId de verdade pra nunca colidir com botUserId().
     private static final long SOUNDBOARD_BOT_OFFSET = 1_000_000_000L;
 
     private Long soundboardBotUserId(Long channelId) {

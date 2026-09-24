@@ -17,33 +17,13 @@ function saveLastRead(channelId, messageId) {
   localStorage.setItem(LAST_READ_PREFIX + channelId, String(messageId));
 }
 
-/**
- * Rastreia mensagem privada NAO LIDA de TODAS as conversas do usuario, o tempo todo - inclusive
- * enquanto ele esta' navegando dentro de um servidor, nao so' na Home (ver pages/home). Por
- * isso vive aqui, num provider GLOBAL (montado uma vez em App.jsx, fora de /servers e /channels/
- * @me) e nao dentro do Container da Home: o pontinho de notificacao na logo do Concorde (ver
- * ServerSidebar.jsx) precisa continuar aparecendo mesmo com o usuario dentro de um servidor
- * (pedido explicito do usuario) - se isso vivesse so' dentro da Home, sairia da Home e o
- * rastreamento pararia de existir.
- *
- * Mesmo "ultimo lido" via localStorage por conversa que useUnreadMessages.js ja usa pros canais
- * de servidor - so' que aqui e' uma conexao STOMP PROPRIA (nao a mesma da pagina de servidor
- * nem a da Home), assinando "/topic/dm.<canal>" de toda conversa que o usuario tem.
- */
 export function DmNotificationsProvider({ children }) {
   const { user, token, isAuthenticated } = useAuth();
   const [stompClient, setStompClient] = useState(null);
   const [stompConnected, setStompConnected] = useState(false);
   const [channels, setChannels] = useState([]);
   const [unreadIds, setUnreadIds] = useState(new Set());
-  // Ultima mensagem de CADA conversa, atualizada ao vivo (channelId -> DmMessage) - e' o que
-  // faz o texto embaixo do nome na lista de "Conversas diretas" acompanhar mensagem nova sem
-  // precisar de F5 (ver pages/home/index.jsx, que mescla isso por cima do que veio da API).
-  // Comeca a partir do "ultima mensagem" que /api/dm/channels ja traz (ver reloadChannels
-  // abaixo) e so' anda pra frente com mensagem NOVA de verdade.
   const [latestMessages, setLatestMessages] = useState({});
-  // Qual conversa esta' sendo VISTA agora (setado pela Home ao abrir uma DM) - mensagem nova
-  // dessa conversa nao conta como nao lida, mesmo chegando por aqui.
   const activeChannelIdRef = useRef(null);
   const subsRef = useRef(new Map());
 
@@ -69,16 +49,12 @@ export function DmNotificationsProvider({ children }) {
     reloadChannels();
   }, [reloadChannels]);
 
-  // Amizade aceita agora = conversa nova pra rastrear; recalcula a lista sempre que algo muda
-  // do lado de amigos (ver FriendshipService.notify no backend).
   useEffect(() => {
     if (!stompClient || !stompConnected) return;
     const sub = subscribeToFriends(stompClient, () => reloadChannels());
     return () => sub.unsubscribe();
   }, [stompClient, stompConnected, reloadChannels]);
 
-  // Sincroniza latestMessages com o que a API devolveu - so' avanca (nunca sobrescreve uma
-  // mensagem mais nova que ja' foi capturada ao vivo por uma resposta de API atrasada/velha).
   useEffect(() => {
     setLatestMessages((prev) => {
       const next = { ...prev };
@@ -95,8 +71,6 @@ export function DmNotificationsProvider({ children }) {
     });
   }, [channels]);
 
-  // Nao-lido inicial: compara a ultima mensagem de cada conversa (ja vem no /api/dm/channels)
-  // com o "ultimo lido" salvo - cobre mensagem que chegou enquanto o app estava fechado.
   useEffect(() => {
     setUnreadIds((prev) => {
       const next = new Set(prev);
@@ -112,8 +86,6 @@ export function DmNotificationsProvider({ children }) {
     });
   }, [channels, user?.id]);
 
-  // Um WebSocket por conversa - assinaturas adicionadas/removidas incrementalmente conforme a
-  // lista de conversas muda (sem re-assinar tudo do zero a cada render).
   useEffect(() => {
     if (!stompClient || !stompConnected) return;
     const subs = subsRef.current;
@@ -153,7 +125,6 @@ export function DmNotificationsProvider({ children }) {
         subs.delete(id);
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channels, stompClient, stompConnected, user?.id]);
 
   useEffect(
@@ -164,9 +135,6 @@ export function DmNotificationsProvider({ children }) {
     []
   );
 
-  /** Notificacao de mensagem privada nova - mesmo padrao de useUnreadMessages.js (mensagem de
-   *  canal de servidor): som toca SEMPRE, popup do SO so' se o toggle estiver ligado E o
-   *  navegador tiver dado permissao. */
   function notifyDesktop(message) {
     playMessageSound();
     if (!getDesktopNotificationsEnabled()) return;
@@ -177,8 +145,6 @@ export function DmNotificationsProvider({ children }) {
         icon: message.authorAvatarUrl || `${import.meta.env.BASE_URL}icon-192.png`,
         badge: `${import.meta.env.BASE_URL}icon-192.png`,
         tag: `dm-${message.channelId}`,
-        // Mesmo motivo de useUnreadMessages.js - sem isso o SO toca o bip padrao dele por cima
-        // do nosso som (playMessageSound acima).
         silent: true,
       });
       notification.onclick = () => {
@@ -186,7 +152,6 @@ export function DmNotificationsProvider({ children }) {
         notification.close();
       };
     } catch {
-      // idem useUnreadMessages.js - navegador pode bloquear silenciosamente, sem problema
     }
   }
 

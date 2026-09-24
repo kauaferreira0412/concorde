@@ -1,7 +1,5 @@
 import { useState } from "react";
 
-/** Criar OU renomear uma categoria de canais - mesmo formulario simples pros dois casos
- *  (initialName preenchido = editando, vazio = criando, ver ChannelSidebar.jsx). */
 export default function CategoryModal({ initialName, onClose, onSave }) {
   const [name, setName] = useState(initialName || "");
   const [submitting, setSubmitting] = useState(false);

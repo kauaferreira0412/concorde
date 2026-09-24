@@ -1,12 +1,6 @@
-# Config de rede do LiveKit para producao (VPS com IP publico real).
-# As chaves (api-key/secret) NAO ficam aqui - vem da env var LIVEKIT_KEYS no
-# docker-compose.prod.yml, pra nao versionar segredo junto com o codigo.
 port: 7880
 rtc:
   tcp_port: 7881
   port_range_start: 50000
   port_range_end: 50100
-  # Faz o LiveKit descobrir sozinho (via STUN) o IP publico da VPS pra anunciar nos
-  # candidatos ICE - equivalente ao --node-ip do modo dev, mas sem precisar hardcodar
-  # o IP (funciona mesmo se a VPS trocar de IP).
   use_external_ip: true

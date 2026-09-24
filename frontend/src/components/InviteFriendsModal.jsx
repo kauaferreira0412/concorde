@@ -3,15 +3,6 @@ import api from "../api/client";
 import Avatar from "./Avatar.jsx";
 import { CheckIcon, PlusIcon, UsersIcon, XIcon } from "./icons.jsx";
 
-/**
- * Convida um AMIGO (aceito nos chats privados, ver FriendshipService) pra entrar nesse servidor
- * - pedido explicito do usuario: qualquer um pode criar um servidor e dar acesso pros amigos que
- * ja' adicionou, sem precisar do admin global fazer isso manualmente (ver
- * ServerService.inviteFriend, diferente do "conceder acesso" do painel de admin, que aceita
- * QUALQUER usuario sem checar amizade). So' mostra quem ja' e' amigo de verdade - quem quiser
- * convidar alguem que ainda nao e' amigo precisa adicionar como amigo primeiro (ver
- * FriendsPanel.jsx).
- */
 export default function InviteFriendsModal({ server, members, onClose }) {
   const [friends, setFriends] = useState([]);
   const [loading, setLoading] = useState(true);

@@ -13,14 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/**
- * Personagens de uma mesa de RPG (villoes, NPCs, personagens de jogador - kit de RPG, pedido
- * explicito do usuario). Vive no SERVIDOR inteiro (cada servidor RPG e' uma mesa/campanha so' -
- * pedido explicito: "desvincule as fichas dos personagens de uma categoria"). SO' o mestre (o
- * dono do servidor) cria personagens e decide qual JOGADOR fica vinculado a cada um - o jogador
- * vinculado ve e EDITA essa ficha (nome/foto/PDF); quem nao esta' vinculado nem sabe que existe
- * (personagem some da lista dele, ver list()).
- */
 @Service
 public class CharacterSheetService {
 
@@ -40,9 +32,6 @@ public class CharacterSheetService {
         this.userRepository = userRepository;
     }
 
-    /** Confere que o servidor existe e o usuario e' membro dele (ou dono/admin global, ver
-     *  PermissionService.isOwnerOrGlobalAdmin) - devolve o servidor pra quem chamou nao
-     *  precisar buscar de novo. */
     private Server assertCanUseSheets(Long serverId, Long userId) {
         Server server = serverRepository.findById(serverId)
                 .orElseThrow(() -> new IllegalArgumentException("Servidor não encontrado"));
@@ -52,8 +41,6 @@ public class CharacterSheetService {
         return server;
     }
 
-    /** O "mestre" de uma mesa RPG e' o DONO do servidor (ou admin global) - um servidor, um
-     *  mestre, pedido explicito do usuario ("cada servidor vai ser pra um mestre especifico"). */
     private boolean isMaster(Long serverId, Long userId) {
         return permissionService.isOwnerOrGlobalAdmin(serverId, userId);
     }
@@ -62,9 +49,6 @@ public class CharacterSheetService {
         return isMaster(serverId, userId) || (sheet.getLinkedUserId() != null && sheet.getLinkedUserId().equals(userId));
     }
 
-    /** Mestre ve TODOS os personagens da mesa. Jogador comum so' ve os que estao VINCULADOS a
-     *  ele - villao/NPC (sem vinculo nenhum) ou o personagem de outro jogador simplesmente nao
-     *  aparecem (pedido explicito do usuario). */
     public List<CharacterSheetResponse> list(Long serverId, Long userId) {
         assertCanUseSheets(serverId, userId);
         boolean master = isMaster(serverId, userId);
@@ -74,9 +58,6 @@ public class CharacterSheetService {
         return sheets.stream().map(s -> toResponse(s, serverId, userId)).toList();
     }
 
-    /** So' o mestre cria personagem novo (pedido explicito: "os jogadores nao criam personagem
-     *  dentro da mesa do mestre, so' o mestre que cria"). imageUrl/fileUrl/fileName/fileSize
-     *  todos opcionais - da' pra criar so' com o nome e completar depois. */
     @Transactional
     public CharacterSheetResponse create(Long serverId, Long userId, String characterName,
                                           String imageUrl, String fileUrl, String fileName, Long fileSize) {
@@ -98,9 +79,6 @@ public class CharacterSheetService {
         return toResponse(sheet, serverId, userId);
     }
 
-    /** Mestre OU o jogador vinculado podem editar (pedido explicito: "o jogador... podendo ate'
-     *  alterar"). Cada parametro null = nao mexe no que ja' tem; "" (string vazia) REMOVE
-     *  foto/PDF atual - mesma convencao ja' usada em MapService.renameToken pros tokens. */
     @Transactional
     public CharacterSheetResponse update(Long serverId, Long userId, Long sheetId,
                                           String characterName, String imageUrl, String fileUrl, String fileName, Long fileSize) {
@@ -129,9 +107,6 @@ public class CharacterSheetService {
         return toResponse(characterSheetRepository.save(sheet), serverId, userId);
     }
 
-    /** So' o mestre vincula (ou desvincula, userId null) um jogador a um personagem - pedido
-     *  explicito: "e' o mestre que vai dizer qual ficha cada jogador tem acesso". Precisa ser
-     *  membro do servidor (nao da' pra vincular alguem de fora). */
     @Transactional
     public CharacterSheetResponse linkPlayer(Long serverId, Long userId, Long sheetId, Long linkedUserId) {
         assertCanUseSheets(serverId, userId);
@@ -146,8 +121,6 @@ public class CharacterSheetService {
         return toResponse(characterSheetRepository.save(sheet), serverId, userId);
     }
 
-    /** So' o mestre apaga um personagem (o jogador vinculado edita, mas nao apaga - continuidade
-     *  da campanha e' decisao do mestre). */
     @Transactional
     public void delete(Long serverId, Long userId, Long sheetId) {
         assertCanUseSheets(serverId, userId);

@@ -5,15 +5,6 @@ import { useAuth } from "../context/AuthContext.jsx";
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 
-/**
- * Editar um servidor existente - dono do servidor, ADMIN global, ou quem tiver a permissao
- * MANAGE_SERVER atribuida por um Perfil NESSE servidor ve o botao que abre isso (ver
- * ChannelSidebar.jsx - o backend tambem confere, ver ServerService.updateServer/
- * updateServerIcon). Icone troca na hora ao escolher o arquivo (igual a foto de perfil do
- * usuario); nome/descricao ficam pendentes ate' clicar em Salvar. A "Zona de perigo" (excluir
- * o servidor inteiro) e' mais restrita - continua so' ADMIN global (ver
- * ServerService.deleteServer, deliberadamente separado por ser irreversivel).
- */
 export default function EditServerModal({ server, onClose, onUpdate, onDelete }) {
   const { isAdmin } = useAuth();
   const [name, setName] = useState(server.name || "");
@@ -27,10 +18,6 @@ export default function EditServerModal({ server, onClose, onUpdate, onDelete })
   const iconInputRef = useRef(null);
   const { showAlert } = useAlert();
 
-  // ConfirmModal fecha sozinho assim que onConfirm() e' chamado (nao espera ele terminar, ver
-  // ConfirmModal.jsx) - por isso o erro, se der, aparece num alerta em vez de dentro do modal
-  // (que ja' nao esta mais na tela quando o "await" resolve). Mesmo padrao de
-  // ChannelSidebar.handleConfirmDeleteChannel.
   async function handleConfirmDeleteServer() {
     try {
       await api.delete(`/api/servers/${server.id}`);
@@ -126,9 +113,6 @@ export default function EditServerModal({ server, onClose, onUpdate, onDelete })
 
         {saveError && <p className="auth-error">{saveError}</p>}
 
-        {/* So' ADMIN global ve isso - diferente do resto do modal (editar nome/icone), que
-            agora tambem libera pra quem tiver MANAGE_SERVER, excluir o servidor continua mais
-            restrito por ser irreversivel (ver ServerService.deleteServer). */}
         {isAdmin && (
           <>
             <div className="settings-divider" />
@@ -156,10 +140,6 @@ export default function EditServerModal({ server, onClose, onUpdate, onDelete })
       </form>
     </div>
 
-    {/* Fora do modal-backdrop de cima de proposito - senao os dois "modal-backdrop" ficariam
-        aninhados, e um clique no fundo escuro do ConfirmModal borbulharia pro onClick={onClose}
-        do backdrop de fora tambem, fechando os dois modais de uma vez em vez de so' o de
-        confirmacao. */}
     {confirmingDelete && (
       <ConfirmModal
         title="Excluir servidor"

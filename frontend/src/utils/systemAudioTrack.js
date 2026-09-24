@@ -1,17 +1,3 @@
-// Constroi uma MediaStreamTrack de audio pra "Tela Inteira, sem o proprio Concorde" (Windows,
-// app desktop) - UMA UNICA sessao de captura nativa do lado do processo principal (WASAPI
-// Process Loopback em modo EXCLUDE, a mesma API que Discord/OBS usam pra isso - a lib
-// "process-audio-capture" so' expunha o modo INCLUDE por padrao, patcheamos ela pra adicionar
-// "startCaptureExcludingSelf" via patch-package, ver patches/process-audio-capture+*.patch e
-// main.cjs). Sistema inteiro (jogo, musica, qualquer coisa tocando), menos o proprio Concorde -
-// e' o Windows quem faz a exclusao de verdade, entao nao tem atraso nenhum pra pegar som de um
-// programa aberto DEPOIS que a transmissao ja comecou (era o problema da versao anterior, que
-// tentava capturar cada processo na mao).
-//
-// Mesmo "sintetizador" de audio que windowAudioTrack.js usa - os chunks PCM (Float32Array, ja'
-// pronto) chegam por IPC do processo principal, um AudioWorklet vai tocando eles no ritmo
-// certo, alimentando um MediaStreamDestination (a forma padrao da Web Audio API de virar uma
-// MediaStreamTrack de verdade, publicavel no LiveKit).
 const WORKLET_SOURCE = `
 class SystemAudioProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -90,7 +76,6 @@ export async function startSystemAudioExcludingSelfTrack() {
     try {
       await desktop.stopSystemAudioExcludingSelf();
     } catch {
-      /* processo principal ja' pode ter derrubado tudo (ex: app fechando) */
     }
     workletNode.disconnect();
     await audioContext.close();

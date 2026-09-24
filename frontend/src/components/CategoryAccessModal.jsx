@@ -3,13 +3,6 @@ import api from "../api/client";
 import Avatar from "./Avatar.jsx";
 import { LockIcon, XIcon } from "./icons.jsx";
 
-/**
- * "Quem pode ver essa categoria" - restringe uma categoria (e os canais dentro dela) a so' um
- * grupo de membros do servidor, em vez de todo mundo (padrao). Pedido explicito do usuario:
- * separar jogadores de campanhas de RPG diferentes no mesmo servidor, mas vale pra qualquer
- * categoria de qualquer servidor (ver CategoryAccessEntry/ServerService.setCategoryAccess no
- * backend). Ninguem marcado = sem restricao nenhuma (aberta pra todo mundo de novo).
- */
 export default function CategoryAccessModal({ server, category, members, onClose, onSaved }) {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(new Set());

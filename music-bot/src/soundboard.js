@@ -65,9 +65,6 @@ async function pumpClip(channelId, session, url) {
   }
 }
 
-// Fila serializada POR CANAL - se duas pessoas tocarem um som quase ao mesmo tempo, o segundo
-// espera o primeiro acabar em vez de misturar os dois frames na mesma AudioSource (o que
-// corromperia o audio dos dois).
 export async function playSoundboardClip(channelId, url) {
   const session = await getSoundboardSession(channelId);
 

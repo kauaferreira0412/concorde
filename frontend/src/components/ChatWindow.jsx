@@ -43,49 +43,21 @@ import {
   XIcon,
 } from "./icons.jsx";
 
-// /roll ou /r seguido de uma notacao de dado (ex: "/roll 2d20+5") - mesma notacao aceita pelo
-// backend (ver DiceService), checada aqui tambem so' pra dar um erro na hora em vez de a
-// mensagem sumir silenciosamente se a notacao for invalida (ver handleSend).
 const ROLL_COMMAND_RE = /^\/(?:roll|r)\s+(.+)$/i;
 const ROLL_NOTATION_RE = /^(\d{0,2})d(\d{1,3})\s*([+-]\s*\d{1,3})?$/i;
 
-// /play <link ou busca> e /stop - bot de musica (ver MusicController.java/music-bot/index.js).
-// So' fazem sentido com o usuario CONECTADO numa call de voz (activeChannel, ver handleSend) -
-// e' o canal de voz que recebe o audio, que pode ser diferente do canal de TEXTO onde o
-// comando foi digitado (por isso o feedback e' mandado de volta pro canal de texto atual).
 const PLAY_COMMAND_RE = /^\/play\s+(.+)$/i;
 const STOP_COMMAND_RE = /^\/stop\s*$/i;
 const PAUSE_COMMAND_RE = /^\/pause\s*$/i;
 const CONTINUE_COMMAND_RE = /^\/continue\s*$/i;
 const SKIP_COMMAND_RE = /^\/skip\s*$/i;
-// Nome e' opcional ("/fila" sozinho tambem funciona, so' fica sem titulo) - so' cosmetico,
-// aparece no topo do card (ver MusicQueueCard.jsx).
 const FILA_COMMAND_RE = /^\/fila(?:\s+(.+))?$/i;
-// Marcador especial no CONTEUDO da mensagem (ver /fila abaixo) - em vez de mandar texto pro
-// chat, /fila manda essa mensagem "magica" com o id do canal de VOZ embutido; ao renderizar
-// (ver MessageText/DiceRollCard mais abaixo) qualquer mensagem com esse conteudo exato vira um
-// MusicQueueCard AO VIVO em vez de texto normal. Evita precisar de uma coluna nova no banco so'
-// pra isso (mesma logica de reaproveitamento que o /roll usa colunas dedicadas, mas aqui nem
-// isso e' necessario - o card busca o estado dele sozinho via REST/WebSocket, ver MusicQueueCard.jsx).
-// Carrega DOIS ids: o canal de voz, e o "queueId" da fila que existia na hora que esse card foi
-// criado (ver /fila abaixo) - todo card do MESMO canal escuta o MESMO broadcast ao vivo, entao
-// sem o queueId um card antigo (de uma fila ja encerrada) virava a fila NOVA na tela sozinho
-// assim que alguem abria outra; com o queueId, o card compara e se tranca como "encerrada" pra
-// sempre se um queueId diferente aparecer (ver MusicQueueCard.jsx).
 const MUSIC_QUEUE_MARKER_RE = /^\[\[MUSIC_QUEUE:(\d+):([^\]]+)\]\]$/;
 
-// /poll Pergunta - cria a enquete SO' com a pergunta (ver PollController no backend); as
-// opcoes sao adicionadas depois, uma de cada vez, direto no card no chat (so' quem criou pode
-// adicionar - ver PollCard.jsx). /pollmulti e' igual, so' que permite votar em mais de uma
-// opcao ao mesmo tempo.
 const POLL_COMMAND_RE = /^\/(poll|pollmulti)\s+(.+)$/i;
 
-// /spotify (sozinho, VOCE) ou /spotify @alguem - manda pro chat o que essa pessoa esta'
-// ouvindo AGORA no Spotify (precisa ter conectado a conta em Configurações > Conexões, ver
-// SpotifyController no backend). "@" antes do nome e' opcional (aceita os dois jeitos).
 const SPOTIFY_COMMAND_RE = /^\/spotify(?:\s+@?(\S+))?\s*$/i;
 
-// Autocomplete de "/" (ver getSlashMenuState).
 const SLASH_COMMANDS = [
   { name: "roll", description: "Rolar dados de RPG (ex: 2d20+5)" },
   { name: "play", description: "Tocar música (ou adicionar à fila) na sua call" },
@@ -100,13 +72,6 @@ const SLASH_COMMANDS = [
 ];
 const DICE_SIDES = [4, 6, 8, 10, 12, 20, 100];
 
-/**
- * Autocomplete de comando "/" - so' faz sentido no COMECO da mensagem (igual Discord), por
- * isso olha o draft inteiro, nao o caret como a mencao (@) faz. Dois estagios:
- *  1. Ainda escolhendo o comando ("/", "/r", "/ro"...) - sugere os nomes de comando.
- *  2. Ja' escolheu "/roll " (ou "/r ") - sugere os tipos de dado (d4..d100), respeitando
- *     qualquer numero de dados ja' digitado antes (ex: "/roll 2" sugere "2d4", "2d6"...).
- */
 function getSlashMenuState(draft) {
   if (!draft.startsWith("/")) return null;
 
@@ -146,9 +111,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
 
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
-  const [pendingImage, setPendingImage] = useState(null); // { file, previewUrl } - aguardando confirmacao de envio
-  // Video/audio/documento/qualquer anexo que nao seja imagem (inclusive mensagem de voz
-  // gravada, ver useAudioRecorder) - { file, name, type, size, previewUrl, isVoiceMessage? }
+  const [pendingImage, setPendingImage] = useState(null);
   const [pendingFile, setPendingFile] = useState(null);
   const recorder = useAudioRecorder();
   const [sending, setSending] = useState(false);
@@ -156,20 +119,18 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
   const [editingId, setEditingId] = useState(null);
   const [editingText, setEditingText] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [lightboxImage, setLightboxImage] = useState(null); // url da imagem em tela cheia, null = fechado
+  const [lightboxImage, setLightboxImage] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
-  const [mentionQuery, setMentionQuery] = useState(null); // string | null - null = autocomplete fechado
+  const [mentionQuery, setMentionQuery] = useState(null);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [slashIndex, setSlashIndex] = useState(0);
-  const [slashDismissed, setSlashDismissed] = useState(false); // true = usuario fechou com Esc
-  const [reactionPickerFor, setReactionPickerFor] = useState(null); // id da mensagem com o picker de emoji aberto
-  // Picker de emoji do PROPRIO campo de digitar (insere no texto, manda como mensagem normal -
-  // diferente do reactionPickerFor acima, que so' reage numa mensagem ja enviada).
+  const [slashDismissed, setSlashDismissed] = useState(false);
+  const [reactionPickerFor, setReactionPickerFor] = useState(null);
   const [showDraftEmojiPicker, setShowDraftEmojiPicker] = useState(false);
   const [myServerPermissions, setMyServerPermissions] = useState(new Set());
-  const [customEmojis, setCustomEmojis] = useState({}); // name -> imageUrl (ver CustomEmojiModal.jsx)
+  const [customEmojis, setCustomEmojis] = useState({});
   const [customEmojiList, setCustomEmojiList] = useState([]);
-  const [typingUsers, setTypingUsers] = useState(new Map()); // userId -> username, de quem esta digitando AGORA
+  const [typingUsers, setTypingUsers] = useState(new Map());
   const [showPinned, setShowPinned] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState([]);
   const [showSearch, setShowSearch] = useState(false);
@@ -179,16 +140,15 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
   const draftInputRef = useRef(null);
-  const messageRefs = useRef(new Map()); // messageId -> elemento na tela, pra "pular pra" no clique do reply
-  const typingTimersRef = useRef(new Map()); // userId -> timeout, pra sumir sozinho sem novo evento
-  const iAmTypingRef = useRef(false); // evita mandar "estou digitando" de novo a cada tecla
+  const messageRefs = useRef(new Map());
+  const typingTimersRef = useRef(new Map());
+  const iAmTypingRef = useRef(false);
 
   const mentionMatches = useMemo(() => {
     if (mentionQuery === null) return [];
     return members.filter((m) => m.username.toLowerCase().startsWith(mentionQuery.toLowerCase())).slice(0, 6);
   }, [mentionQuery, members]);
 
-  // "/roll" so' faz sentido no comeco da mensagem - nunca junto com o autocomplete de @mencao.
   const slashMenu = useMemo(
     () => (mentionQuery === null && !slashDismissed ? getSlashMenuState(draft) : null),
     [draft, mentionQuery, slashDismissed]
@@ -208,11 +168,8 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     clearPendingImage();
     clearPendingFile();
     api.get(`/api/channels/${channel.id}/messages`).then(({ data }) => setMessages(data));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel]);
 
-  // Permissoes do usuario NESSE servidor (ver ChannelSidebar.jsx, mesmo padrao) - so' usado
-  // aqui pra decidir quem ve o botao de fixar mensagem (exige MANAGE_CHANNELS no backend).
   useEffect(() => {
     if (!channel?.serverId) {
       setMyServerPermissions(new Set());
@@ -232,8 +189,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     };
   }, [channel?.serverId]);
 
-  // Emojis customizados desse servidor (ver CustomEmojiModal.jsx) - usados tanto no texto
-  // (:nome: em markdown.jsx) quanto como opcao extra no picker de reacao rapida.
   useEffect(() => {
     if (!channel?.serverId) {
       setCustomEmojis({});
@@ -257,9 +212,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
         });
     }
     fetchEmojis();
-    // Sem isso, um emoji criado/apagado no CustomEmojiModal.jsx (modal separado, aberto pela
-    // sidebar) so' aparecia/sumia do picker e do :nome: depois de um F5 - esse efeito so' busca
-    // a lista uma vez, ao trocar de canal, e o modal nao tinha como avisar ele diretamente.
     function handleUpdated(e) {
       if (e.detail?.serverId === channel.serverId) fetchEmojis();
     }
@@ -284,15 +236,11 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     return () => sub.unsubscribe();
   }, [channel, stompClient, stompConnected]);
 
-  // "Fulano esta digitando..." - o servidor so' retransmite (sem estado nenhum la', ver
-  // ChatController.typing no backend), entao quem decide quando SUMIR sozinho e' o cliente:
-  // cada evento "typing: true" reseta um timer de alguns segundos, e some se nenhum outro
-  // chegar antes dele estourar (cobre o caso de alguem fechar a aba/cair no meio digitando).
   useEffect(() => {
     if (!channel || !stompClient || !stompConnected) return;
     const timers = typingTimersRef.current;
     const sub = subscribeToTyping(stompClient, channel.id, (event) => {
-      if (event.userId === user?.id) return; // nao mostra "eu mesmo digitando" pra mim
+      if (event.userId === user?.id) return;
       clearTimeout(timers.get(event.userId));
       if (event.typing) {
         setTypingUsers((prev) => {
@@ -323,17 +271,12 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       timers.forEach((t) => clearTimeout(t));
       timers.clear();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel, stompClient, stompConnected]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Campo de mensagem e' um <textarea> que cresce sozinho conforme o texto (ate' um limite,
-  // depois rola por dentro) - roda a cada mudanca do rascunho, inclusive quando ele e' limpo
-  // programaticamente depois de enviar (por isso e' um efeito, nao so' um onInput: o reset
-  // pra 1 linha precisa acontecer mesmo sem o usuario ter digitado nada naquele momento).
   useEffect(() => {
     const el = draftInputRef.current;
     if (!el) return;
@@ -342,7 +285,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
   }, [draft]);
 
   useEffect(() => {
-    // Libera a memoria do preview quando o componente desmonta ou a imagem pendente muda
     return () => {
       if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
     };
@@ -368,8 +310,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     });
   }
 
-  /** Video/audio/documento/qualquer coisa que NAO seja imagem - imagem continua no fluxo de
-   *  sempre (pendingImage), so' pra nao arriscar mexer no que ja' funciona. */
   function pickFile(file) {
     if (!file) return;
     if (file.type.startsWith("image/")) {
@@ -383,16 +323,14 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
 
   function handlePickImage(e) {
     pickFile(e.target.files?.[0]);
-    e.target.value = ""; // permite escolher o mesmo arquivo de novo depois
+    e.target.value = "";
   }
 
-  // Ctrl+V com uma imagem na area de transferencia so prepara o preview - o envio de
-  // verdade so acontece quando o usuario confirma (Enviar ou Enter), igual anexar arquivo.
   function handlePaste(e) {
     const items = e.clipboardData?.items;
     if (!items) return;
     const imageItem = [...items].find((it) => it.type.startsWith("image/"));
-    if (!imageItem) return; // deixa o paste normal (texto) acontecer
+    if (!imageItem) return;
     e.preventDefault();
     pickFile(imageItem.getAsFile());
   }
@@ -452,9 +390,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     });
   }
 
-  /** Insere o emoji escolhido no ponto do cursor (nao manda a mensagem sozinho - so' entra no
-   *  texto, igual :nome: digitado a mao, pra mandar como mensagem normal e nao so' como reacao,
-   *  pedido explicito do usuario). */
   function insertEmojiIntoDraft(emoji) {
     const input = draftInputRef.current;
     const caret = input?.selectionStart ?? draft.length;
@@ -468,8 +403,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     });
   }
 
-  /** Clique ou Tab/Enter numa sugestao do "/" - so' troca o draft (nunca envia sozinho, o
-   *  usuario ainda pode continuar digitando/editando antes de mandar de verdade). */
   function pickSlashItem(item) {
     setDraft(item.insert);
     setSlashIndex(0);
@@ -493,9 +426,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
         return;
       }
       if (e.key === "Tab" || (e.key === "Enter" && slashMenu.kind === "command")) {
-        // Enter so' auto-completa no estagio "escolhendo o comando" - no estagio da notacao do
-        // dado (ex: "/roll d2_"), Enter continua ENVIANDO de verdade (ja' e' uma notacao valida
-        // sozinha, tipo "d20"), so' Tab completa com a sugestao ali.
         e.preventDefault();
         pickSlashItem(slashMenu.items[slashIndex]);
         return;
@@ -526,9 +456,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
         return;
       }
     }
-    // Textarea de verdade insere quebra de linha no Enter por padrao (diferente do <input>
-    // de antes, que enviava sozinho) - Enter sozinho envia, Shift+Enter quebra linha, igual
-    // Discord/WhatsApp.
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend(e);
@@ -545,9 +472,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       publishTyping(stompClient, channel.id, false);
     }
 
-    // /poll ou /pollmulti Pergunta - cria a enquete SO' com a pergunta; voce (o criador) adiciona
-    // as opções depois, uma de cada vez, direto no card que aparece no chat (ver PollCard.jsx).
-    // /pollmulti permite votar em mais de uma opção ao mesmo tempo.
     const pollMatch = POLL_COMMAND_RE.exec(draft.trim());
     if (pollMatch) {
       const question = pollMatch[2].trim();
@@ -560,9 +484,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       return;
     }
 
-    // Comando /roll (ou /r) - "notação de mesa" (2d20+5, d6, 1d100-2) em vez de mandar uma
-    // mensagem normal. Validado aqui tambem (nao so' no backend, ver DiceService) pra avisar
-    // na hora se a notação estiver errada, em vez de a mensagem simplesmente nao aparecer.
     const rollMatch = ROLL_COMMAND_RE.exec(draft.trim());
     if (rollMatch) {
       const notation = rollMatch[1].trim();
@@ -575,9 +496,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       return;
     }
 
-    // /spotify (ou /spotify @alguem) - consulta o que essa pessoa esta' ouvindo AGORA e manda
-    // como mensagem normal pro chat (reaproveita "imageUrl" pra capa do album - e' so' uma URL
-    // do proprio Spotify, sem upload nenhum, mesmo caminho que colar uma imagem ja' usa).
     const spotifyMatch = SPOTIFY_COMMAND_RE.exec(draft.trim());
     if (spotifyMatch) {
       const targetUsername = spotifyMatch[1];
@@ -620,9 +538,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       return;
     }
 
-    // /play <link ou busca> - manda pro bot de musica TOCAR na call de voz em que o usuario
-    // esta agora (activeChannel), e avisa no canal de TEXTO atual (onde o comando foi digitado)
-    // com o titulo que o bot devolveu, igual um card de confirmacao.
     const playMatch = PLAY_COMMAND_RE.exec(draft.trim());
     if (playMatch) {
       if (!activeChannel) {
@@ -645,11 +560,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       return;
     }
 
-    // /fila - manda um card AO VIVO da fila de musica pro chat (ver MUSIC_QUEUE_MARKER_RE/
-    // MusicQueueCard.jsx). Abrir uma fila nova ENCERRA a anterior automaticamente no backend
-    // (nao precisa apagar na mao antes) - o queueId que ele devolve vai embutido no marcador da
-    // mensagem, e' assim que ESSE card sabe que e' o ATUAL (o card antigo, com o queueId velho,
-    // vai se trancar sozinho como "encerrada" ao perceber que um id diferente esta em uso agora).
     const filaMatch = FILA_COMMAND_RE.exec(draft.trim());
     if (filaMatch) {
       if (!activeChannel) {
@@ -671,7 +581,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       return;
     }
 
-    // /stop - para a musica que estiver tocando na call de voz atual.
     if (STOP_COMMAND_RE.test(draft.trim())) {
       if (!activeChannel) {
         showAlert("Você precisa estar conectado numa call de voz para parar a música");
@@ -690,9 +599,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       return;
     }
 
-    // /skip - pula pra proxima musica da fila (PUBLICO, qualquer um pode pular, nao so' quem
-    // pediu a musica atual - pedido explicito do usuario). Mesma acao do botão "Pular" dentro
-    // do MusicQueueCard.jsx.
     if (SKIP_COMMAND_RE.test(draft.trim())) {
       if (!activeChannel) {
         showAlert("Você precisa estar conectado numa call de voz para pular a música");
@@ -711,8 +617,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       return;
     }
 
-    // /pause e /continue - congelam/retomam a musica atual no ponto exato em que parou (nao e'
-    // a mesma coisa que mutar - ver comentario em music-bot/index.js pumpAudio).
     if (PAUSE_COMMAND_RE.test(draft.trim()) || CONTINUE_COMMAND_RE.test(draft.trim())) {
       const pausing = PAUSE_COMMAND_RE.test(draft.trim());
       if (!activeChannel) {
@@ -1073,10 +977,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                 )}
                 {canModify(m) && (
                   <>
-                    {/* Editar nao faz sentido numa rolagem de dado (resultado ja' sorteado), num
-                        card de fila (editar o marcador especial so' quebraria o card) nem numa
-                        enquete (opcoes ja' foram criadas) - so' da pra apagar os tres (ver
-                        DiceRollCard/MusicQueueCard/PollCard acima). */}
                     {!m.rollNotation && !m.poll && !MUSIC_QUEUE_MARKER_RE.test(m.content || "") && (
                       <button className="icon-btn" onClick={() => startEdit(m)} title="Editar mensagem">
                         <PencilIcon size={15} />
@@ -1149,20 +1049,12 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
       )}
 
       {channel.adminOnly && !isAdmin ? (
-        // Canal "so' admin posta" (ver Channel.adminOnly no backend, ex: "Atualizações") -
-        // todo mundo le normalmente, mas quem nao e' admin nem VE a caixa de escrever (o
-        // backend tambem recusa de verdade, ver MessageService.save - isso aqui e' so' pra
-        // nao nem mostrar um campo que sempre ia falhar).
         <div className="chat-readonly-notice">
           <MegaphoneIcon size={15} />
           Só administradores podem postar em #{channel.name}.
         </div>
       ) : (
         <form className="chat-input" onSubmit={handleSend}>
-          {/* Sem "accept" restrito - imagem continua no fluxo de sempre (pendingImage), video/
-              audio/documento/qualquer outra coisa vira anexo generico (pendingFile, ver
-              AttachmentMessage.jsx) - "video, arquivos, documentos, audios... e etcetera",
-              pedido explicito do usuario. */}
           <input type="file" ref={fileInputRef} onChange={handlePickImage} hidden />
           <button
             type="button"
@@ -1217,7 +1109,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                     key={item.key}
                     className={"mention-option slash-option" + (i === slashIndex ? " active" : "")}
                     onMouseDown={(e) => {
-                      e.preventDefault(); // nao deixa o input perder foco antes do clique registrar
+                      e.preventDefault();
                       pickSlashItem(item);
                     }}
                   >
@@ -1236,7 +1128,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                     key={m.userId}
                     className={"mention-option" + (i === mentionIndex ? " active" : "")}
                     onMouseDown={(e) => {
-                      e.preventDefault(); // nao deixa o input perder foco antes do clique registrar
+                      e.preventDefault();
                       pickMention(m.username);
                     }}
                   >

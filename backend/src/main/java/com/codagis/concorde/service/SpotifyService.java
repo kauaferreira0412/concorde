@@ -27,23 +27,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-/**
- * Integracao com o Spotify ("ouvindo Spotify" na lista de membros/perfil, ver
- * SpotifyController) - fluxo OAuth "Authorization Code" padrao:
- *  1. authorizeUrl() gera um link pro usuario autorizar no proprio site do Spotify (com um
- *     "state" aleatorio de uso unico, guardado aqui em memoria por alguns minutos - e' o que
- *     liga o redirect de volta, que chega SEM nenhum jeito de identificar o usuario Concorde
- *     por conta propria, de volta ao userId certo).
- *  2. handleCallback() troca o "code" que o Spotify manda de volta por um access_token (dura
- *     ~1h) e um refresh_token (nao expira, so' se o usuario revogar o acesso no proprio
- *     Spotify) - guarda os dois em SpotifyAccount.
- *  3. nowPlaying() usa o access_token pra perguntar ao Spotify "o que essa pessoa esta' ouvindo
- *     agora" - renova sozinho com o refresh_token quando o access_token esta' perto de expirar,
- *     sem o usuario precisar autorizar de novo.
- *
- * So' guarda o token de quem CONECTOU (opt-in explicito, ver ConnectSpotifyCard.jsx em
- * Configuracoes) - ninguem tem a musica de ninguem exposta sem ter clicado em "Conectar".
- */
 @Service
 public class SpotifyService {
 
@@ -52,19 +35,9 @@ public class SpotifyService {
     private static final String NOW_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing";
     private static final String TRACK_URL = "https://api.spotify.com/v1/tracks/";
     private static final String SCOPE = "user-read-currently-playing user-read-playback-state";
-    // Link de uma FAIXA do Spotify (site normal "open.spotify.com/track/<id>", com ou sem
-    // "intl-xx/" no meio e "?si=..." no final, ou o URI "spotify:track:<id>") - pedido
-    // explicito do usuario: "colar o link da musica" no /play do bot. So' pega o ID, o resto
-    // (titulo/artista) vem da API (ver resolveIfSpotifyTrack abaixo).
     private static final Pattern SPOTIFY_TRACK_PATTERN =
             Pattern.compile("(?:open\\.spotify\\.com/(?:intl-\\w+/)?track/|spotify:track:)([a-zA-Z0-9]+)");
-    // Cache curto do "tocando agora" - evita bater no Spotify de novo pra cada membro em cada
-    // poll da lista de membros (varias pessoas olhando a mesma lista ao mesmo tempo, cada
-    // frontend perguntando a cada ~15s - ver useSpotifyNowPlaying.js). 8s e' curto o suficiente
-    // pra parecer "ao vivo", mas corta a maior parte das chamadas repetidas.
     private static final long CACHE_TTL_MILLIS = 8_000;
-    // "state" de autorizacao pendente - de uso UNICO (removido assim que o callback chega) e
-    // expira sozinho depois de um tempo, pro caso do usuario abrir o link e nunca completar.
     private static final long PENDING_STATE_TTL_MILLIS = 10 * 60 * 1000;
 
     private final SpotifyAccountRepository accountRepository;
@@ -75,12 +48,6 @@ public class SpotifyService {
 
     private final Map<String, PendingState> pendingStates = new ConcurrentHashMap<>();
     private final Map<Long, CachedNowPlaying> nowPlayingCache = new ConcurrentHashMap<>();
-    // Token do APP em si (Client Credentials, RFC 6749 4.4) - diferente do access_token de
-    // CADA usuario (Authorization Code, usado no resto da classe). Serve so' pra ler dado
-    // PUBLICO do catalogo (nome/artista de uma faixa, ver resolveIfSpotifyTrack) - nao precisa
-    // de NENHUM usuario ter autorizado nada, e por isso nao esbarra no limite de 25 contas do
-    // modo "Development" do app (esse limite e' so' pra API que le' o que uma PESSOA especifica
-    // esta' ouvindo, nao pra consultar o catalogo publico).
     private volatile CachedAppToken appToken;
 
     public SpotifyService(SpotifyAccountRepository accountRepository,
@@ -120,8 +87,6 @@ public class SpotifyService {
                 + "&state=" + encode(state);
     }
 
-    /** Troca o "code" do Spotify pelos tokens e salva - devolve o userId Concorde pra quem
-     *  chamou (SpotifyController) poder mostrar a pagina de sucesso certa. */
     public Long handleCallback(String code, String state) {
         PendingState pending = state == null ? null : pendingStates.remove(state);
         if (pending == null || pending.expiresAtMillis < System.currentTimeMillis()) {
@@ -157,10 +122,6 @@ public class SpotifyService {
         return result;
     }
 
-    /** Mesma coisa que nowPlaying(), so' que pra varios usuarios de uma vez (ver
-     *  MemberList/ProfileModal no frontend, que preferem UMA chamada em lote a uma por membro
-     *  visivel). So' devolve quem esta' CONECTADO E TOCANDO algo agora - o resto nem entra no
-     *  mapa, pra a resposta ficar pequena. */
     public Map<Long, NowPlaying> nowPlayingBatch(Set<Long> userIds) {
         return userIds.stream()
                 .map(id -> Map.entry(id, nowPlaying(id)))
@@ -168,12 +129,6 @@ public class SpotifyService {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
-    /** Se "text" for um link (ou URI) de uma FAIXA do Spotify, devolve "Artista - Nome da
-     *  Música" pronta pra buscar no YouTube (pedido explicito do usuario: "colar o link da
-     *  música... o bot deve pegar, ver qual é o título... e pesquisar no YouTube"). Se nao for
-     *  um link do Spotify, devolve null (quem chamou usa o texto original como estava). Usa o
-     *  token do APP (client_credentials), NAO precisa de nenhum usuario ter conectado a propria
-     *  conta - funciona pra qualquer link, mesmo com o app do Spotify em modo "Development". */
     public String resolveIfSpotifyTrack(String text) {
         if (text == null) return null;
         Matcher matcher = SPOTIFY_TRACK_PATTERN.matcher(text);
@@ -203,8 +158,6 @@ public class SpotifyService {
         }
     }
 
-    /** Token do APP (client_credentials) com cache - dura 1h, renova sozinho um pouco antes de
-     *  expirar (mesma folga de 60s de ensureValidToken, pelo mesmo motivo). */
     private synchronized String appAccessToken() {
         if (appToken != null && appToken.expiresAt.isAfter(Instant.now().plusSeconds(60))) {
             return appToken.accessToken;
@@ -224,8 +177,6 @@ public class SpotifyService {
         try {
             accessToken = ensureValidToken(account);
         } catch (RestClientException e) {
-            // Refresh falhou (provavelmente o usuario revogou o acesso pelo lado do Spotify) -
-            // desconecta de vez em vez de ficar tentando (e falhando) pra sempre.
             accountRepository.deleteByUserId(userId);
             return NowPlaying.notConnected();
         }
@@ -271,10 +222,6 @@ public class SpotifyService {
                 progressMs == null ? null : progressMs.intValue(), durationMs == null ? null : durationMs.intValue());
     }
 
-    /** Renova o access_token se ele ja' expirou (ou esta' a menos de 1 minuto de expirar, pra
-     *  nao correr risco de expirar NO MEIO da chamada seguinte) - refresh_token nao muda nesse
-     *  processo (o Spotify pode devolver um novo, mas normalmente nao, e o antigo continua
-     *  valendo se nao vier). */
     private String ensureValidToken(SpotifyAccount account) {
         if (account.getExpiresAt().isAfter(Instant.now().plusSeconds(60))) {
             return account.getAccessToken();
@@ -319,9 +266,6 @@ public class SpotifyService {
         pendingStates.entrySet().removeIf(e -> e.getValue().expiresAtMillis < now);
     }
 
-    // URLEncoder.encode() vira espaco em "+" (application/x-www-form-urlencoded) - troca por
-    // "%20" (padrao de verdade de query string) so' pra evitar qualquer ambiguidade do lado do
-    // Spotify, so' o "scope" (com espaco separando os escopos) e' afetado na pratica.
     private static String encode(String value) {
         return java.net.URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }

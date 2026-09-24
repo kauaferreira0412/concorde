@@ -1,9 +1,3 @@
-/**
- * Icone set minimalista (estilo "linha fina", inspirado em Feather/Lucide) usado em toda
- * a UI no lugar de emoji - emoji renderiza com estilo/tamanho inconsistente entre SO e
- * navegador, o que fica "amador"; SVG com stroke="currentColor" herda a cor do botao
- * (inclusive nos estados hover/ativo/perigo) e fica nitido em qualquer resolução.
- */
 const base = {
   viewBox: "0 0 24 24",
   fill: "none",
@@ -83,12 +77,6 @@ export function PhoneOffIcon(props) {
   );
 }
 
-/**
- * Icone de "encerrar chamada" - o telefone risco (PhoneOffIcon) e' ambiguo (parece so'
- * "sem telefone"/silenciado). Esse aqui e' o desenho universal de "desligar" usado por
- * Discord/Zoom/Meet: um bocal de telefone preenchido, na diagonal - reconhecivel de cara
- * mesmo pequeno, por isso e' preenchido (fill) em vez de traco fino como o resto do set.
- */
 export function HangUpIcon(props) {
   return (
     <svg
@@ -142,8 +130,6 @@ export function MaximizeIcon(props) {
   );
 }
 
-/** "Ampliar" (modo largo/teatro) - estagio intermediario antes da tela cheia de verdade,
-    ocupa a largura toda da area central sem sair da pagina. */
 export function WidenIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
@@ -430,8 +416,6 @@ export function AlertTriangleIcon(props) {
   );
 }
 
-/** Canal "Atualizações" (so' admin posta, ver ChannelSidebar/ChatWindow) - megafone em vez
- *  do # normal de canal de texto, deixa claro de cara que e' um canal diferente. */
 export function MegaphoneIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
@@ -441,8 +425,6 @@ export function MegaphoneIcon(props) {
   );
 }
 
-/** Fila de musica (MusicQueueCard.jsx) - nota musical, no lugar do emoji "🎵" que tinha antes
- *  (mesmo motivo do resto desse arquivo: emoji renderiza inconsistente entre SO/navegador). */
 export function MusicNoteIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
@@ -453,8 +435,6 @@ export function MusicNoteIcon(props) {
   );
 }
 
-/** Botao "Pular" da fila (MusicQueueCard.jsx) - icone de "proxima faixa" de player de musica
- *  de verdade (barra + triangulo), no lugar do ChevronsRightIcon generico que tinha antes. */
 export function SkipForwardIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
@@ -524,8 +504,6 @@ export function BarChartIcon(props) {
   );
 }
 
-// Balaozinho de chat - usado na Home (ver FriendsPanel.jsx) pro botao "mandar mensagem" de um
-// amigo, e na lista de conversas diretas (pages/home).
 export function MessageSquareIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
@@ -534,8 +512,6 @@ export function MessageSquareIcon(props) {
   );
 }
 
-// Folha de documento com a pontinha dobrada - card de anexo generico no chat (video/documento/
-// audio que nao seja imagem, ver AttachmentMessage.jsx).
 export function FileIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
@@ -545,8 +521,6 @@ export function FileIcon(props) {
   );
 }
 
-// Circulo com uma barra na diagonal ("proibido") - usado pra bloquear/desbloquear usuario (ver
-// FriendsPanel.jsx).
 export function BlockIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
@@ -556,7 +530,6 @@ export function BlockIcon(props) {
   );
 }
 
-// Mapa dobrado (kit de RPG - mapa de batalha, ver BattleMap.jsx).
 export function MapIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
@@ -567,7 +540,6 @@ export function MapIcon(props) {
   );
 }
 
-// Um pin de mapa (kit de RPG - token/marcador no mapa de batalha, ver BattleMap.jsx).
 export function MapPinIcon(props) {
   return (
     <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>

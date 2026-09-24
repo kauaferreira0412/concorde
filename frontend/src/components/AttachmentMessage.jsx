@@ -1,14 +1,6 @@
 import { DownloadIcon, FileIcon } from "./icons.jsx";
 import { formatFileSize } from "../utils/fileSize";
 
-/**
- * Renderiza o anexo GENERICO de uma mensagem (video/audio/documento/qualquer arquivo - ver
- * fileUrl/fileName/fileType em Message.java/DirectMessage.java) - separado do fluxo de imagem
- * (m.imageUrl continua exatamente como estava, com preview+lightbox, ver ChatWindow.jsx). Video
- * e audio tocam INLINE (elemento nativo do navegador, com controles); qualquer outro tipo vira
- * um cartao com icone+nome+tamanho+link de abrir. Usado tanto no chat de servidor quanto no
- * privado (mesmo card nos dois, "mesmas caracteristicas" pedido pelo usuario).
- */
 export default function AttachmentMessage({ url, name, type, size }) {
   if (!url) return null;
   const kind = (type || "").split("/")[0];

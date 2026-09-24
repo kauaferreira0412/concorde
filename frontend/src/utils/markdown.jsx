@@ -1,15 +1,3 @@
-/**
- * Markdown "estilo Discord" pras mensagens do chat - so' o subconjunto comum (negrito, italico,
- * sublinhado, tachado, codigo, blocos de codigo, citacao, listas, titulos, links) - nao e' um
- * CommonMark completo de proposito, e' so' o que faz sentido numa mensagem de chat curta.
- *
- * SEMPRE renderiza pra nos React (nunca HTML cru/dangerouslySetInnerHTML) - o texto de um
- * participante nunca vira HTML de verdade, so' elementos React comuns, que o proprio React ja
- * escapa. Isso e' o que torna isso seguro contra XSS sem precisar de nenhuma biblioteca de
- * sanitizacao por cima.
- */
-
-/** Quebra o conteudo em blocos (paragrafo, lista, citacao, bloco de codigo, titulo). */
 export function parseMarkdownBlocks(content) {
   const lines = (content || "").split("\n");
   const blocks = [];
@@ -24,7 +12,7 @@ export function parseMarkdownBlocks(content) {
         codeLines.push(lines[i]);
         i++;
       }
-      i++; // pula o ``` de fechamento (se existir - mensagem pode ter esquecido de fechar)
+      i++;
       blocks.push({ type: "code", text: codeLines.join("\n") });
       continue;
     }
@@ -71,7 +59,6 @@ export function parseMarkdownBlocks(content) {
       continue;
     }
 
-    // Paragrafo: junta linhas seguidas ate' bater numa linha em branco ou num bloco especial.
     const paraLines = [];
     while (i < lines.length && lines[i].trim() !== "" && !/^```|^#{1,3}\s|^>\s?|^[-*]\s+|^\d+\.\s+/.test(lines[i])) {
       paraLines.push(lines[i]);
@@ -82,16 +69,9 @@ export function parseMarkdownBlocks(content) {
   return blocks;
 }
 
-// Fonte da regex de tokens inline (SEM o "g" aqui) - so' vira RegExp de verdade dentro de
-// renderInline, uma instancia NOVA a cada chamada (ver comentario la' embaixo pro motivo).
 const INLINE_SOURCE =
   "`(?<code>[^`\\n]+)`|\\*\\*(?<bold>[^*\\n]+)\\*\\*|__(?<underline>[^_\\n]+)__|~~(?<strike>[^~\\n]+)~~|\\*(?<italic1>[^*\\n]+)\\*|_(?<italic2>[^_\\n]+)_|\\[(?<linktext>[^\\]\\n]+)\\]\\((?<linkurl>https?:\\/\\/[^\\s)]+)\\)|(?<autolink>https?:\\/\\/[^\\s<]+)|@(?<mention>\\w+)|:(?<emoji>[a-z0-9_]{2,30}):";
 
-/**
- * Formatacao inline (dentro de um paragrafo/item de lista/citacao) - negrito, italico,
- * sublinhado, tachado, codigo, links e @mencoes, tudo na mesma passada. `\n` simples vira
- * quebra de linha (<br/>).
- */
 export function renderInline(text, { memberUsernames = [], myUsername, members = [], openProfile, customEmojis = {} } = {}, keyPrefix = "") {
   const knownMembers = new Set(memberUsernames.map((u) => u.toLowerCase()));
   const lines = (text || "").split("\n");
@@ -103,12 +83,6 @@ export function renderInline(text, { memberUsernames = [], myUsername, members =
     let lastIndex = 0;
     let match;
     let tokenIdx = 0;
-    // Regex com flag "g" e' STATEFUL (lastIndex) - uma instancia compartilhada quebrava aqui
-    // porque renderInline chama a SI MESMA (pra formatacao dentro de **negrito**, __sublinhado__
-    // etc): a chamada recursiva reusava o mesmo objeto de regex e bagunçava o lastIndex da
-    // chamada de FORA no meio da propria iteracao dela, as vezes travando num loop que nunca
-    // avancava - trava a aba inteira (bug reportado: app trava 100% ao mandar markdown).
-    // Instancia NOVA a cada chamada = cada nivel de recursao tem seu proprio estado, isolado.
     const re = new RegExp(INLINE_SOURCE, "g");
     while ((match = re.exec(line))) {
       if (match.index > lastIndex) out.push(line.slice(lastIndex, match.index));
@@ -160,9 +134,6 @@ export function renderInline(text, { memberUsernames = [], myUsername, members =
         }
       }
       lastIndex = match.index + match[0].length;
-      // Reforco: nenhuma das alternativas hoje pode casar string vazia, mas se um dia alguem
-      // mexer na regex e introduzir uma, isso evita o mesmo tipo de loop infinito de novo -
-      // forca o ponteiro a andar pelo menos 1 caractere sempre.
       if (match[0].length === 0) re.lastIndex++;
     }
     if (lastIndex < line.length) out.push(line.slice(lastIndex));

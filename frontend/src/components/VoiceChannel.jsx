@@ -26,33 +26,13 @@ import CameraPipWindow from "./CameraPipWindow.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import SoundboardPanel from "./SoundboardPanel.jsx";
 
-// window.concordeDesktop so' existe dentro do app Electron (ver electron/preload.cjs). A janela
-// separada das cameras usa Document Picture-in-Picture (CameraPipWindow.jsx) NO NAVEGADOR - mas
-// essa API depende de integracao com a "casca" de navegador de verdade (abas, gerenciador de
-// janelas) que o Electron simplesmente NAO tem (ele empacota so' o motor Chromium, sem o Chrome
-// em si por cima) - o objeto ate' existe no "window" (nao da pra checar por feature-detection
-// comum), mas o pedido de janela nunca resolve nem rejeita, so' fica pendurado pra sempre
-// (reportado: "clico, pisca e nao aparece nada" - so' no app desktop, no navegador funciona).
-// Dentro do Electron a gente abre uma janela DE VERDADE do proprio Electron em vez disso (ver
-// window.concordeDesktop.openCameraPip/CameraPipPage.jsx) - como e' um PROCESSO separado, nao
-// enxerga os tracks de video da janela principal, entao ela entra na MESMA sala do LiveKit por
-// conta propria so' pra assistir (token "hidden", ver VoiceController.getCameraViewerToken).
 const isElectronDesktop = typeof window !== "undefined" && !!window.concordeDesktop;
 
-// Tamanhos disponiveis pro tile de webcam - "size" vira uma classe CSS (.camera-tile-<size>,
-// ver global.css). Comeca em "md" (tamanho de antes), dá pra aumentar/diminuir pelos botoes
-// no cabecalho da secao (afeta TODOS os tiles de uma vez, ver CAMERA_SIZES/cameraSize abaixo).
 const CAMERA_SIZES = ["sm", "md", "lg", "xl"];
 
-// Quantidade de barrinhas do medidor de microfone (estilo equalizador) - puramente visual,
-// so' controla a resolucao do "preenchimento" (ver mic-meter-segments em VoiceChannel).
 const MIC_SEGMENT_COUNT = 40;
 const MIC_SEGMENTS = Array.from({ length: MIC_SEGMENT_COUNT }, (_, i) => i);
 
-/** true so' quando ESSE elemento especifico (nao qualquer um) esta em tela cheia agora -
- *  varios tiles podem entrar em tela cheia em momentos diferentes, cada um com seu proprio
- *  botao (ver ScreenShareTile) - por isso escuta fullscreenchange e compara com o proprio ref,
- *  em vez de um estado global unico. */
 function useIsThisElementFullscreen(elRef) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
@@ -65,12 +45,6 @@ function useIsThisElementFullscreen(elRef) {
   return isFullscreen;
 }
 
-/**
- * "Facepile" flutuante que aparece POR CIMA de uma tela compartilhada em tela cheia - igual o
- * Discord: cada pessoa na call vira um circulo (a propria camera, se estiver ligada, senao o
- * avatar), com um anel verde quando esta falando. Escondida por padrao mesmo em tela cheia -
- * um botao (UsersIcon) no canto liga/desliga ela na hora, sem sair da tela cheia.
- */
 function FullscreenParticipantStrip({ participants, cameraTracks, speakingIds }) {
   const cameraByIdentity = new Map(cameraTracks.map((c) => [c.identity, c]));
   return (
@@ -93,8 +67,6 @@ function FullscreenParticipantStrip({ participants, cameraTracks, speakingIds })
   );
 }
 
-/** Camera de alguem dentro do facepile - tile pequeno e redondo em vez do retangulo normal
- *  (ver CameraTile), so' pra caber no anel junto com os avatares de quem nao tem camera. */
 function FullscreenParticipantCamera({ track, isLocal }) {
   const videoRef = useRef(null);
   useEffect(() => {
@@ -106,9 +78,6 @@ function FullscreenParticipantCamera({ track, isLocal }) {
   return <video ref={videoRef} autoPlay playsInline muted={isLocal} className="fullscreen-participant-avatar" />;
 }
 
-/** Cabecalho do canal de voz - nome, subtitulo "Canal de voz · Servidor", badge de "TEMPO
- *  REAL" enquanto conectado. Sem "facepile" de iniciais aqui (pedido do usuario pra tirar) -
- *  quem esta na call ja aparece na lista de participantes logo abaixo. */
 function VoiceHeader({ channel, serverName, live }) {
   return (
     <div className="chat-header chat-header-voice">
@@ -137,10 +106,6 @@ function VoiceHeader({ channel, serverName, live }) {
   );
 }
 
-/** Um tile de webcam (sua ou de outro participante) - anexa/solta o track de video do
- *  LiveKit num <video> proprio conforme o componente monta/desmonta (mesmo padrao usado
- *  pra tela compartilhada, so' que aqui varios tiles ficam visiveis ao mesmo tempo). Cada
- *  tile tem seu proprio botao de "tela cheia" (Fullscreen API), independente dos outros. */
 function CameraTile({ track, name, isLocal, size }) {
   const videoRef = useRef(null);
 
@@ -168,21 +133,6 @@ function CameraTile({ track, name, isLocal, size }) {
   );
 }
 
-/**
- * Um quadrado por transmissao de tela ativa. Enquanto ninguem escolheu assistir aquela
- * transmissao especifica (isLocal e' sempre "assistida", e' a sua propria - quem compartilha
- * ve a propria previa do MESMO jeito que quem esta assistindo, pedido explicito do usuario),
- * o quadrado fica num tamanho pequeno e fixo (so' um "escolher" clicavel, com o nome de quem
- * compartilha no centro) - clicar nele e' o unico jeito de comecar a baixar aquele video (ver
- * toggleWatchScreenShare/watchedShareIdentitiesRef no VoiceCallContext). Assistindo, o tile usa
- * um tamanho fixo (bem maior que o de camera) OU o tamanho de "modo teatro" (ver theaterMode em
- * VoiceChannel) - sem zoom manual, so' esses dois estados. Botao direito (so' em transmissao de
- * outra pessoa que voce esta assistindo) abre o controle de volume do audio dela - mesmo padrao
- * do botao direito num participante na sidebar (ver onVolumeMenu/VolumeSlider em VoiceChannel).
- * Em tela cheia, ganha o facepile flutuante da call (ver FullscreenParticipantStrip) - por
- * isso "tela cheia" aqui fulscreena o CONTAINER (essa div toda), nao so' o <video> sozinho:
- * um <video> em tela cheia so' pode mostrar o proprio video, nada por cima dele.
- */
 function ScreenShareTile({
   share,
   theaterMode,
@@ -202,11 +152,6 @@ function ScreenShareTile({
   const watchersRef = useRef(null);
   const fps = useTrackFps(share.track);
 
-  // Previa da PROPRIA transmissao (isLocal) so' fica ligada enquanto o Concorde esta em foco -
-  // com o usuario mexendo em outro app/aba, ninguem esta olhando essa previa mesmo, entao
-  // desanexar o track evita o navegador continuar decodificando/desenhando esse video a toa
-  // (pedido explicito do usuario: economizar recurso de processamento). A transmissao em SI
-  // continua indo normal pra quem esta assistindo do outro lado - so' a previa local pausa.
   const appFocused = useAppFocused();
   const previewPaused = share.isLocal && !appFocused;
 
@@ -217,8 +162,6 @@ function ScreenShareTile({
     return () => share.track.detach(el);
   }, [share.track, previewPaused]);
 
-  // Fecha o popover de "quem esta vendo" ao clicar em qualquer lugar fora dele - mesmo padrao
-  // do menu de canal (ver ChannelSidebar.jsx).
   useEffect(() => {
     if (!watchersOpen) return;
     function handlePointerDown(e) {
@@ -337,9 +280,6 @@ function ScreenShareTile({
 
       {isFullscreen && (
         <>
-          {/* Igual o Discord: botao pra ligar/desligar o facepile por cima do video, sem sair
-              da tela cheia - escondido por padrao mesmo em tela cheia (pedido explicito do
-              usuario: "clicou, aparece a sobreposição; clicou de novo, some"). */}
           <button
             type="button"
             className={"fullscreen-overlay-toggle" + (overlayVisible ? " active" : "")}
@@ -357,11 +297,6 @@ function ScreenShareTile({
   );
 }
 
-/**
- * Vista de UM canal de voz. A conexao em si (LiveKit) vive no VoiceCallContext, entao
- * ela sobrevive mesmo se voce sair desse canal para ler um canal de texto - igual ao
- * Discord, que te mantem na call enquanto voce navega pelo servidor.
- */
 export default function VoiceChannel({ channel, serverName, stompClient, stompConnected }) {
   const { showAlert } = useAlert();
   const {
@@ -381,16 +316,11 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
     setStreamVolume,
     joinChannel,
   } = useVoiceCall();
-  // Hoje nao existe permissao por canal (todo membro do servidor ve todos os canais - ver
-  // README), entao "quem tem acesso a esse canal de voz" = todo membro do servidor.
   const members = useServerMembers(channel.serverId, stompClient, stompConnected);
 
   const isThisChannelActive = connected && activeChannel?.id === channel.id;
 
-  // Popover de volume do audio da transmissao de tela - abre no botao direito em cima de uma
-  // tela de OUTRA pessoa que voce esta assistindo (ver ScreenShareTile), mesmo padrao do botao
-  // direito num participante na sidebar (ver ChannelSidebar.jsx).
-  const [volumeMenu, setVolumeMenu] = useState(null); // { participantIdentity, name, x, y }
+  const [volumeMenu, setVolumeMenu] = useState(null);
   const volumeMenuRef = useRef(null);
 
   function openVolumeMenu(e, share) {
@@ -413,24 +343,11 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
     };
   }, [volumeMenu]);
 
-  // Indice em CAMERA_SIZES - comeca no "md" (index 1, tamanho de antes). Afeta todos os
-  // tiles de webcam de uma vez (ver botoes +/- no cabecalho da secao CÂMERAS).
   const [cameraSizeIdx, setCameraSizeIdx] = useState(1);
   const cameraSize = CAMERA_SIZES[cameraSizeIdx];
-  // Janela separada so' com as cameras - pedido explicito do usuario: ver as cameras maiores,
-  // lado a lado, numa janela DE VERDADE. No navegador usa Document Picture-in-Picture (ver
-  // CameraPipWindow.jsx, gerido por "cameraPipOpen" - liga/desliga no mesmo clique). No app
-  // desktop abre uma BrowserWindow de verdade do Electron por IPC (ver
-  // window.concordeDesktop.openCameraPip/CameraPipPage.jsx) - essa janela se vira sozinha
-  // (processo separado, com seu proprio ciclo de vida), entao o clique aqui e' so' UMA ACAO
-  // ("abrir/focar"), sem precisar de estado nenhum de "aberta ou nao" desse lado.
   const [cameraPipOpen, setCameraPipOpen] = useState(false);
   const cameraPipSupported = isElectronDesktop || (typeof window !== "undefined" && "documentPictureInPicture" in window);
   const { token } = useAuth();
-  // Sem camera nenhuma ligada, a secao inteira some (ver "cameraTracks.length > 0" abaixo) -
-  // sem isso aqui, se alguem ligasse a camera de novo depois, a secao voltaria tentando reabrir
-  // o PiP do navegador sozinha (sem clique nenhum da pessoa), e ele rejeita isso
-  // (documentPictureInPicture exige um gesto do usuario) - melhor so' resetar nesse meio-tempo.
   useEffect(() => {
     if (cameraTracks.length === 0) setCameraPipOpen(false);
   }, [cameraTracks.length]);
@@ -443,9 +360,6 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
     }
   }
 
-  // "Modo teatro" - POR TELA (um Set de sids), nao um botao global: ativar/desativar numa
-  // transmissao nao deve mexer nas outras (bug relatado: parar de assistir uma tirava o modo
-  // teatro de TODAS). So' dois tamanhos por tile (normal ou bem maior), sem zoom manual.
   const [theaterSids, setTheaterSids] = useState(() => new Set());
   const screenshareSectionRef = useRef(null);
 
@@ -458,8 +372,6 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
     });
   }, []);
 
-  // Limpa sids que pararam de ser assistidos (parou de assistir, ou a pessoa parou de
-  // compartilhar de vez) - senao "modo teatro" ficava "lembrado" preso pra um sid morto.
   useEffect(() => {
     setTheaterSids((prev) => {
       if (prev.size === 0) return prev;
@@ -625,11 +537,6 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
               <p>Ninguém está compartilhando a tela agora.</p>
             </div>
           ) : (
-            // Um quadrado por transmissao - quem nao e' voce so' vira video de verdade depois
-            // que voce clica pra entrar naquela transmissao especifica (ver ScreenShareTile
-            // acima); os que ja estao sendo assistidos (inclusive a sua propria, se estiver
-            // compartilhando) usam o tamanho normal ou o de "modo teatro" (POR TELA, ver
-            // theaterSids acima) - sem zoom manual.
             <div className="camera-grid" ref={screenshareSectionRef}>
               {screenShares.map((s) => (
                 <ScreenShareTile
@@ -675,11 +582,6 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
   );
 }
 
-/**
- * "Quem tem acesso a esse canal" - hoje e' o mesmo que "membros do servidor" (nao existe
- * permissao por canal ainda, ver README), com o status ao vivo de cada um. Aparece tanto
- * antes de entrar na call quanto durante ela.
- */
 function ChannelAccessSection({ members }) {
   if (members.length === 0) return null;
   return (

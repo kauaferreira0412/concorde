@@ -4,8 +4,6 @@ import { useServerMembers } from "../utils/useServerMembers";
 import { PencilIcon, TrashIcon, XIcon } from "./icons.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 
-/** Catalogo fixo de permissoes (bate com ServerPermission.java) - so' o rotulo em
- *  portugues e' definido aqui, o valor em si e' o que o backend espera de volta. */
 const PERMISSIONS = [
   { value: "MOVE_MEMBERS", label: "Mover membros entre calls" },
   { value: "MUTE_MEMBERS", label: "Mutar/desmutar membros à força" },
@@ -18,7 +16,6 @@ const PERMISSIONS = [
   { value: "VIEW_AUDIT_LOG", label: "Ver o log de auditoria (quem fez o quê)" },
 ];
 
-/** Formulario de criar/editar um Perfil - nome + quais permissoes ele carrega. */
 function RoleForm({ initial, onCancel, onSave, saving, error }) {
   const [name, setName] = useState(initial?.name || "");
   const [permissions, setPermissions] = useState(new Set(initial?.permissions || []));
@@ -63,12 +60,6 @@ function RoleForm({ initial, onCancel, onSave, saving, error }) {
   );
 }
 
-/**
- * Gerenciar Perfis do servidor (criar/editar/apagar - "roles" no sentido Discord) e
- * atribui-los a membros. So' aparece o botão que abre isso pra quem tem MANAGE_ROLES (ou
- * é dono/ADMIN) - ver ChannelSidebar.jsx. O backend confere a permissão de novo em cada
- * chamada, então mesmo sem o botão aparecer, ninguém sem permissão consegue nada por aqui.
- */
 export default function ServerRolesModal({ server, stompClient, stompConnected, onClose }) {
   const [roles, setRoles] = useState([]);
   const [loadError, setLoadError] = useState("");
@@ -95,7 +86,6 @@ export default function ServerRolesModal({ server, stompClient, stompConnected, 
 
   useEffect(() => {
     loadRoles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [server.id]);
 
   useEffect(() => {

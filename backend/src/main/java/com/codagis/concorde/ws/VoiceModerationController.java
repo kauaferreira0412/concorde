@@ -54,8 +54,6 @@ public class VoiceModerationController {
         return targetUserId != null && targetUserId.equals(-channelId);
     }
 
-    // Batera (bot do soundboard) - mesmo esquema de userId "falso" do VoicePresenceService
-    // (soundboardBotUserId), participante SEPARADO do Melodion no LiveKit.
     private static final long SOUNDBOARD_BOT_OFFSET = 1_000_000_000L;
 
     private boolean isSoundboardBot(Long channelId, Long targetUserId) {

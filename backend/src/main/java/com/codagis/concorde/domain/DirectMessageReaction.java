@@ -5,9 +5,6 @@ import lombok.*;
 
 import java.time.Instant;
 
-// Reacao numa DirectMessage - mesma forma da MessageReaction de servidor (ver
-// MessageReaction.java), entidade separada pelo mesmo motivo de DirectMessage: um messageId de
-// DM nunca deve poder ser confundido com um messageId de servidor na hora de agrupar reacoes.
 @Entity
 @Table(name = "direct_message_reactions", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"messageId", "userId", "emoji"})

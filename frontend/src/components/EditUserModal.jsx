@@ -1,7 +1,6 @@
 import { useState } from "react";
 import api from "../api/client";
 
-/** ADMIN edita username/email/cargo/senha de uma conta. Senha em branco = mantem a atual. */
 export default function EditUserModal({ user, onClose, onSaved }) {
   const [username, setUsername] = useState(user.username);
   const [email, setEmail] = useState(user.email);

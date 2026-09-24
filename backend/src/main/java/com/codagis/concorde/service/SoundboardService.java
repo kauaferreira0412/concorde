@@ -63,11 +63,6 @@ public class SoundboardService {
         return clip;
     }
 
-    /**
-     * Manda a lista atualizada pra TODAS as sessoes WebSocket abertas desse usuario ao mesmo
-     * tempo (web + app desktop, por exemplo) - sem isso, subir/apagar um som so' refletia na
-     * aba/janela onde a acao aconteceu; as outras so' viam a mudanca reabrindo o painel.
-     */
     private void broadcastList(Long userId) {
         messagingTemplate.convertAndSendToUser(String.valueOf(userId), "/queue/soundboard", listMyClips(userId));
     }

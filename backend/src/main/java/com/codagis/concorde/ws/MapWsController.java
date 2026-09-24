@@ -15,13 +15,6 @@ import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
 
-/**
- * Tokens/pins do mapa de batalha - mover é o que precisa ser "ao vivo" de verdade (pedido
- * explicito do usuario), por isso é WebSocket (não REST) igual o resto do chat em tempo real
- * (ver ChatController, mesmo padrão - inclusive o tokenId vai no CORPO da mensagem, não no
- * destino STOMP, igual ToggleReactionRequest/PinMessageRequest ja' fazem). Upload da imagem do
- * mapa em si é REST, ver MapController (precisa de multipart/StorageService).
- */
 @Controller
 public class MapWsController {
 
@@ -43,8 +36,6 @@ public class MapWsController {
         }
     }
 
-    // Publicado com throttle do lado do frontend enquanto arrasta (ver BattleMap.jsx) - sem
-    // isso, um arraste de 1s vira dezenas de mensagens WS por segundo.
     @MessageMapping("/channel.{channelId}.map.token.move")
     public void moveToken(@DestinationVariable Long channelId, MoveTokenRequest payload, Principal principal) {
         try {

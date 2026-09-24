@@ -37,9 +37,6 @@ public class AttachmentController {
         return new AttachmentResponse(url);
     }
 
-    // Anexo generico (video, documento, audio - inclusive mensagem de voz gravada) - endpoint
-    // NOVO e SEPARADO do de imagem acima, pra nao arriscar mexer no fluxo de imagem que ja'
-    // funciona (ver StorageService.uploadAttachment pro porque de nao ter lista fechada de tipos).
     @PostMapping(value = "/{channelId}/files", consumes = "multipart/form-data")
     public FileAttachmentResponse uploadFile(@PathVariable Long channelId, @RequestParam("file") MultipartFile file) {
         Channel channel = channelRepository.findById(channelId)

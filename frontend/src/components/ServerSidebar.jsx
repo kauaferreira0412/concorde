@@ -5,30 +5,18 @@ import api from "../api/client";
 import Avatar from "./Avatar.jsx";
 import { HeadphonesIcon } from "./icons.jsx";
 
-const MAX_AVATARS = 8; // depois disso so mostra "+N", senao a fileira fica gigante num servidor grande
+const MAX_AVATARS = 8;
 
 export default function ServerSidebar({ servers, selectedServerId, homeActive, onSelect, onHome, onCreateServer }) {
   const { hasUnreadDm } = useDmNotifications();
-  // Tooltip customizado ao passar o mouse num servidor - pedido explicito do usuario: mostrar
-  // os avatares de quem esta numa call de voz AGORA nesse servidor, sem precisar entrar nele
-  // primeiro (ver GET /api/servers/{id}/voice-presence, junta a presenca de TODOS os canais de
-  // voz do servidor - ver ServerService.getVoicePresence no backend).
   const [hoveredServerId, setHoveredServerId] = useState(null);
-  const [tooltipPos, setTooltipPos] = useState(null); // {top, left} em pixels de tela
-  const [voicePresence, setVoicePresence] = useState(null); // null = carregando, [] = ninguem na call
+  const [tooltipPos, setTooltipPos] = useState(null);
+  const [voicePresence, setVoicePresence] = useState(null);
   const hoverTimeoutRef = useRef(null);
 
   function handleHoverStart(serverId, iconEl) {
-    // Pequeno atraso antes de buscar - passar o mouse RAPIDO por varios servidores em sequencia
-    // (rolando a lista) nao devia disparar uma chamada de API pra cada um.
     clearTimeout(hoverTimeoutRef.current);
     hoverTimeoutRef.current = setTimeout(() => {
-      // ".server-sidebar" tem "overflow-y:auto" - sem overflow-x definido, o CSS forca os DOIS
-      // eixos a cortar conteudo que vaza (regra do proprio spec: um eixo "auto" e o outro
-      // "visible" vira "auto" tambem) - um tooltip posicionado com "left:100%" (pra fora da
-      // barra estreita de 76px) ficava CORTADO/invisivel mesmo com os dados certos chegando
-      // (reportado: "nao ta mostrando"). Portal pro document.body em position:fixed, calculado
-      // a partir da posicao de VERDADE do icone na tela, escapa desse corte de vez.
       const rect = iconEl.getBoundingClientRect();
       setTooltipPos({ top: rect.top + rect.height / 2, left: rect.right + 14 });
       setHoveredServerId(serverId);
@@ -49,8 +37,6 @@ export default function ServerSidebar({ servers, selectedServerId, homeActive, o
 
   return (
     <div className="server-sidebar">
-      {/* Logo do Concorde = "ir pra Home" (amigos + chats privados), igual o botao do Discord
-          no topo da barra de servidores - pedido explicito do usuario. */}
       <div className="server-icon-wrap">
         <span className={"server-icon-pill" + (homeActive ? " active" : "")} />
         <button
@@ -60,9 +46,6 @@ export default function ServerSidebar({ servers, selectedServerId, homeActive, o
         >
           <img src={`${import.meta.env.BASE_URL}icon-192.png`} alt="" className="server-icon-img" />
         </button>
-        {/* Pontinho de "tem mensagem privada nao lida" - some sozinho ao abrir a conversa (ver
-            DmNotificationsContext.jsx), fica visivel mesmo com o usuario dentro de um servidor
-            (pedido explicito do usuario). */}
         {hasUnreadDm && <span className="server-icon-unread-dot" title="Você tem mensagens privadas não lidas" />}
       </div>
       <div className="server-sidebar-divider" />
@@ -85,8 +68,6 @@ export default function ServerSidebar({ servers, selectedServerId, homeActive, o
           </div>
         );
       })}
-      {/* Qualquer usuario pode criar um servidor agora (pedido explicito do usuario) - o dono
-          decide depois quem entra, convidando amigos (ver InviteFriendsModal.jsx). */}
       <button className="server-icon add" title="Criar servidor" onClick={onCreateServer}>
         +
       </button>

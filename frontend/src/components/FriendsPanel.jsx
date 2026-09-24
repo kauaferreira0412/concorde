@@ -17,13 +17,6 @@ const TABS = [
   { key: "add", label: "Adicionar amigo" },
 ];
 
-/**
- * Tela de "Amigos" da Home (ver pages/home) - mesmas abas do Discord: quem esta online agora,
- * todo mundo, pedidos pendentes (recebidos + enviados), quem voce bloqueou e o formulario pra
- * mandar um pedido novo por nome de usuario. Clicar num amigo abre o chat privado com ele (ver
- * onOpenDm). Bloquear alguem some com a amizade/pedido pendente dos dois lados na hora (ver
- * FriendshipService.block no backend) - so' quem bloqueou consegue desbloquear depois.
- */
 export default function FriendsPanel({ friends, requests, blocked, onSendRequest, onAccept, onDecline, onRemove, onBlock, onUnblock, onOpenDm }) {
   const { showAlert } = useAlert();
   const { openProfile } = useProfile();
@@ -35,17 +28,12 @@ export default function FriendsPanel({ friends, requests, blocked, onSendRequest
   const [removeTarget, setRemoveTarget] = useState(null);
   const [blockTarget, setBlockTarget] = useState(null);
 
-  // Previa de "quem eu vou adicionar" ANTES de mandar o pedido de verdade - pedido explicito do
-  // usuario: ao digitar, aparece um card com a foto/nome de quem foi encontrado. undefined =
-  // ainda nao buscou (campo vazio), null = buscou e nao achou ninguem, objeto = achou.
   const [preview, setPreview] = useState(undefined);
   const [previewLoading, setPreviewLoading] = useState(false);
 
   const onlineFriends = friends.filter((f) => f.status !== "OFFLINE");
   const pendingCount = requests.incoming.length;
 
-  // Busca o usuario pelo nome digitado com um pequeno atraso (nao dispara uma chamada por
-  // tecla) - GET /api/users/by-username/<nome> (ver UserProfileController no backend).
   useEffect(() => {
     setSendError("");
     setSendOk("");

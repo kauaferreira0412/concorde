@@ -11,11 +11,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Integracao com o Spotify - conectar/desconectar (opt-in, ver SettingsModal.jsx) e consultar
- * "o que essa pessoa esta' ouvindo agora" (lista de membros/perfil/comando "/spotify", ver
- * SpotifyService pro fluxo OAuth completo).
- */
 @RestController
 @RequestMapping("/api/spotify")
 public class SpotifyController {
@@ -58,12 +53,6 @@ public class SpotifyController {
         return spotifyService.nowPlayingBatch(ids);
     }
 
-    /** PUBLICO (ver SecurityConfig) - e' o proprio Spotify que redireciona o NAVEGADOR pra ca'
-     *  depois do usuario autorizar (ou cancelar), sem nenhum jeito de mandar o token JWT do
-     *  Concorde junto. Devolve uma paginazinha HTML auto-suficiente (mesma tela seja aberta
-     *  numa aba do navegador ou pelo navegador padrao do sistema, ver window.concordeDesktop.
-     *  openExternal no app desktop) so' avisando que ja' pode fechar - quem identifica o
-     *  usuario Concorde certo e' o "state" (ver SpotifyService.handleCallback). */
     @GetMapping(value = "/callback", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> callback(@RequestParam(required = false) String code,
                                             @RequestParam(required = false) String state,

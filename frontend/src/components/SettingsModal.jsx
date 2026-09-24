@@ -33,7 +33,6 @@ import StatusDropdown from "./StatusDropdown.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
 import { BellIcon, KeyboardIcon, MicIcon, MusicNoteIcon, ShieldIcon, UserIcon, XIcon } from "./icons.jsx";
 
-/** Abas da tela de configuracoes - cada uma so' renderiza o seu pedaco (ver SettingsModal). */
 const TABS = [
   { id: "perfil", label: "Perfil", Icon: UserIcon },
   { id: "audio", label: "Áudio e vídeo", Icon: MicIcon },
@@ -41,17 +40,14 @@ const TABS = [
   { id: "notificacoes", label: "Notificações", Icon: BellIcon },
   { id: "conexoes", label: "Conexões", Icon: MusicNoteIcon },
 ];
-// So' aparece pra admin (ver isAdmin abaixo) - fica separada das abas normais porque nao
-// renderiza conteudo aqui dentro, so' leva pro /admin (ver handleTabClick).
 const ADMIN_TAB = { id: "administracao", label: "Administração", Icon: ShieldIcon };
 
-/** Campo de "gravar atalho": clica em Alterar, aperta a combinacao desejada, pronto. */
 function ShortcutRecorder({ value, onChange }) {
   const [recording, setRecording] = useState(false);
 
   function handleKeyDown(e) {
     e.preventDefault();
-    if (isOnlyModifier(e)) return; // espera uma tecla "de verdade" junto do Ctrl/Shift/etc
+    if (isOnlyModifier(e)) return;
     if (e.key === "Escape") {
       setRecording(false);
       return;
@@ -81,11 +77,6 @@ function ShortcutRecorder({ value, onChange }) {
   );
 }
 
-/**
- * Configuracoes de audio: escolher microfone/alto-falante, testar o microfone ouvindo a
- * propria voz, e atalhos de teclado pra mutar/ensurdecer sem precisar clicar em nada.
- * Tudo fica salvo no localStorage e vale a partir da proxima call (ver VoiceCallContext.jsx).
- */
 export default function SettingsModal({ onClose }) {
   const { user, updateUser, isAdmin } = useAuth();
   const { activeChannel, deafened, toggleDeafen, micGain, setMicGainPercent, masterVolume, setMasterVolumePercent } = useVoiceCall();
@@ -93,9 +84,6 @@ export default function SettingsModal({ onClose }) {
   const [activeTab, setActiveTab] = useState("perfil");
   const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
 
-  // A aba de administracao nao mostra conteudo aqui dentro - so' fecha as configuracoes e
-  // leva pro painel de verdade (gerenciar contas/usuarios, ver AdminPage.jsx), que ja existe
-  // e e' uma pagina inteira (nao cabe dentro do modal).
   function handleTabClick(tabId) {
     if (tabId === "administracao") {
       onClose();
@@ -110,16 +98,10 @@ export default function SettingsModal({ onClose }) {
   const [visibilitySaving, setVisibilitySaving] = useState(false);
   const [visibilityError, setVisibilityError] = useState("");
 
-  // Apelido/bio GLOBAIS (valem em qualquer servidor) - salvos junto com o resto ao clicar
-  // em "Salvar" no rodape (ver handleSave). Antes isso vivia numa tela separada
-  // (ProfileModal), agora mora aqui junto com o resto do perfil.
   const [nickname, setNickname] = useState(user?.nickname || "");
   const [bio, setBio] = useState(user?.bio || "");
   const [profileError, setProfileError] = useState("");
 
-  // Servidores que o usuario esta - calculado sozinho (so' busca a lista, ver useEffect
-  // abaixo) - e o apelido DENTRO de um servidor especifico escolhido no seletor (esse tem
-  // salvamento proprio, ja que so' faz sentido depois de escolher pra qual servidor).
   const [myServers, setMyServers] = useState([]);
   const [serverNicknameTarget, setServerNicknameTarget] = useState("");
   const [serverNickname, setServerNickname] = useState("");
@@ -143,9 +125,7 @@ export default function SettingsModal({ onClose }) {
   const [muteShortcut, setMuteShortcutState] = useState(getMuteShortcut());
   const [deafenShortcut, setDeafenShortcutState] = useState(getDeafenShortcut());
   const [permissionError, setPermissionError] = useState("");
-  // Integração com Spotify (ver Configurações > Conexões, SpotifyController no backend) - null
-  // enquanto carrega o status pela primeira vez.
-  const [spotifyStatus, setSpotifyStatus] = useState(null); // { configured, connected }
+  const [spotifyStatus, setSpotifyStatus] = useState(null);
   const [spotifyConnecting, setSpotifyConnecting] = useState(false);
   const [spotifyError, setSpotifyError] = useState("");
   const [testing, setTesting] = useState(false);
@@ -154,21 +134,11 @@ export default function SettingsModal({ onClose }) {
   const streamRef = useRef(null);
   const audioElRef = useRef(null);
   const { level, start: startMeter, stop: stopMeter } = useMicLevel();
-  // Testar microfone tambem precisa passar pela MESMA supressao de ruido escolhida abaixo -
-  // senao "bater na mesa pra testar" nunca mostrava diferenca nenhuma entre os modos (bug
-  // relatado: "continuo ouvindo com qualquer supressão ligada"), porque esse teste captava o
-  // microfone cru direto (getUserMedia -> <audio>), sem passar pelo AudioWorklet nenhum -
-  // so' a call de verdade (LiveKit) usava a supressao, ver VoiceCallContext.jsx.
   const testAudioContextRef = useRef(null);
   const testProcessorRef = useRef(null);
-  // true = foi ESSE teste que ligou o ensurdecido (ver startTest/stopTest abaixo) - so' desfaz
-  // ao parar se foi a gente quem mudou, senao ia desensurdecer alguem que ja' estava assim por
-  // opcao propria (ex: abriu Configuracoes pra testar o mic enquanto ja' tava ensurdecido).
   const testDeafenedForTestRef = useRef(false);
 
   useEffect(() => {
-    // O navegador so mostra os nomes dos dispositivos depois de uma permissao de microfone
-    // ser concedida pelo menos uma vez - por isso pedimos getUserMedia so pra "destravar" os labels.
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
@@ -178,11 +148,6 @@ export default function SettingsModal({ onClose }) {
       .then((devices) => {
         setInputDevices(devices.filter((d) => d.kind === "audioinput"));
         setOutputDevices(devices.filter((d) => d.kind === "audiooutput"));
-        // As cameras tambem aparecem aqui (enumerateDevices lista TODOS os dispositivos, nao
-        // so' os de audio que acabamos de pedir permissao) - os nomes delas so' vem
-        // preenchidos se a permissao de camera ja' tiver sido concedida em algum momento
-        // (ex: ja' ligou a webcam numa call antes) - sem pedir um segundo popup de permissao
-        // so' por abrir essa tela.
         setVideoDevices(devices.filter((d) => d.kind === "videoinput"));
       })
       .catch((err) => setPermissionError("Não foi possível acessar o microfone: " + err.message));
@@ -190,11 +155,8 @@ export default function SettingsModal({ onClose }) {
     setOutputSupported(typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype);
 
     return () => stopTest();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // "Quantos e quais servidores você está" - so' reaproveita a mesma lista que a sidebar ja
-  // usa (GET /api/servers), calculada sozinha, sem precisar manter nada a parte.
   useEffect(() => {
     api.get("/api/servers").then(({ data }) => setMyServers(data));
   }, []);
@@ -203,11 +165,6 @@ export default function SettingsModal({ onClose }) {
     api.get("/api/spotify/status").then(({ data }) => setSpotifyStatus(data)).catch(() => setSpotifyStatus({ configured: false, connected: false }));
   }, []);
 
-  // Fica de olho enquanto o usuario esta' na aba do Spotify autorizando (aberta numa aba/
-  // navegador separado, ver handleConnectSpotify) - assim que o backend registrar a conexao
-  // (callback do Spotify chegou), atualiza sozinho aqui, sem precisar fechar e reabrir
-  // Configurações. Desiste depois de 2 minutos (usuario pode ter cancelado/fechado a aba sem
-  // avisar - fica preso em "Aguardando..." pra sempre senao).
   useEffect(() => {
     if (!spotifyConnecting) return;
     let cancelled = false;
@@ -255,8 +212,6 @@ export default function SettingsModal({ onClose }) {
     }
   }
 
-  // Ao escolher um servidor no seletor de apelido, busca o apelido que ja existe la' (se
-  // existir) pra pre-preencher o campo, em vez de sempre comecar em branco.
   useEffect(() => {
     if (!serverNicknameTarget) {
       setServerNickname("");
@@ -286,19 +241,9 @@ export default function SettingsModal({ onClose }) {
     }
   }
 
-  /** So' a parte de captura/tocar de volta o microfone - sem mexer em ensurdecer (ver
-   *  startTest/stopTest abaixo, que envolvem essa aqui). Reaproveitada tambem pra reiniciar
-   *  o teste ao trocar o modo de supressao de ruido no meio (ver useEffect mais abaixo) - nesse
-   *  caso o teste inteiro continua rodando, entao NAO faz sentido desensurdecer/ensurdecer nesse
-   *  meio-tempo (so' no inicio/fim de verdade do teste). */
   async function startLocalTest() {
     setPermissionError("");
     try {
-      // MESMAS constraints que a call de verdade usa (ver audioCaptureDefaults em
-      // VoiceCallContext.jsx) - echoCancellation/autoGainControl explicitos aqui tambem
-      // (nao so' deixando no padrao do navegador), pra garantir que a captura em si e' idêntica,
-      // nao so' o filtro de ruido por cima. noiseSuppression nativa sempre false nos dois lugares
-      // (a supressao de verdade e' o AudioWorklet logo abaixo).
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           ...(selectedInput ? { deviceId: { exact: selectedInput } } : {}),
@@ -310,9 +255,6 @@ export default function SettingsModal({ onClose }) {
       streamRef.current = stream;
       const rawTrack = stream.getAudioTracks()[0];
 
-      // Passa pelo MESMO AudioWorklet de supressao de ruido escolhido abaixo - assim "bater na
-      // mesa"/testar o microfone reflete de verdade o que vai acontecer numa call, em vez de
-      // sempre tocar o audio cru independente do modo selecionado.
       let audibleTrack = rawTrack;
       if (noiseSuppressionMode !== "off") {
         try {
@@ -328,8 +270,6 @@ export default function SettingsModal({ onClose }) {
       }
       const audibleStream = new MediaStream([audibleTrack]);
 
-      // Toca de volta o que o microfone esta captando (ja' filtrado) - e' assim que voce "se
-      // ouve". Recomenda-se usar fone de ouvido para evitar microfonia (eco/feedback).
       if (audioElRef.current) {
         audioElRef.current.srcObject = audibleStream;
         audioElRef.current.muted = false;
@@ -370,50 +310,30 @@ export default function SettingsModal({ onClose }) {
     setTesting(false);
   }
 
-  /** Comeca a testar de verdade - ver startLocalTest acima pra so' a parte de captura/audio. */
   async function startTest() {
-    // Se estiver numa call agora, ensurdece antes de comecar a testar - ensurdecer TAMBEM muta
-    // o microfone sozinho (ver toggleDeafen em VoiceCallContext.jsx, mesmo comportamento do
-    // botao de ensurdecer normal) - pedido explicito: sem isso, quem esta testando ouviria a
-    // propria voz duas vezes (o teste local + ela voltando pela call) e todo mundo mais ouviria
-    // o "testando, 1, 2, 3" ao vivo.
     if (activeChannel && !deafened) {
       await toggleDeafen();
       testDeafenedForTestRef.current = true;
     }
     const started = await startLocalTest();
-    // Deu errado antes de comecar o teste de verdade (ex: permissao negada) - desfaz o
-    // ensurdecer que a gente acabou de ligar acima, senao a pessoa ficava ensurdecida a
-    // toa, sem nenhum teste rodando.
     if (!started && testDeafenedForTestRef.current) {
       testDeafenedForTestRef.current = false;
       await toggleDeafen();
     }
   }
 
-  /** Para de testar de verdade - ver stopLocalTest acima pra so' a parte de captura/audio. */
   async function stopTest() {
     stopLocalTest();
-    // Desfaz o ensurdecer que o INICIO do teste ligou (ver startTest acima) - que tambem
-    // desmuta o microfone sozinho ao desligar (mesmo comportamento do botao de ensurdecer
-    // normal, ver toggleDeafen em VoiceCallContext.jsx). So' roda se foi ESSE teste quem
-    // ensurdeceu - se a pessoa ja' estava ensurdecida por opcao propria antes de testar, isso
-    // fica do jeito que estava.
     if (testDeafenedForTestRef.current) {
       testDeafenedForTestRef.current = false;
       await toggleDeafen();
     }
   }
 
-  // Troca o modo de supressao COM o teste ja' rodando (bater na mesa comparando) - reinicia
-  // so' a captura/audio (nao ensurdecer/desensurdecer de novo - o teste inteiro continua "de
-  // pe" o tempo todo, so' o filtro de ruido troca no meio) pra aplicar o novo modo na hora, sem
-  // precisar clicar em "Parar"/"Testar" nele.
   useEffect(() => {
     if (!testing) return;
     stopLocalTest();
     startLocalTest();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noiseSuppressionMode]);
 
   async function handleSave() {
@@ -423,7 +343,7 @@ export default function SettingsModal({ onClose }) {
       updateUser({ nickname: data.nickname, bio: data.bio });
     } catch (err) {
       setProfileError(err.response?.data?.error || "Falha ao salvar perfil");
-      return; // nao fecha o modal nem salva o resto - o usuario precisa ver o erro primeiro
+      return;
     }
 
     setSavedAudioInput(selectedInput);
@@ -434,8 +354,6 @@ export default function SettingsModal({ onClose }) {
     setMuteShortcut(muteShortcut);
     setDeafenShortcut(deafenShortcut);
 
-    // So' pede permissao ao navegador se o usuario realmente ligou a opcao agora - nunca
-    // pede sem ele ter escolhido isso primeiro. Se ele negar, a opcao volta a ficar desligada.
     if (desktopNotifications && notificationsSupported && Notification.permission !== "granted") {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
@@ -739,7 +657,6 @@ export default function SettingsModal({ onClose }) {
                   </div>
                 )}
 
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                 <audio ref={audioElRef} autoPlay />
 
                 <div className="settings-divider" />

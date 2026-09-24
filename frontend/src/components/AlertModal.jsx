@@ -1,7 +1,5 @@
 import { useEffect } from "react";
 
-/** Substitui o alert() nativo do navegador (aquela caixinha feia "localhost diz...") por um
- *  modal com a mesma cara do resto do app - ver AlertContext.jsx/useAlert(). */
 export default function AlertModal({ title, message, onClose }) {
   useEffect(() => {
     function handleKeyDown(e) {

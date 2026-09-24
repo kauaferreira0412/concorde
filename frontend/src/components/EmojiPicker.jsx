@@ -1,13 +1,6 @@
 import { useState } from "react";
 import { EMOJI_CATEGORIES } from "../utils/emojiData";
 
-/**
- * Picker de emoji com categorias de verdade (Pessoas, Natureza, Alimentos, Atividades, Viagem,
- * Objetos, Símbolos, Bandeiras) - antes o Concorde só tinha 32 emojis fixos numa gradinha só,
- * o Discord tem centenas divididos em categoria (pedido explicito do usuario, com print
- * comparando os dois). Emojis customizados do SERVIDOR (ver CustomEmojiModal.jsx) entram como
- * uma categoria a mais, só quando o servidor tem pelo menos um.
- */
 export default function EmojiPicker({ customEmojis = [], onPick }) {
   const hasCustom = customEmojis.length > 0;
   const [activeKey, setActiveKey] = useState(hasCustom ? "servidor" : EMOJI_CATEGORIES[0].key);

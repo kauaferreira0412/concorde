@@ -1,19 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { CopyIcon, DownloadIcon, ExternalLinkIcon, XIcon, ZoomInIcon, ZoomOutIcon } from "./icons.jsx";
 
-/**
- * Visualizador de imagem em tela cheia, estilo Discord (ver print de referencia do usuario) -
- * antes clicar numa imagem do chat abria uma aba nova do navegador; agora abre por cima da
- * propria pagina, com uma barrinha de acoes (baixar / copiar / abrir em nova aba / fechar) no
- * canto, dá pra dar zoom (roda do mouse ou botões +/-) e arrastar quando tiver com zoom
- * (pedido explicito do usuario: "quero uma opção de copiar uma imagem e dar zoom"). Fecha
- * clicando fora da imagem (sem zoom), no X, ou apertando Esc.
- */
 export default function ImageLightbox({ src, alt, onClose }) {
   const [scale, setScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [copyState, setCopyState] = useState("idle"); // "idle" | "copying" | "done" | "error"
-  const panStateRef = useRef(null); // { startX, startY, originX, originY, moved }
+  const [copyState, setCopyState] = useState("idle");
+  const panStateRef = useRef(null);
   const wrapRef = useRef(null);
 
   useEffect(() => {
@@ -24,9 +16,6 @@ export default function ImageLightbox({ src, alt, onClose }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  // Listener NATIVO (nao "onWheel" do React, que e' passivo por padrao e nao deixa o
-  // "preventDefault" travar o scroll da pagina de verdade por trás - mesmo motivo/mesma
-  // correção do zoom do mapa de RPG, ver BattleMap.jsx).
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -67,20 +56,8 @@ export default function ImageLightbox({ src, alt, onClose }) {
     panStateRef.current = null;
   }
 
-  // window.concordeDesktop so' existe DENTRO do app Electron (ver electron/preload.cjs) - la'
-  // ele carrega a pagina via file://, sem "mesma origem" com o bucket de storage de onde a
-  // imagem vem, entao tanto o Clipboard API quanto o <a download>/target="_blank" do navegador
-  // falhavam silenciosamente (reportado pelo usuario: "não faz download"/"não foi possível
-  // copiar"). Rodar isso no processo PRINCIPAL do Electron (via IPC) evita essas restricoes
-  // por completo - no navegador normal (isElectronDesktop false) continua tudo pelo caminho de
-  // sempre (fetch+Clipboard API, <a download>/target=_blank), sem mudar nada.
   const isElectronDesktop = typeof window !== "undefined" && !!window.concordeDesktop;
 
-  // Copia a imagem de verdade pra area de transferencia (dá pra colar em outro app/chat). No
-  // navegador, so' funciona se ele permitir "fetch" da imagem (mesma origem, ou o servidor de
-  // onde ela veio libera CORS) e o formato for compativel com o Clipboard API (png/jpeg/webp -
-  // gif nao é suportado por nenhum navegador ainda). Se falhar por qualquer motivo, avisa em
-  // vez de fingir que funcionou.
   async function handleCopy() {
     setCopyState("copying");
     try {
@@ -126,9 +103,6 @@ export default function ImageLightbox({ src, alt, onClose }) {
             <DownloadIcon size={18} />
           </button>
         ) : (
-          // "download" so' funciona de verdade pra imagens da mesma origem - em imagens de
-          // outro dominio (ex: bucket de storage) o navegador pode abrir em vez de baixar,
-          // mas nunca quebra: e' so' um link normal por baixo.
           <a className="icon-btn" href={src} download title="Baixar imagem">
             <DownloadIcon size={18} />
           </a>

@@ -1,10 +1,3 @@
-/* ============================================================
-   Design tokens
-   Paleta "deep space" azul-marinho + electric blue + turquesa,
-   replicada do mockup Potato Chat.html (Claude design) - mesmos
-   nomes de variavel de antes, valores novos, pra nao precisar
-   reescrever cada componente que ja consome esses tokens.
-   ============================================================ */
 :root {
   --bg-app: #050816;
   --bg-app-grad:
@@ -62,14 +55,6 @@
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 
-/* ============================================================
-   Barra de titulo customizada (so' app DESKTOP/Electron - ver DesktopTitleBar.jsx/main.cjs).
-   Os botoes de minimizar/maximizar/fechar sao desenhados pelo proprio WINDOWS por cima
-   (titleBarOverlay, ver main.cjs) - aqui so' cuida do resto: icone + nome do app a esquerda,
-   fundo no estilo do app, e arrastar a janela pelo clique-e-segura (-webkit-app-region: drag,
-   propriedade especifica do Chromium/Electron pra isso). Precisa ficar ACIMA de qualquer modal
-   (z-index bem alto) - um titulo de janela de verdade nunca fica escondido atras de um dialogo.
-   ============================================================ */
 .desktop-titlebar {
   position: fixed;
   top: 0;
@@ -79,7 +64,7 @@ html, body, #root { height: 100%; margin: 0; }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 150px 0 14px; /* padding-right reserva o espaco dos botoes nativos do Windows */
+  padding: 0 150px 0 14px;
   background: var(--bg-rail);
   border-bottom: 1px solid var(--border-soft);
   -webkit-app-region: drag;
@@ -94,10 +79,6 @@ html, body, #root { height: 100%; margin: 0; }
   color: var(--text-secondary);
 }
 
-/* Empurra TODO o conteudo da pagina pra baixo do espaco que a barra de titulo ocupa - com
-   "* { box-sizing: border-box }" acima, o padding entra DENTRO da altura de 100% do #root
-   (nao soma por cima), entao o resto do app (.app-shell etc) continua enchendo certinho o
-   que sobrou da tela, sem precisar mexer em nenhum layout existente. */
 html[data-desktop-titlebar="true"] #root {
   padding-top: 38px;
 }
@@ -146,11 +127,6 @@ input, textarea {
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 input:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 
-/* input[type=range] (sliders de volume) nao deve herdar a caixa de text input (fundo, borda,
-   padding) - senao vira uma barra gigante em volta de um controle fininho. !important pra
-   nunca mais depender de guerra de especificidade com a regra ".volume-slider" (foi
-   exatamente isso que quebrou da primeira vez - "input[type=range]" e' mais especifico que
-   uma classe sozinha, entao ficava disputando propriedade por propriedade com ela). */
 input[type="range"] {
   background: none !important;
   border: none !important;
@@ -171,9 +147,6 @@ select {
 }
 select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 
-/* ============================================================
-   Auth
-   ============================================================ */
 .auth-screen {
   height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
   background:
@@ -227,9 +200,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .auth-card a { color: var(--accent-text); text-decoration: none; font-weight: 600; }
 .auth-card a:hover { text-decoration: underline; }
 
-/* Tela de "atualização necessária" (ver UpdateRequiredGate.jsx) - reaproveita o .auth-card
-   (mesmo card do login), so' com o "logo" trocado por um alerta amarelo e dois botoes de
-   acao cheios em vez de um formulario. */
 .update-required-card { width: 400px; }
 .update-required-icon {
   width: 76px;
@@ -297,14 +267,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   flex-shrink: 0;
 }
 .server-icon:hover { border-color: var(--accent); color: var(--text-primary); }
-/* position:absolute + inset:0 em vez de width/height:100% comum - imune a foto enviada em
-   resolucao gigante "vazando" pra fora da caixinha de 46x46 (era exatamente isso que
-   acontecia antes: sem isso, o tamanho intrinseco da imagem as vezes vencia o 100% dentro
-   do flexbox e ela aparecia enorme, cobrindo o resto da tela). */
 .server-icon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-/* Servidor selecionado: SEM borda/glow azul em volta do icone (ficava horrivel por cima de
-   uma foto de verdade, ver feedback do usuario) - so' os sem foto (iniciais) ganham o fundo
-   azul; quem tem foto so' e' indicado pela pilula ao lado (.server-icon-pill), igual Discord. */
 .server-icon.active:not(.has-icon) {
   background: var(--accent);
   border-color: var(--accent);
@@ -324,12 +287,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   pointer-events: none;
 }
 .server-icon-pill.active { height: 22px; }
-/* Logo do Concorde (botao de Home) - maior que um icone de servidor comum (46px), pra ter mais
-   presenca como marca do app (pedido explicito do usuario: "aumente a largura do quadrado"). */
 .server-icon.home { width: 54px; height: 54px; }
-/* Pontinho vermelho de "tem DM nao lida" no canto da logo (ver ServerSidebar.jsx) - mesma
-   borda da cor do fundo da barra (--bg-rail) pra "recortar" visualmente por cima do icone,
-   igual o badge de notificacao do Discord. */
 .server-icon-unread-dot {
   position: absolute;
   right: -2px;
@@ -341,8 +299,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   border: 3px solid var(--bg-rail);
   pointer-events: none;
 }
-/* Separa o botao de Home (logo do Concorde) da lista de servidores - mesma largura do icone
-   de servidor, uma linha fina no meio (igual Discord). */
 .server-sidebar-divider {
   width: 32px;
   height: 2px;
@@ -360,13 +316,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 }
 .server-icon.add:hover { border-color: var(--success); color: var(--success); }
 
-/* Tooltip ao passar o mouse num servidor (ver ServerSidebar.jsx) - nome + avatares de quem
-   esta numa call de voz agora nesse servidor (so' aparece se tiver alguem). "position:fixed"
-   com top/left calculados em JS (posicao de VERDADE do icone na tela) e renderizado via portal
-   pro document.body - de proposito, NAO "position:absolute" dentro da sidebar: ".server-sidebar"
-   tem overflow-y:auto sem overflow-x definido, e o proprio spec do CSS forca os DOIS eixos a
-   cortar juntos nesse caso - um tooltip posicionado só com CSS relativo ao icone (sem portal)
-   ficava cortado/invisivel mesmo com os dados certos chegando (reportado: "nao ta mostrando"). */
 .server-hover-tooltip {
   position: fixed;
   transform: translateY(-50%);
@@ -394,8 +343,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 }
 .server-hover-tooltip-voice-icon { color: var(--success); flex-shrink: 0; }
 .server-hover-tooltip-avatars { display: flex; align-items: center; }
-/* Tamanho/fundo de fallback (iniciais) ja' vem de ".voice-avatar.small" (ver JSX) - aqui so'
-   cuida da borda (destaca do fundo do tooltip) e da sobreposicao entre os avatares. */
 .server-hover-tooltip-avatar {
   border: 2px solid var(--bg-elevated);
   margin-left: -8px;
@@ -440,8 +387,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 }
 .channel-sidebar.collapsed .channel-sidebar-header { padding: 17px 0; justify-content: center; }
 .channel-sidebar-header-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-/* Largura fixa por baixo do corte (overflow:hidden do pai) - assim o conteudo nao
-   quebra linha/reflui durante a animacao, so' fica "cortado" suavemente enquanto some. */
 .channel-sidebar-body {
   display: flex;
   flex-direction: column;
@@ -458,13 +403,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 }
 .collapse-toggle { flex-shrink: 0; }
 .channel-sidebar-title { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-/* Nome do servidor - maior que antes (pedido explicito do usuario, ficava pequeno e
-   espremido pelos varios botoes de acao que existiam aqui, ver channel-sidebar-name-btn
-   abaixo pra onde eles foram). */
 .channel-sidebar-header strong { font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Quando o usuario tem alguma acao de servidor disponivel (editar/emojis/perfis/log), o
-   proprio nome vira um botao que abre um menu com tudo isso (ver serverMenu em
-   ChannelSidebar.jsx) - substitui os 4 botoes separados que ficavam no cabecalho. */
 .channel-sidebar-name-btn {
   display: flex;
   align-items: center;
@@ -488,8 +427,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .channel-list { flex: 1; overflow-y: auto; padding: 14px 10px; }
-/* Falha de CARREGAR servidores/canais (soluco de rede, ver fetchWithRetry.js) - diferente de
-   "voce nao tem nenhum" (texto simples sem isso). */
 .channel-list-error { padding: 0 6px; }
 .channel-list-error .link-btn { font-size: 12.5px; }
 .channel-group-title {
@@ -524,11 +461,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   border: 1px dashed var(--border);
 }
 .channel-item.add:hover { border-color: var(--border-strong); color: var(--text-primary); }
-/* Atalho pra "Personagens" (kit de RPG, ver CharacterSheetsModal.jsx) - fixo no topo da lista
-   de canais de um servidor RPG, visivel pra QUALQUER membro (nao e' um canal de verdade, so'
-   abre o modal) - pedido explicito do usuario: "deve ficar solto em algum lugar, pra você
-   clicar, abrir o modal". Cor de destaque (nao cinza como os canais normais) pra diferenciar
-   visualmente de um canal de verdade. */
 .channel-item.character-sheets-shortcut {
   color: var(--accent-text);
   font-weight: 600;
@@ -541,9 +473,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .channel-item.character-sheets-shortcut:hover { background: var(--accent-soft); }
 .channel-item-icon { flex-shrink: 0; margin-right: 8px; color: var(--text-muted); }
 .channel-item.active .channel-item-icon { color: var(--accent-text); }
-/* Canal de voz que voce esta REALMENTE conectado agora (nao so' selecionado/olhando) -
-   preenchimento solido, mais forte que o ".active" comum, pra deixar bem claro visualmente
-   onde sua call esta rolando. */
 .channel-item.connected-active {
   background: var(--accent);
   color: #fff;
@@ -571,14 +500,7 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   padding: 2px 7px;
   border-radius: var(--radius-pill);
 }
-/* Agrupa o "@" de mencao + o numerozinho de nao lidas, colados na direita do nome do canal -
-   um wrapper so' com margin-left:auto (em vez de cada badge ter o seu) pra eles ficarem juntos
-   um do lado do outro em vez de cada um tentar ocupar o espaco sozinho. */
 .channel-item-badges { margin-left: auto; flex-shrink: 0; display: flex; align-items: center; gap: 4px; }
-/* "Você foi mencionado aqui" - mais chamativo que o numerozinho de nao lidas comum (pedido
-   explicito do usuario: precisa se destacar MAIS que uma mencao perdida em meio a outras
-   mensagens nao lidas), mesma cor de aviso usada pra "mensagem te menciona" no proprio chat
-   (ver .chat-message.mentioned). */
 .channel-mention-badge {
   background: var(--warning);
   color: #1a1200;
@@ -601,13 +523,8 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   min-width: 18px;
   text-align: center;
 }
-/* "CONECTADO" ja usa margin-left:auto - se os badges tambem aparecerem no mesmo item (caso
-   raro, canal de voz nao tem unread/mencao hoje) evita os dois disputarem o auto. */
 .channel-item-live + .channel-item-badges { margin-left: 6px; }
 
-/* Lista de quem esta na call, aninhada embaixo do canal de voz na propria sidebar - avatar e
-   nome maiores (pedido explicito do usuario: "ta pequeno demais") - avatar usa o tamanho
-   PADRAO do .voice-avatar agora (30px, ver classe mais abaixo), nao mais o ".small" (22px). */
 .channel-voice-participants { padding: 4px 0 6px 12px; display: flex; flex-direction: column; gap: 3px; }
 .channel-voice-participant {
   display: flex;
@@ -622,9 +539,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .channel-voice-participant span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .channel-voice-participant .voice-status-icon { margin-left: auto; flex-shrink: 0; }
 
-/* Faixa "solta" logo antes das categorias - so' aparece quando tem alguma categoria criada,
-   e' onde soltar um canal que estava arrastando de dentro de uma categoria pra tira-lo dela
-   (ver onDrop em ChannelSidebar.jsx). Discreta ate' o hover/arraste por cima (drop-target). */
 .channel-uncategorized-drop {
   width: 100%;
   box-sizing: border-box;
@@ -643,12 +557,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   border-style: solid;
 }
 
-/* Cabecalho de uma CATEGORIA (pasta de canais, texto e voz juntos, igual Discord - ver
-   ChannelSidebar.jsx renderCategoryHeader/groupByCategory). Clicavel pra recolher/expandir,
-   botao direito abre renomear/excluir. */
-/* Linha com o cabecalho da categoria (botao grande, ocupa o resto do espaco) + o botaozinho
-   de "Personagens" ao lado (ver renderCategoryHeader em ChannelSidebar.jsx) - visivel pra
-   QUALQUER membro, nao so' quem gerencia canais. */
 .channel-category-subheader-row { display: flex; align-items: center; gap: 2px; margin: 6px 0 2px; }
 .channel-category-subheader-row .channel-category-subheader { margin: 0; }
 .channel-category-sheets-btn { flex-shrink: 0; width: 22px !important; height: 22px; color: var(--text-muted); }
@@ -666,22 +574,14 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .channel-category-subheader:hover { background: var(--bg-hover); color: var(--text-secondary); }
 .channel-category-subheader .channel-group-title { margin: 0; font-size: 10.5px; }
 .channel-category-subheader svg { flex-shrink: 0; }
-/* Categoria recebendo o arraste de um canal de TEXTO (ver draggable/onDrop em
-   ChannelSidebar.jsx) - destaca pra indicar que soltar ali move o canal pra essa categoria.
-   box-shadow em vez de border (o cabecalho nao tem borda nenhuma por padrao, evita mudar o
-   tamanho da caixa so' por causa do hover de arraste). */
 .channel-category-subheader.drop-target {
   background: var(--accent-soft);
   color: var(--accent-text);
   box-shadow: inset 0 0 0 1.5px var(--accent);
   border-radius: var(--radius-sm);
 }
-/* Canal de texto sendo arrastado - fica meio apagado enquanto arrasta, igual o padrao de
-   drag-and-drop do resto do app. */
 .channel-item.dragging { opacity: 0.45; }
 
-/* Botao "+ categoria" no topo da lista de canais - mesmo estilo tracejado do "+ canal", mais
-   compacto (fica sozinho numa linha, nao um por tipo de canal). */
 .channel-item.category-add {
   display: inline-flex;
   align-items: center;
@@ -691,7 +591,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   padding: 5px 10px;
 }
 
-/* "Conectados agora" - expansivel, abaixo do nome do servidor */
 .connected-block {
   border-bottom: 1px solid var(--border-soft);
   padding-bottom: 4px;
@@ -730,10 +629,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   flex-shrink: 0;
 }
 
-/* Barra de status de voz - so aparece quando conectado a uma call, persiste entre canais.
-   Cartao flutuante com cantos arredondados e borda propria (em vez de uma faixa reta colada
-   na sidebar) + botoes de acao circulares - pra bater com o modelo feito no Figma pelo
-   usuario (mesmos icones/estilo/cores). */
 .voice-status-bar {
   margin: 8px 8px 0;
   padding: 12px;
@@ -760,15 +655,9 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 }
 .voice-status-level { color: var(--success); font-weight: 700; }
 .voice-status-level.muted { color: var(--danger); }
-/* Ping em ms (ver pingMs no VoiceCallContext, lido de room.engine.client.rtt) - mesma cor
-   verde do "Voz conectada" no modelo do Figma. */
 .voice-status-ping { font-size: 11.5px; font-weight: 700; color: var(--success); flex-shrink: 0; }
 
 .voice-status-icons { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-/* Botoes circulares preenchidos (nao mais quadrados/transparentes como o .icon-btn padrao) -
-   cada um com uma cor de repouso propria, igual ao modelo: microfone/fone ficam num cinza-
-   -azulado neutro ate' entrar em estado de alerta (mutado = vermelho), compartilhar tela ja'
-   nasce destacado em azul (acao "ligada" por natureza), e sair da call e' sempre vermelho solido. */
 .voice-status-icon-btn {
   width: 36px;
   height: 36px;
@@ -782,9 +671,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
   background: var(--bg-hover);
   color: var(--text-secondary);
 }
-/* O button{} global tem padding:9px 16px - sem zerar acima, isso "comia" quase todo o
-   circulo de 36px e deixava o SVG (18px) espremido/cortado, sumindo visualmente
-   (o bug que o usuario reportou: "os icones sumiram"). */
 .voice-status-icon-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 .voice-status-icon-btn:hover { background: var(--border-soft); color: var(--text-primary); }
 .voice-status-icon-btn.accent { background: var(--accent); color: #fff; }
@@ -794,9 +680,6 @@ select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px
 .voice-status-icon-btn.danger, .voice-status-icon-btn.leave { background: var(--danger); color: #fff; }
 .voice-status-icon-btn.danger:hover, .voice-status-icon-btn.leave:hover { background: #ff5c6c; }
 
-/* Uma linha so' (avatar+nome+cargo a esquerda, engrenagem/sair a direita) - igual o
-   modelo do Figma do usuario. Antes era flex-direction:column, empilhando os icones
-   numa segunda linha embaixo a direita, bem diferente do print. */
 .user-bar {
   padding: 12px 14px;
   background: var(--bg-panel-2);
@@ -830,9 +713,6 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
 .user-bar .admin-badge { flex-shrink: 0; }
 .user-bar-actions { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
 
-/* Icone SVG (ver icons.jsx): botao quadrado, icone sempre centralizado e do mesmo
-   tamanho, cor herdada via currentColor - fica uniforme em qualquer estado (normal/
-   hover/ativo/perigo), diferente de emoji que varia de estilo entre SO e navegador. */
 .icon-btn {
   background: transparent;
   border: none;
@@ -854,9 +734,6 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
 .icon-btn-active { color: var(--accent-text); background: var(--accent-soft); }
 .icon-btn-active:hover { background: var(--accent-soft); }
 
-/* ============================================================
-   Chat
-   ============================================================ */
 .chat-window, .voice-channel, .battle-map-channel { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-app); }
 .battle-map-channel-body { flex: 1; overflow-y: auto; padding: 16px 20px; min-height: 0; }
 .chat-window.empty { align-items: center; justify-content: center; gap: 10px; color: var(--text-muted); font-size: 14px; }
@@ -875,10 +752,6 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
 }
 .chat-header-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-header-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-/* Cabecalho do chat PRIVADO (ver DmChatWindow.jsx) - mesmo .chat-header de fora, so' que em vez
-   de "# nome-do-canal" mostra avatar + nome de quem voce esta conversando (clicavel, abre o
-   perfil dele) - MESMO tamanho de avatar/dot/gap da lista de conversas diretas (ver
-   .home-dm-item em pages/home/style.css), pedido explicito do usuario pra ficar consistente. */
 .chat-header-dm-user {
   display: flex;
   align-items: center;
@@ -894,8 +767,6 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
   cursor: pointer;
 }
 
-/* Painel deslizante de mensagens fixadas/busca (ver botoes no chat-header) - lista simples de
-   resultados clicaveis, cada um pula pra mensagem correspondente se ela estiver carregada. */
 .chat-side-panel {
   max-height: 240px;
   overflow-y: auto;
@@ -928,12 +799,8 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
 .chat-side-panel-item:hover { background: var(--bg-hover); color: var(--text-primary); }
 .chat-side-panel-item strong { color: var(--text-primary); font-weight: 600; flex-shrink: 0; }
 .chat-side-panel-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Canal "Atualizações" (so' admin posta, ver Channel.adminOnly) - faixa de destaque sutil no
-   cabecalho, pra ficar claro de cara que e' um canal diferente dos outros. */
 .chat-header-announcements { border-bottom-color: rgba(47, 107, 255, 0.35); background: var(--accent-soft); }
 .chat-header-announcements-icon { color: var(--accent-text); vertical-align: -2px; margin-right: 2px; }
-/* Substitui a caixa de escrever pra quem nao e' admin nesse canal - mesma altura/posicao,
-   so' um aviso em vez de um formulario que sempre ia falhar. */
 .chat-readonly-notice {
   display: flex;
   align-items: center;
@@ -945,9 +812,6 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
   font-size: 13px;
 }
 
-/* Cabecalho do canal de VOZ - variante mais rica que o do chat de texto: icone + nome +
-   subtitulo, badge de "TEMPO REAL" enquanto conectado, e o facepile de quem esta na call
-   (ver VoiceHeader em VoiceChannel.jsx). */
 .chat-header-voice { display: flex; align-items: center; gap: 12px; }
 .chat-header-icon {
   width: 30px; height: 30px; flex-shrink: 0;
@@ -968,7 +832,6 @@ img.user-bar-avatar, img.voice-avatar, img.chat-avatar, img.avatar-picker-previe
 }
 .chat-header-subtitle { margin: 0; font-size: 11.5px; font-weight: 500; color: var(--text-muted); }
 
-/* Badge generica de "ao vivo" - usada no cabecalho do canal de voz ("TEMPO REAL"). */
 .live-badge {
   display: flex; align-items: center; gap: 6px; flex-shrink: 0;
   padding: 4px 10px;
@@ -1013,9 +876,6 @@ img.chat-header-avatar { object-fit: cover; }
   transition: background 0.1s ease;
 }
 .chat-message:hover { background: var(--bg-panel); }
-/* Mensagem no canal "Atualizações" (ver Channel.adminOnly) - cartao proprio, mais "planejado"
-   que uma linha comum de chat: fundo levemente destacado, borda, barra de acento na lateral
-   e mais respiro por dentro - da pra bater o olho e saber na hora que e' um anuncio. */
 .chat-message.announcement {
   margin: 10px 0;
   padding: 14px 16px 14px 14px;
@@ -1038,9 +898,6 @@ img.chat-header-avatar { object-fit: cover; }
 .chat-time { font-size: 11px; color: var(--text-muted); }
 .chat-message p { margin: 3px 0 0; font-size: 14.5px; line-height: 1.45; color: var(--text-primary); word-break: break-word; }
 
-/* Markdown "estilo Discord" dentro de uma mensagem (ver utils/markdown.jsx) - negrito/italico/
-   sublinhado/tachado ja' vem de tags nativas do navegador (<strong>/<em>/<u>/<s>), so' precisam
-   de cor herdada certa; o resto (codigo, citacao, listas, titulos) ganha estilo proprio aqui. */
 .chat-markdown p + p,
 .chat-markdown ul,
 .chat-markdown ol,
@@ -1059,15 +916,8 @@ img.chat-header-avatar { object-fit: cover; }
   font-family: ui-monospace, "SF Mono", Consolas, monospace;
   font-size: 13px;
 }
-/* Emoji customizado do servidor (ver :nome: em markdown.jsx/CustomEmojiModal.jsx) - do
-   tamanho da linha de texto, um pouco maior que uma letra normal (como no Discord/Slack). */
 .chat-custom-emoji { height: 1.375em; width: auto; vertical-align: -0.4em; object-fit: contain; }
 
-/* Linha de upload no CustomEmojiModal.jsx - nome + botao de escolher imagem lado a lado. O
-   botao (dentro de ".modal") tinha "width:100%" forçado por ".modal button:not(...)" (ver
-   comentario em .settings-inline-save button) - isso fazia ELE tomar quase toda a largura da
-   linha, sobrando so' um fiapo pro input (reportado pelo usuario: campo de nome minusculo,
-   ilegivel, e o botao de escolher imagem virando uma barra enorme). !important nos dois. */
 .emoji-upload-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .emoji-upload-row .emoji-name-input { flex: 1; min-width: 0; height: 40px; box-sizing: border-box; }
 .emoji-upload-row button { flex-shrink: 0; width: auto !important; margin-top: 0 !important; white-space: nowrap; }
@@ -1094,8 +944,6 @@ img.chat-header-avatar { object-fit: cover; }
 .chat-markdown ul, .chat-markdown ol { padding-left: 22px; font-size: 14.5px; line-height: 1.5; color: var(--text-primary); }
 .chat-markdown li { margin: 2px 0; }
 .chat-heading { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.01em; color: var(--text-primary); }
-/* h1: titulo de secao "de verdade" - maior, com linha divisoria embaixo pra separar bem do
-   texto anterior/seguinte (bate mais com "algo mais planejado", em vez de so' negrito maior). */
 h1.chat-heading {
   margin: 16px 0 8px;
   padding-bottom: 8px;
@@ -1103,7 +951,6 @@ h1.chat-heading {
   border-bottom: 1px solid var(--border-soft);
 }
 .chat-markdown > h1.chat-heading:first-child { margin-top: 2px; }
-/* h2: barra de destaque na cor de acento a esquerda, como um "chip" de subtitulo. */
 h2.chat-heading {
   margin: 14px 0 6px;
   padding-left: 10px;
@@ -1111,7 +958,6 @@ h2.chat-heading {
   color: var(--accent-text);
   border-left: 3px solid var(--accent);
 }
-/* h3: pequeno e em caixa alta, tipo "eyebrow" - rotulo discreto acima de um paragrafo. */
 h3.chat-heading {
   margin: 10px 0 2px;
   font-size: 11.5px;
@@ -1120,9 +966,6 @@ h3.chat-heading {
   text-transform: uppercase;
   color: var(--text-muted);
 }
-/* Resultado do comando /roll (ver DiceRollCard.jsx/DiceService no backend) - um cartao com um
-   iconzinho poligono por dado rolado (o numero de lados vira a "forma" do icone, calculada na
-   hora, sem precisar de arte pronta por dado) + o total em destaque. */
 .dice-roll-card {
   margin-top: 4px;
   padding: 12px 14px;
@@ -1142,9 +985,6 @@ h3.chat-heading {
 .dice-roll-notation { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
 .dice-roll-total { font-size: 22px; font-weight: 800; font-family: var(--font-display); color: var(--accent-text); }
 
-/* Card de enquete (ver /poll em ChatWindow.jsx / PollCard.jsx) - mesmo visual "elevado" do
-   dice-roll-card. Cada opcao e' um botao com uma barra de progresso proporcional aos votos
-   (largura em % do total) atras do texto - clique de novo tira o SEU voto (toggle). */
 .poll-card {
   margin-top: 4px;
   padding: 12px 14px;
@@ -1193,8 +1033,6 @@ h3.chat-heading {
 .poll-card-total { font-size: 11.5px; color: var(--text-muted); }
 .poll-card-empty { margin: 0; font-size: 12.5px; color: var(--text-muted); font-style: italic; }
 
-/* So' quem criou a enquete ve isso (ver PollCard.jsx) - botao discreto que vira um mini
-   formulario inline pra adicionar mais uma opcao, sem precisar de modal. */
 .poll-card-add-btn {
   display: flex;
   align-items: center;
@@ -1221,9 +1059,6 @@ h3.chat-heading {
 }
 .poll-card-add-form button:hover:not(:disabled) { background: var(--accent-hover); }
 
-/* Card ao vivo da fila de musica (ver /fila em ChatWindow.jsx / MusicQueueCard.jsx) - mesmo
-   visual "elevado" do dice-roll-card, mas ocupa mais largura pra caber titulo + duracao +
-   botao de remover numa linha por musica. */
 .music-queue-card {
   margin-top: 4px;
   padding: 12px 14px;
@@ -1346,8 +1181,6 @@ h3.chat-heading {
 .music-queue-remove-btn:disabled { opacity: 0.5; cursor: default; }
 .music-queue-error { font-size: 12px; color: var(--danger, #ed4245); margin: 0; }
 
-/* Botao "invisivel" so' pra dar clique na imagem (ver ImageLightbox.jsx) - reseta todo o
-   visual padrao de <button> (fundo, borda, padding), sobra so' a imagem em si. */
 .chat-image-btn { background: none; border: none; padding: 0; display: block; }
 .chat-image {
   display: block;
@@ -1360,10 +1193,6 @@ h3.chat-heading {
 }
 .chat-edited { font-size: 11px; color: var(--text-muted); margin-left: 6px; font-style: italic; }
 
-/* Anexo GENERICO de mensagem - video toca inline, audio vira um mini player com nome do
-   arquivo do lado, qualquer outra coisa vira um cartao com icone+nome+tamanho (ver
-   AttachmentMessage.jsx). Mesmas medidas maximas da imagem (.chat-image acima), pra
-   nao estourar a largura do balao de mensagem. */
 .chat-video {
   display: block;
   max-width: min(100%, 360px);
@@ -1417,13 +1246,9 @@ h3.chat-heading {
 .chat-file-card-download { flex-shrink: 0; color: var(--text-muted); }
 .chat-file-card:hover .chat-file-card-download { color: var(--text-primary); }
 
-/* Previa de video/audio pendente (antes de enviar, ver chat-pending-attachment abaixo) e o
-   icone generico de arquivo qualquer, mesmas medidas do preview de imagem. */
 .chat-pending-video, .chat-pending-audio { max-width: 220px; max-height: 120px; border-radius: var(--radius-sm); flex-shrink: 0; }
 .chat-pending-file-icon { font-size: 28px; flex-shrink: 0; }
 
-/* Botao de gravar mensagem de voz (ver useAudioRecorder.js) - "aceso" (vermelho, pulsando)
-   enquanto grava, igual o indicador de "AO VIVO" de qualquer app de mensagem. */
 .chat-record-btn.recording { color: var(--danger); background: var(--danger-soft); }
 .chat-recording-indicator {
   display: flex;
@@ -1448,10 +1273,6 @@ h3.chat-heading {
   50% { opacity: 0.25; }
 }
 
-/* Mencao (@username) dentro do texto - mais forte quando e' voce mesmo sendo mencionado.
-   E' um <button> (clicavel - abre o perfil da pessoa, ver MessageText em ChatWindow.jsx),
-   por isso zera border/font/cursor por cima do button{} global - senao herdava padding
-   grande e cor de fundo padrao de botao, ficando gigante e sem cara de "pill" de texto. */
 .chat-mention {
   display: inline;
   border: none;
@@ -1467,11 +1288,9 @@ h3.chat-heading {
 .chat-mention:disabled { cursor: text; }
 .chat-mention.me { background: var(--warning-soft); color: var(--warning); }
 .chat-mention.me:hover:not(:disabled) { background: var(--warning-soft); filter: brightness(1.15); }
-/* A mensagem inteira ganha uma faixa sutil quando menciona voce - facil de achar na rolagem. */
 .chat-message.mentioned { background: var(--warning-soft); border-left: 2px solid var(--warning); padding-left: 8px; }
 .chat-message.mentioned:hover { background: var(--warning-soft); }
 
-/* Preview da mensagem original, mostrado em cima de quem respondeu a ela. */
 .chat-reply-preview {
   display: flex;
   align-items: center;
@@ -1490,14 +1309,12 @@ h3.chat-heading {
 .chat-reply-preview strong { color: var(--text-secondary); font-weight: 600; flex-shrink: 0; }
 .chat-reply-preview span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Flash breve quando "pula" pra mensagem original ao clicar no preview de resposta. */
 @keyframes chat-message-flash {
   0%, 100% { background: transparent; }
   30% { background: var(--accent-soft); }
 }
 .chat-message-flash { animation: chat-message-flash 1.1s ease; }
 
-/* Barra "Respondendo a X" acima do input, antes de enviar. */
 .chat-replying-bar {
   display: flex;
   align-items: center;
@@ -1511,9 +1328,6 @@ h3.chat-heading {
 .chat-replying-bar strong { color: var(--text-primary); }
 .chat-replying-bar .icon-btn { margin-left: auto; flex-shrink: 0; }
 
-/* Reacoes com emoji embaixo do conteudo da mensagem (ver ChatWindow.jsx/MessageReaction no
-   backend) - cada pill mostra o emoji + quantas pessoas reagiram, clicavel pra dar/tirar a
-   SUA reacao (toggle). ".mine" destaca quando voce e' uma delas. */
 .chat-reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .chat-reaction {
   display: flex;
@@ -1531,12 +1345,6 @@ h3.chat-heading {
 .chat-reaction-count { color: var(--text-muted); font-weight: 600; }
 .chat-reaction.mine .chat-reaction-count { color: var(--accent-text); }
 
-/* Picker de emoji com categorias (botao de carinha nas acoes da mensagem, ver EmojiPicker.jsx)
-   - antes era uma lista fixa de 32 emojis numa gradinha so' (QUICK_REACTIONS); agora e'
-   dividido em categorias com abas em cima, igual o Discord (pedido explicito do usuario, com
-   print comparando os dois - "o Concorde tem muito pouco"). */
-/* Aumentado (pedido explicito do usuario: "deixe a secao de escolha dos emojis maior, pra ver
-   os emojis") - largura, altura da grade e tamanho de cada emoji, tudo maior que antes. */
 .emoji-picker {
   margin-top: 6px;
   padding: 10px;
@@ -1593,8 +1401,6 @@ h3.chat-heading {
 }
 .emoji-picker-grid button:hover { background: var(--bg-hover); }
 
-/* "Fulano esta digitando..." (ver ChatController.typing no backend) - abaixo da ultima
-   mensagem, some sozinho quando ninguem mais esta digitando (ver ChatWindow.jsx). */
 .chat-typing-indicator {
   padding: 4px 10px;
   font-size: 12px;
@@ -1602,7 +1408,6 @@ h3.chat-heading {
   color: var(--text-muted);
 }
 
-/* Botoes de editar/apagar so aparecem ao passar o mouse na mensagem (padrao Discord/Slack) */
 .chat-message-actions {
   display: none;
   align-items: center;
@@ -1645,9 +1450,6 @@ h3.chat-heading {
 
 .chat-input { display: flex; align-items: center; gap: 8px; padding: 16px 20px 20px; }
 .chat-attach-btn { flex-shrink: 0; }
-/* Botao de emoji do PROPRIO campo de digitar (insere no texto, ver insertEmojiIntoDraft em
-   ChatWindow.jsx/DmChatWindow.jsx) - abre PRA CIMA (a barra de digitar fica no fim da tela,
-   embaixo nao tem espaco nenhum), diferente do picker de reacao que abre pra baixo. */
 .chat-emoji-btn-wrap { position: relative; flex-shrink: 0; }
 .emoji-picker-composer-wrap { position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 30; }
 .chat-input-field { position: relative; flex: 1; min-width: 0; }
@@ -1668,7 +1470,6 @@ h3.chat-heading {
 }
 .chat-input button[type="submit"]:hover:not(:disabled) { background: var(--accent-hover); }
 
-/* Autocomplete de @mencao - abre PRA CIMA (o input fica embaixo, colado na barra inferior). */
 .mention-menu {
   position: absolute;
   bottom: calc(100% + 8px);
@@ -1700,8 +1501,6 @@ h3.chat-heading {
 }
 .mention-option:hover, .mention-option.active { background: var(--bg-hover); }
 
-/* Autocomplete de "/" (ver getSlashMenuState em ChatWindow.jsx) - mesmo cartao do @mencao,
-   so' com um rotulo (ex: "/roll" ou "d20") + descricao ao lado em vez de avatar+nome. */
 .slash-option { justify-content: flex-start; gap: 10px; }
 .slash-option-command {
   font-family: ui-monospace, "SF Mono", Consolas, monospace;
@@ -1727,12 +1526,7 @@ h3.chat-heading {
 }
 .chat-status.error { background: var(--danger-soft); color: var(--danger); }
 
-/* ============================================================
-   Voice
-   ============================================================ */
 .voice-join { flex: 1; display: flex; align-items: center; justify-content: center; }
-/* Quando a secao de membros aparece na tela de "Entrar na call" (ainda fora do
-   .voice-body), ela nao tem o padding/gap que as outras secoes ganham la dentro. */
 .voice-channel > .voice-section { margin: 0 24px 24px; }
 .voice-join button { background: var(--accent); color: #fff; padding: 12px 28px; font-size: 14.5px; border-radius: var(--radius-md); box-shadow: var(--glow-accent); }
 .voice-join button:hover { background: var(--accent-hover); }
@@ -1740,8 +1534,6 @@ h3.chat-heading {
 .voice-controls .danger { background: var(--danger-soft); color: var(--danger); }
 .voice-controls .danger:hover { background: var(--danger); color: #fff; }
 
-/* Conteudo do canal de voz organizado em cards, com scroll proprio - nada mais gruda
-   de ponta a ponta na tela (era o que deixava o video/participantes esticados). */
 .voice-body {
   flex: 1;
   overflow-y: auto;
@@ -1757,7 +1549,6 @@ h3.chat-heading {
 .voice-section-title-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .voice-section-sort-hint { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
 
-/* Botao primario pequeno (preenchido, cor de destaque) - "Compartilhar tela". */
 .btn-accent-sm {
   display: flex; align-items: center; gap: 6px;
   background: var(--accent); color: #fff;
@@ -1768,7 +1559,6 @@ h3.chat-heading {
 .btn-accent-sm.active { background: var(--danger); box-shadow: none; }
 .btn-accent-sm.active:hover { background: #ff5c6c; }
 
-/* Botao secundario pequeno (so' contorno) - "Assistir transmissão" / "Testar microfone". */
 .btn-outline-sm {
   display: flex; align-items: center; gap: 6px;
   background: transparent;
@@ -1777,8 +1567,6 @@ h3.chat-heading {
   font-size: 12.5px; padding: 7px 13px;
 }
 .btn-outline-sm:hover { background: var(--bg-hover); color: var(--text-primary); }
-/* "active" aqui marca a transmissao PAUSADA (voce parou de assistir) - destaca em azul pra
-   chamar atencao de que precisa clicar de novo pra voltar a ver, nao e' um erro. */
 .btn-outline-sm.active { border-color: rgba(47,107,255,0.4); background: var(--accent-soft); color: var(--accent-text); }
 .voice-section {
   background: var(--bg-panel);
@@ -1792,7 +1580,6 @@ h3.chat-heading {
   text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 12px;
 }
 
-/* Pilula "Microfone ativo/mutado" no cabecalho da secao SEU MICROFONE. */
 .mic-status-pill {
   padding: 4px 10px;
   border-radius: var(--radius-pill);
@@ -1806,9 +1593,6 @@ h3.chat-heading {
 .mic-meter-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-secondary); font-weight: 600; }
 .mic-meter-icon { display: flex; color: var(--text-muted); flex-shrink: 0; }
 .mic-meter-icon.danger { color: var(--danger); }
-/* Medidor estilo equalizador (varias barrinhas finas em vez de uma barra unica) - as que
-   estao "dentro" do nivel atual acendem, o resto fica apagado. Ver MIC_SEGMENT_COUNT em
-   VoiceChannel.jsx. */
 .mic-meter-segments { flex: 1; display: flex; align-items: center; gap: 2.5px; height: 18px; }
 .mic-meter-segment {
   flex: 1;
@@ -1862,8 +1646,6 @@ h3.chat-heading {
   font-size: 11.5px; font-weight: 700; flex-shrink: 0;
 }
 .voice-avatar.small { width: 22px; height: 22px; font-size: 9.5px; }
-/* Anel verde de "falando agora" - reaproveitado tanto nos cards da tela de voz (card inteiro
-   ganha borda) quanto na lista aninhada da sidebar (so' o avatar, que e' bem menor ali). */
 .voice-avatar.speaking { box-shadow: 0 0 0 2px var(--success); }
 .voice-status-badge {
   display: flex; align-items: center; gap: 4px;
@@ -1877,9 +1659,6 @@ h3.chat-heading {
 
 .voice-hint:first-child { margin-top: 0; }
 
-/* Popover de volume individual - abre no botao direito do mouse em cima do avatar de
-   alguem na lista de "quem esta na call" (aninhada sob o canal, ver ChannelSidebar.jsx),
-   posicionado onde o clique aconteceu. */
 .volume-popover {
   position: fixed;
   z-index: 60;
@@ -1889,9 +1668,6 @@ h3.chat-heading {
   padding: 10px 12px;
   box-shadow: var(--shadow-md);
   width: 220px;
-  /* Reposicionado com a altura real em ChannelSidebar.jsx (ver useLayoutEffect) - esse
-     max-height + scroll e' so' o ultimo recurso, pra quando o conteudo (lista de "mover
-     para") for maior que a propria tela caber. */
   max-height: calc(100vh - 16px);
   overflow-y: auto;
 }
@@ -1905,9 +1681,6 @@ h3.chat-heading {
   white-space: nowrap;
 }
 
-/* Acoes de moderacao (mover/mutar/ensurdecer/expulsar) dentro do mesmo popover - ver
-   participantMenu em ChannelSidebar.jsx. Cada botao e' uma linha de menu, nao um botao
-   "normal" (largura total, alinhado a esquerda, sem preenchimento solido). */
 .participant-mod-actions { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
 .participant-mod-actions:not(:first-child) { padding-top: 8px; border-top: 1px solid var(--border-soft); }
 .participant-mod-submenu-label {
@@ -1936,31 +1709,20 @@ h3.chat-heading {
 .participant-mod-btn.danger { color: var(--danger); }
 .participant-mod-btn.danger:hover { background: var(--danger-soft); }
 
-/* Canal de voz recebendo um arraste de participante (ver draggable/onDrop em
-   ChannelSidebar.jsx) - destaca pra indicar que soltar ali move a pessoa pra esse canal. */
 .channel-item.drop-target {
   border-color: var(--accent) !important;
   background: var(--accent-soft) !important;
   box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
-/* Controle de volume 0-200% - reaproveitado pra voz de cada participante e pro audio da
-   transmissao de tela selecionada. Acima de 100% (boosted) o preenchimento fica laranja,
-   pra deixar claro visualmente que aquilo esta sendo amplificado alem do normal. */
 .volume-slider-row { display: flex; align-items: center; gap: 8px; }
-/* accent-color sozinho estiliza a cor mas nao o TAMANHO do polegar nativo do navegador/SO
-   (em alguns Chrome/Windows sai bem maior que o resto da UI, deixando a linha toda mais alta).
-   Zera a aparencia nativa e desenha um trilho fino + bolinha pequena do zero, igual em qualquer
-   navegador. */
 .volume-slider {
   flex: 1;
-  min-width: 0; /* input[type=range] tem uma largura minima intrinseca no navegador que o
-    flexbox nao encolhe sozinho - sem isso o valor (%) ficava empurrado pra fora da caixa
-    (aconteceu no popover, que e' mais estreito que o resto da UI). */
+  min-width: 0;
   -webkit-appearance: none !important;
   -moz-appearance: none !important;
   appearance: none !important;
-  height: 14px; /* area de clique confortavel - o trilho visual em si fica bem mais fino (ver track abaixo) */
+  height: 14px;
   background: transparent !important;
   cursor: pointer;
 }
@@ -1975,7 +1737,7 @@ h3.chat-heading {
   -webkit-appearance: none !important;
   width: 10px;
   height: 10px;
-  margin-top: -4px; /* centraliza a bolinha de 10px sobre o trilho de 4px */
+  margin-top: -4px;
   border-radius: 50%;
   background: var(--accent);
   border: none;
@@ -2006,10 +1768,6 @@ h3.chat-heading {
   flex-shrink: 0;
 }
 
-/* ============================================================
-   Lista de membros (online/offline) - painel a direita, espelha
-   a largura/comportamento de recolher do channel-sidebar.
-   ============================================================ */
 .member-list {
   width: 220px;
   background: var(--bg-panel);
@@ -2059,9 +1817,6 @@ h3.chat-heading {
 }
 .member-row:hover { background: var(--bg-hover); }
 .member-row.offline { opacity: 0.5; }
-/* Coluna (nome+cargo numa linha, "ouvindo Spotify" embaixo) - antes era so' um <span> de nome
-   solto; virou coluna pra caber a linha extra do Spotify sem esticar a altura toda da linha
-   (ver MemberList.jsx). */
 .member-row-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
 .member-row-name-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .member-row-name {
@@ -2072,8 +1827,6 @@ h3.chat-heading {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* "Ouvindo Spotify" (ver useSpotifyNowPlaying.js) - verde da marca, igual o badge que o
-   Discord usa pra essa mesma integração. */
 .member-row-spotify {
   display: flex;
   align-items: center;
@@ -2100,7 +1853,6 @@ h3.chat-heading {
 .status-dot.dnd { background: var(--danger); }
 .status-dot.offline { background: var(--text-muted); }
 
-/* Dropdown de status em Configuracoes (Online/Ausente/Nao perturbe/Invisivel) */
 .status-dropdown { position: relative; width: 100%; }
 .status-dropdown-trigger {
   display: flex;
@@ -2150,8 +1902,6 @@ h3.chat-heading {
 .status-option strong { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
 .status-option small { font-size: 11.5px; color: var(--text-muted); }
 
-/* Ninguem compartilhando ainda: caixa tracejada com icone, maior e mais convidativa do que
-   so' um texto solto. */
 .screenshare-empty {
   display: flex;
   flex-direction: column;
@@ -2168,13 +1918,8 @@ h3.chat-heading {
 .screenshare-empty svg { color: var(--text-muted); }
 .screenshare-empty p { margin: 0; }
 
-/* Soundboard (ver SoundboardPanel.jsx/SoundboardController no backend) - banco de sons
-   PESSOAL de cada usuario, so' ele ve a lista. Clicar num som toca ele pra todo mundo na call. */
 .soundboard-hint { margin-bottom: 10px !important; }
 
-/* Dropzone pequena e quadrada pra subir um som novo - arrastar/soltar OU clicar (ver
-   SoundboardPanel.jsx), fica ao lado dos chips em vez de uma barra comprida ocupando a
-   largura toda. Nao e' mais um formulario com campo de nome: o nome vem direto do arquivo. */
 .soundboard-dropzone {
   position: relative;
   display: flex;
@@ -2207,8 +1952,6 @@ h3.chat-heading {
   height: 18px;
 }
 
-/* Grade de chips, um do lado do outro - icone redondo + nome, lixeira sempre visivel (nao so'
-   no hover - sumia demais e ninguem achava). */
 .soundboard-grid {
   display: flex;
   flex-wrap: wrap;
@@ -2253,10 +1996,6 @@ h3.chat-heading {
 }
 .soundboard-clip.playing .soundboard-clip-icon { background: var(--accent); color: #fff; }
 .soundboard-clip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
-/* !important pelo mesmo motivo de .settings-inline-save button (ver comentario la') - usado
-   tambem dentro do modal de emojis do servidor (ver CustomEmojiModal.jsx), onde ".modal
-   button:not(...)" forçava width:100%/padding grande/fundo azul sem isso (reportado pelo
-   usuario com print: virava uma pilula azul gigante cobrindo a linha inteira). */
 .soundboard-clip-remove {
   display: flex !important;
   align-items: center;
@@ -2275,11 +2014,6 @@ h3.chat-heading {
 }
 .soundboard-clip-remove:hover { background: var(--danger-soft) !important; color: var(--danger); }
 
-/* Quadrado "escolher assistir" (ver ScreenShareTile em VoiceChannel.jsx) - tamanho proprio,
-   fixo e pequeno (nao usa o zoom de camera nem o de tela cheia - e' so' um "escolher"), mostra
-   o nome de quem esta compartilhando centralizado ate' voce clicar pra entrar naquela
-   transmissao especifica - pedido explicito do usuario: ninguem deve ver a tela de outro
-   automaticamente. */
 .screenshare-tile-pick {
   width: 200px;
   height: 120px;
@@ -2304,9 +2038,6 @@ h3.chat-heading {
   white-space: nowrap;
 }
 .screenshare-tile-pick-hint { font-size: 10.5px; color: var(--text-muted); }
-/* Substitui o <video> da sua PROPRIA transmissao quando o Concorde esta fora de foco (ver
-   previewPaused/useAppFocused em VoiceChannel.jsx) - economiza processamento nao desenhando
-   uma previa que ninguem esta olhando. Preenche o tile inteiro (mesmo espaco do video real). */
 .screenshare-preview-paused {
   position: absolute;
   inset: 0;
@@ -2321,8 +2052,6 @@ h3.chat-heading {
   color: var(--text-muted);
   font-size: 12px;
 }
-/* Botao de "parar de assistir" no canto oposto ao de tela cheia (ver .camera-tile-maximize),
-   mesmo estilo discreto-ate-o-hover. */
 .screenshare-tile-stop {
   position: absolute;
   top: 6px;
@@ -2345,9 +2074,6 @@ h3.chat-heading {
 @media (hover: none) {
   .screenshare-tile-stop { opacity: 1; }
 }
-/* Botao de "modo teatro" - por tela, POR ISSO fica dentro do proprio tile (nao no cabecalho
-   da secao) - ativar numa transmissao especifica nao deve afetar as outras. Ao lado do botao
-   de tela cheia, mesmo estilo discreto-ate-o-hover. */
 .screenshare-tile-theater-btn {
   position: absolute;
   top: 6px;
@@ -2372,9 +2098,6 @@ h3.chat-heading {
   .screenshare-tile-theater-btn { opacity: 1; }
 }
 
-/* Contador de fps de verdade (ver useTrackFps.js) - canto oposto ao nome (que fica embaixo a
-   esquerda, ver .camera-tile-name), sempre visivel (informativo, nao e' uma acao pra esconder
-   ate' o hover como os botoes ao lado). */
 .screenshare-fps-badge {
   position: absolute;
   bottom: 6px;
@@ -2387,9 +2110,6 @@ h3.chat-heading {
   font-weight: 600;
 }
 
-/* Icone "quem esta vendo essa transmissao agora" (ScreenShareTile) - pedido explicito do
-   usuario. Terceiro slot na fileira de cima (ver .screenshare-tile-theater-btn "right:36px" e
-   .camera-tile-maximize "right:6px" - esse aqui fica mais a esquerda dos dois, "right:66px"). */
 .screenshare-watchers-wrap { position: absolute; top: 6px; right: 66px; }
 .screenshare-watchers-btn {
   display: flex;
@@ -2443,15 +2163,8 @@ h3.chat-heading {
   color: var(--text-primary);
 }
 
-/* Tela cheia de uma transmissao (ver ScreenShareTile.handleMaximize, fullscreena o container
-   INTEIRO, nao so' o <video> - senao nada consegue aparecer por cima dele). Video ganha
-   object-fit:contain so' nesse estado (senao "cover" cortaria as bordas em telas com proporcao
-   diferente da do monitor de quem assiste). */
 .camera-tile:fullscreen { background: #000; }
 .camera-tile:fullscreen video { object-fit: contain; }
-/* Botao "quem esta na call" - so' existe/aparece quando em tela cheia (ver isFullscreen em
-   ScreenShareTile). Canto oposto de onde o botao de tela cheia normal fica, pra nao competir
-   com o controle nativo de sair da tela cheia do proprio navegador (geralmente canto superior). */
 .fullscreen-overlay-toggle {
   position: absolute;
   bottom: 16px;
@@ -2471,9 +2184,6 @@ h3.chat-heading {
 .fullscreen-overlay-toggle:hover { background: rgba(4, 5, 8, 0.85); }
 .fullscreen-overlay-toggle.active { background: var(--accent); }
 
-/* Facepile flutuante por cima do video em tela cheia (ver FullscreenParticipantStrip) - igual
-   o Discord: uma fileira de circulos (camera de quem tiver ligada, senao avatar), com anel
-   verde em quem esta falando agora. Rola na horizontal se nao couber todo mundo. */
 .fullscreen-participant-strip {
   position: absolute;
   left: 16px;
@@ -2493,11 +2203,6 @@ h3.chat-heading {
   flex-shrink: 0;
   width: 168px;
 }
-/* Retangulo (nao quadrado nem circulo) - mesma proporcao do tile de camera ligada normal
-   (.camera-tile-md, 168x94, ver VoiceChannel.jsx) pra ficar consistente com o resto do app. O
-   video (FullscreenParticipantCamera) preenche o retangulo INTEIRO via object-fit:cover - se
-   aparecer pequeno/sobrando fundo, e' o conteudo de origem em si (ex: placeholder da OBS
-   Virtual Camera quando nenhuma cena esta ativa), nao um recorte feito aqui. */
 .fullscreen-participant-avatar {
   width: 168px;
   height: 94px;
@@ -2525,10 +2230,6 @@ h3.chat-heading {
   white-space: nowrap;
 }
 
-/* Webcams - ao contrario da tela compartilhada (um "palco" so' de cada vez), varias podem
-   ficar ligadas ao mesmo tempo, entao aparecem lado a lado em tiles pequenos. O tamanho de
-   cada tile vem da classe .camera-tile-<size> (ver CAMERA_SIZES/botoes +/- em
-   VoiceChannel.jsx) - afeta todos os tiles de uma vez. */
 .camera-grid { display: flex; flex-wrap: wrap; gap: 10px; }
 .camera-tile {
   position: relative;
@@ -2541,15 +2242,7 @@ h3.chat-heading {
 .camera-tile-md { width: 168px; height: 94px; }
 .camera-tile-lg { width: 240px; height: 135px; }
 .camera-tile-xl { width: 340px; height: 191px; }
-/* Tela compartilhada assistida (ou a sua propria, se estiver compartilhando - ve do MESMO
-   jeito que quem esta assistindo) - bem maior que webcam, texto/detalhe numa tela precisa de
-   mais espaco pra dar pra ler. So' dois tamanhos por tile (sem zoom manual, pedido explicito
-   do usuario): normal e "modo teatro" - e' POR TELA (ver theaterSids/WidenIcon em
-   VoiceChannel.jsx), ativar numa transmissao nao mexe nas outras. */
 .screenshare-tile-default { width: 560px; height: 315px; max-width: 100%; }
-/* Sempre ocupa a linha toda sozinha (flex-basis:100%) mesmo dentro do .camera-grid flex-wrap
-   normal - com varias transmissoes, uma em modo teatro nao devia tentar dividir espaco na
-   mesma linha que as outras (pequenas ou nao). */
 .screenshare-tile-theater { flex-basis: 100%; width: 100%; max-width: 1600px; aspect-ratio: 16 / 9; height: auto; }
 .camera-tile video {
   width: 100%;
@@ -2558,11 +2251,6 @@ h3.chat-heading {
   display: block;
   cursor: pointer;
 }
-/* Tela compartilhada (normal ou "modo teatro") NAO pode usar cover como webcam usa - cover
-   corta as bordas pra preencher a caixa toda, e' aceitavel numa webcam (um rostinho) mas numa
-   tela inteira corta conteudo de verdade (barra de tarefas, texto na borda, etc - reportado
-   pelo usuario como "parece que ta dando zoom e cortando"). contain mostra a tela INTEIRA,
-   com uma tarja preta dos lados se a proporcao nao bater exatamente com a caixa. */
 .screenshare-tile-default video,
 .screenshare-tile-theater video {
   object-fit: contain;
@@ -2583,8 +2271,6 @@ h3.chat-heading {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Botao de tela cheia - fica discreto no canto, so' se destaca no hover do tile (mouse) -
-   sempre visivel em telas touch (sem hover) pra nao ficar escondido. */
 .camera-tile-maximize {
   position: absolute;
   top: 6px;
@@ -2608,10 +2294,6 @@ h3.chat-heading {
   .camera-tile-maximize { opacity: 1; }
 }
 
-/* Janela separada so' com as cameras (Document Picture-in-Picture, ver CameraPipWindow.jsx) -
-   ela clona essas MESMAS folhas de estilo pro proprio <head>, entao essas classes tambem valem
-   la' dentro. Comeca com um document vazio (sem "html,body,#root{height:100%}" do topo do
-   arquivo) - daqui pra baixo cuida da altura/fundo sozinho. */
 .camera-pip-body {
   margin: 0;
   height: 100vh;
@@ -2626,15 +2308,8 @@ h3.chat-heading {
   box-sizing: border-box;
   min-height: 100%;
 }
-/* Dentro do PiP as cameras devem preencher o quadradinho que o grid deu pra elas (maiores,
-   lado a lado) em vez do tamanho fixo em px de ".camera-tile-<size>" (pensado pro grid normal,
-   que flui/quebra linha - ver .camera-grid acima) - especificidade de 2 classes juntas ja'
-   ganha da de 1 classe so', nao precisa de !important. */
 .camera-pip-grid .camera-tile { width: 100%; height: 100%; aspect-ratio: 16 / 9; }
 
-/* ============================================================
-   Lightbox (visualizador de imagem em tela cheia - ver ImageLightbox.jsx)
-   ============================================================ */
 .lightbox-backdrop {
   position: fixed; inset: 0; z-index: 1000;
   background: rgba(4, 5, 8, 0.9);
@@ -2643,9 +2318,6 @@ h3.chat-heading {
   padding: 60px 20px 20px;
   cursor: zoom-out;
 }
-/* Container do zoom/arraste (ver ImageLightbox.jsx) - precisa ocupar o espaco todo disponivel
-   (nao so' o tamanho da imagem) pra dar pra arrastar em qualquer direcao quando tiver com
-   zoom, e pra capturar a rolagem do mouse mesmo fora da imagem em si. */
 .lightbox-image-wrap {
   width: 100%;
   height: 100%;
@@ -2654,11 +2326,6 @@ h3.chat-heading {
   justify-content: center;
   overflow: hidden;
   touch-action: none;
-  /* Sem isso, uma imagem grande o suficiente pra chegar perto dos cantos desenhava POR CIMA da
-     barra de ferramentas/aviso de copiado (que vem antes no HTML, mas nenhum dos tres tinha
-     z-index explicito - a ordem de empilhamento ficava so' por ordem do DOM, e esse container
-     vem depois). Um z-index mais baixo aqui (ver .lightbox-toolbar/.lightbox-copy-toast
-     abaixo, que ficam mais alto) garante que os controles sempre ficam acessiveis por cima. */
   z-index: 1;
 }
 .lightbox-image {
@@ -2669,9 +2336,6 @@ h3.chat-heading {
   cursor: default;
   user-select: none;
 }
-/* Confirmacao rapida de "copiar imagem" (pedido explicito do usuario) - mesmo canto do resto
-   da barra de ferramentas, some sozinha depois de um instante (ver setTimeout em
-   ImageLightbox.jsx). */
 .lightbox-copy-toast {
   position: fixed;
   z-index: 2;
@@ -2704,28 +2368,13 @@ h3.chat-heading {
 }
 .lightbox-toolbar .icon-btn { color: var(--text-secondary); }
 .lightbox-toolbar .icon-btn:hover { color: var(--text-primary); }
-/* No app desktop, a barra de titulo customizada (ver DesktopTitleBar.jsx) fica FIXA no topo,
-   por cima de tudo (z-index bem mais alto que o do lightbox) - sem esse ajuste, a barra de
-   ferramentas (e o aviso de "copiado") nasciam parcialmente ATRAS dela, cortadas (reportado
-   pelo usuario: "os botões de interação com uma imagem" bugados so' no desktop). No navegador
-   normal (sem essa barra) nada muda. */
 html[data-desktop-titlebar="true"] .lightbox-toolbar { top: 54px; }
 html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 
-/* ============================================================
-   Modal
-   ============================================================ */
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(4, 5, 8, 0.72);
   backdrop-filter: blur(2px);
   display: flex; align-items: center; justify-content: center;
-  /* Sem z-index explicito, o backdrop ficava sujeito a ordem do DOM - qualquer elemento
-     posicionado (fixed/absolute) declarado DEPOIS dele na arvore (ex: avatares de quem esta
-     conectado na call, na sidebar) empatava e vencia por ordem, aparecendo por cima do modal
-     (reportado: "Sair da conta" ficando atras dos avatares). Um numero bem alto garante que
-     todo modal (ConfirmModal, SettingsModal, etc) sempre fica acima de qualquer outra coisa
-     da tela, independente de onde ele e' renderizado no JSX.
-  */
   z-index: 10000;
 }
 .modal {
@@ -2750,8 +2399,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 .modal button.danger:hover { background: var(--danger); color: #fff; }
 .modal-wide { width: 640px; max-width: calc(100vw - 40px); }
 
-/* Seletor de tela/janela customizado (Electron, ver ScreenSharePicker.jsx) - so' existe
-   dentro do app desktop, nunca no navegador. */
 .screen-picker-tabs { display: flex; gap: 8px; }
 .screen-picker-tab {
   display: flex; align-items: center; gap: 6px;
@@ -2794,19 +2441,9 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 .screen-picker-name {
   display: flex; align-items: center; gap: 6px;
   font-size: 12px; font-weight: 600; color: var(--text-secondary);
-  /* "overflow/text-overflow/white-space" precisam estar no SPAN DE TEXTO em si (ver
-     .screen-picker-name-text abaixo), nao aqui - nesse container flex (que tambem tem o icone
-     como filho) eles nao cortam o texto direito, so' deixa o nome vazando pra fora do card
-     (reportado - nome de aba/janela grande "estourando" o espaco do popup). */
   min-width: 0;
 }
 .screen-picker-name-text {
-  /* "display:block" e' necessario pra "text-overflow:ellipsis" funcionar de verdade num filho
-     de flexbox - um <span> normal (inline) nao respeita "overflow:hidden" direito. "flex:1" +
-     "width:100%" (em vez de so' "min-width:0") - sem isso, um nome de janela/aba comprido
-     ainda "vazava"/ficava "passando" pro lado de vez em quando (reportado de novo pelo
-     usuario), porque o span so' encolhia ate' o tamanho que o FLEX calculava, nao ate' a
-     largura real disponivel do card. */
   display: block;
   flex: 1 1 0;
   width: 100%;
@@ -2818,10 +2455,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 .invite-link-row input { flex: 1; }
 .invite-link-row button { width: auto; margin-top: 0; white-space: nowrap; }
 
-/* Modal de configuracoes: cabecalho fixo + navegacao lateral por abas (esquerda) + conteudo
-   da aba selecionada (direita, com scroll proprio) + rodape de acoes fixo - bem mais largo
-   que o modal padrao (era uma lista unica, comprida, de tudo empilhado - "muito feio, mal
-   ordenado" no feedback do usuario). */
 .settings-modal {
   width: 760px;
   max-width: calc(100vw - 40px);
@@ -2874,8 +2507,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 }
 .settings-content .settings-section-title:first-child { margin-top: 0; }
 
-/* Log de auditoria (ver AuditLogModal.jsx/AuditLogService no backend) - lista simples,
-   mais recente primeiro. */
 .audit-log-list { display: flex; flex-direction: column; gap: 2px; max-height: 55vh; overflow-y: auto; }
 .audit-log-entry {
   display: flex;
@@ -2909,16 +2540,9 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
   margin: 0; text-transform: uppercase; letter-spacing: 0.04em;
 }
 .settings-field { display: flex; flex-direction: column; gap: 6px; }
-/* Input + botao de salvar lado a lado, pra acoes pontuais dentro de uma aba (ex: apelido
-   por servidor) que nao fazem sentido esperar ate' o "Salvar" geral do rodape. */
 .settings-inline-save { display: flex; gap: 8px; }
 .settings-inline-save input { flex: 1; }
-/* !important pelo mesmo motivo de .settings-actions button acima - ".modal button:not(...)"
-   e' mais especifico e força width:100%/margin-top sem isso. */
 .settings-inline-save button { width: auto !important; margin-top: 0 !important; flex-shrink: 0; padding: 10px 16px; }
-/* Card de "Conectar Spotify" (Configurações > Conexões, ver SettingsModal.jsx) - mesmo layout
-   do .avatar-picker acima (icone + texto + botao numa linha). !important pelo mesmo motivo de
-   .settings-inline-save button acima. */
 .spotify-connect-card {
   display: flex;
   align-items: center;
@@ -2932,7 +2556,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 .spotify-connect-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .spotify-connect-info strong { font-size: 13.5px; }
 .spotify-connect-card button { width: auto !important; margin-top: 0 !important; flex-shrink: 0; white-space: nowrap; }
-/* "Seus servidores" (Configurações > Perfil) - lista simples, so' leitura. */
 .settings-server-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .settings-server-list li {
   display: flex; align-items: center; gap: 8px;
@@ -2942,9 +2565,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
   background: var(--bg-panel-2);
 }
 
-/* Perfis do servidor (ServerRolesModal.jsx) - cada secao (lista de perfis, formulario de
-   criar/editar, atribuir a um membro) fica dentro de um "cartao" proprio, mais facil de
-   escanear visualmente do que tudo solto na mesma coluna. */
 .roles-section-card {
   background: var(--bg-panel-2);
   border: 1px solid var(--border-soft);
@@ -2984,8 +2604,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
   flex-direction: column;
   gap: 8px;
 }
-/* Grade de 2 colunas em telas largas o bastante (o modal tem 620px+) - cada permissao vira um
-   "chip" selecionavel em vez de uma lista vertical crua de checkbox + texto. */
 .role-permission-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -3031,27 +2649,14 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 }
 .settings-test-row { margin: 0; }
 .settings-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 4px; }
-/* !important pra vencer ".modal button:not(...)" (mais especifico por causa dos varios
-   :not() - a mesma guerra de especificidade documentada acima em input[type=range]) - sem
-   isso o botao "Salvar"/"Confirmar" ficava width:100%, gigante do lado do "Cancelar" pequeno
-   (link-btn) numa linha so'. */
 .settings-actions button:not(.link-btn) { width: auto !important; padding: 10px 20px; margin-top: 0; }
 
-/* ============================================================
-   Admin panel (classes exclusivas do painel ficam em pages/admin/style.css -
-   admin-hint/admin-badge continuam aqui por serem reaproveitadas em varios outros lugares)
-   ============================================================ */
 .admin-hint { color: var(--text-muted); font-size: 12.5px; margin: -6px 0 4px; line-height: 1.5; }
 .admin-badge {
   background: var(--accent-soft); color: var(--accent-text); font-size: 10.5px; font-weight: 700;
   padding: 2px 7px; border-radius: 999px; margin-left: 8px; text-transform: uppercase; letter-spacing: 0.04em;
 }
 
-/* ============================================================
-   Cartao de perfil (ProfileModal.jsx) - banner colorido com o avatar "flutuando" por cima
-   (estilo Discord), depois secoes bem separadas (Sobre mim / Informacoes) em vez de tudo
-   solto num paragrafo so' (pedido explicito do usuario: "bem organizada, bem dividida").
-   ============================================================ */
 .profile-modal { width: 380px; padding: 0; gap: 0; overflow: hidden; }
 .profile-banner {
   height: 72px;
@@ -3090,13 +2695,7 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
   margin-bottom: 14px;
 }
 .profile-status-pill .status-dot { position: static; width: 8px; height: 8px; border: none; }
-/* Acao de amizade no perfil de um membro (ver ProfileModal.jsx) - "Adicionar amigo"/"Pedido
-   enviado"/"Aceitar pedido"/"Enviar mensagem", pedido explicito do usuario: dava pra fazer isso
-   direto no perfil de quem tem acesso ao servidor, nao so' pela tela de Amigos. */
 .profile-friend-action { margin-bottom: 14px; }
-/* !important pelo mesmo motivo de .settings-inline-save button acima - ".modal button:not(...)"
-   e' mais especifico e força width:100%/padding grande sem isso (reportado pelo usuario com
-   print: botao esticado a largura toda, feio). */
 .profile-friend-action button {
   display: inline-flex;
   align-items: center;
@@ -3129,8 +2728,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 .profile-info-value { font-size: 13px; font-weight: 600; color: var(--text-primary); }
 .profile-section-title-spotify { display: flex; align-items: center; gap: 4px; }
 .profile-section-title-spotify svg { flex-shrink: 0; }
-/* "Ouvindo Spotify" no cartao de perfil (ver ProfileModal.jsx/useSpotifyNowPlaying.js) - capa
-   do album + musica/artista, clicavel (abre a musica no proprio Spotify). */
 .profile-spotify-card {
   display: flex;
   align-items: center;
@@ -3147,8 +2744,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 .profile-spotify-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .profile-spotify-info strong { font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-spotify-info span { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Lista de membros pra marcar em "Restringir acesso" de uma categoria (ver
-   CategoryAccessModal.jsx). */
 .category-access-list {
   display: flex;
   flex-direction: column;
@@ -3168,8 +2763,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 .category-access-row:hover { background: var(--bg-hover); }
 .category-access-row input { flex-shrink: 0; }
 
-/* Mapa de batalha (kit de RPG, ver BattleMap.jsx) - dentro de uma secao normal do canal de
-   voz (mesmo "voice-section" das cameras/microfone). */
 .battle-map-section-title { display: flex; align-items: center; gap: 5px; }
 .battle-map-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .battle-map-toolbar .icon-btn {
@@ -3182,9 +2775,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
-/* Aviso pro mestre quando ele esta' olhando um mapa que os jogadores AINDA NAO veem (mapa em
-   preparo, diferente do ativo) - pedido explicito do usuario: precisa ficar claro que so' ele
-   enxerga aquilo, com um atalho pra publicar sem reabrir o menu "Mapas". */
 .battle-map-preview-banner {
   display: flex;
   align-items: center;
@@ -3208,10 +2798,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 .battle-map-viewport {
   position: relative;
   width: 100%;
-  /* Aumentado de novo (pedido explicito do usuario: "aumente ele mais pra baixo") - calc com o
-     topo da propria viewport em vez de um numero fixo, pra aproveitar quase toda a altura da
-     tela disponivel mesmo em monitores menores, sem estourar pra fora e cortar o resto da
-     sidebar. */
   height: calc(100vh - 160px);
   min-height: 560px;
   max-height: 1300px;
@@ -3243,8 +2829,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
   display: flex;
   align-items: center;
   justify-content: center;
-  /* So' entra em jogo quando o token TEM imagem customizada (ver style inline em
-     BattleMap.jsx) - sem imagem, o fundo continua sendo so' a cor solida de sempre. */
   background-size: cover;
   background-position: center;
 }
@@ -3274,18 +2858,8 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 }
 .battle-map-color-swatch.active { border-color: var(--text-primary); }
 
-/* Popover de editar token (ver BattleMap.jsx) - nasce fora da tela (top/left calculados so'
-   depois de renderizado, ver useLayoutEffect) pra nunca "piscar" no canto errado; largura
-   um pouco maior que o volume-popover padrao pra caber a linha de cores + os botoes de
-   imagem sem precisar de barra de rolagem (reportado pelo usuario: "está cortando"). overflow-x
-   hidden explicito - sem isso, so' ter "overflow-y: auto" (herdado de .volume-popover) ja' basta
-   pro navegador tratar o eixo X tambem como "auto" (regra da propria especificacao de CSS) e
-   mostrar uma barrinha horizontal do nada quando o conteudo bate certinho na borda. */
 .battle-map-token-popover { top: -9999px; left: -9999px; width: 236px; overflow-x: hidden; box-sizing: border-box; }
 
-/* Menu "Mapas" do mestre (varios mapas por canal, cada um com o proprio conjunto de tokens -
-   pedido explicito do usuario) - dropdown simples ancorado no proprio botao, mesmo padrao do
-   seletor de "Usar personagem" (.battle-map-character-picker). */
 .battle-map-menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -3306,10 +2880,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
   overflow-y: auto;
   margin-bottom: 8px;
 }
-/* Uma linha = uma miniatura clicavel (ver/preparar, so' o mestre enxerga) + botao "olho"
-   (torna o mapa ativo pros jogadores) + botao de apagar - 3 controles separados, nao mais um
-   soh botao (evita interativo-dentro-de-interativo e deixa "ver" e "publicar" bem distintos,
-   pedido explicito do usuario). Borda a esquerda marca qual mapa o MESTRE esta' vendo agora. */
 .battle-map-menu-row {
   display: flex;
   align-items: center;
@@ -3387,8 +2957,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
   background: var(--accent) !important;
 }
 
-/* Seletor de "Usar personagem" (foto de um personagem da mesa vira token direto, ver
-   BattleMap.jsx) - dropdown simples ancorado no proprio botao. */
 .battle-map-character-picker {
   position: absolute;
   top: calc(100% + 6px);
@@ -3426,19 +2994,10 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
   object-fit: cover;
 }
 
-/* Personagens de uma mesa de RPG (kit de RPG, ver CharacterSheetsModal.jsx) - grade de cards
-   com retrato grande em cima, inspirado no "Journal" do Roll20 (pedido explicito do usuario:
-   "pesquise como o Roll20 e deixe parecido" - a lista anterior era uma linha fina soh com
-   icones pequenos, "muito mal feita" no feedback do usuario). */
 .character-sheets-modal { width: 820px; max-width: calc(100vw - 40px); }
 .character-sheets-content { padding: 16px 22px; }
 .character-sheets-hint { margin-top: 0; }
 .character-sheets-create-form { margin-bottom: 14px; }
-/* Botao de criar personagem - pequeno, no cabecalho do modal (nao mais uma barra grandona
-   ocupando a largura toda, pedido explicito do usuario: "esse botão grandão... está muito
-   feio" - estilo mais parecido com o "+" discreto do Roll20 pra adicionar um personagem novo
-   no Journal). !important pelo mesmo motivo de sempre (".modal button:not(...)" forca
-   width:100%/padding sem isso). */
 .character-sheets-new-btn {
   width: auto !important;
   display: flex;
@@ -3466,9 +3025,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
   border-radius: var(--radius-md);
   overflow: hidden;
 }
-/* Retrato = o quadrado inteiro do topo, nao um circulo pequeno - e' o que da' o "jeito de
-   ficha de personagem" (Roll20 mostra assim na lista de personagens). !important pelo mesmo
-   motivo de sempre (".modal button:not(...)" forca width:100%/padding/background sem isso). */
 .character-card-portrait {
   position: relative;
   width: 100% !important;
@@ -3546,8 +3102,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
   border-top: 1px solid var(--border-soft);
 }
 
-/* Popup com o PDF embutido (ver CharacterSheetViewerModal) - bem maior que o modal de lista,
-   pra dar espaco de verdade pra ler a ficha. */
 .character-sheet-viewer-modal { width: min(820px, 92vw); height: min(880px, 88vh); display: flex; flex-direction: column; }
 .character-sheet-viewer-modal .settings-modal-header h2 { display: flex; align-items: center; gap: 8px; }
 .character-sheet-viewer-avatar { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; }
@@ -3560,8 +3114,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 }
 .profile-modal textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
-/* Painel de Amigos da Home (ver FriendsPanel.jsx/pages/home) - abas Online/Todos/Pendentes/
-   Adicionar amigo em cima, lista rolavel embaixo. Mesmos tokens de cor do resto do app. */
 .friends-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg-app); }
 .friends-panel-tabs {
   display: flex;
@@ -3608,9 +3160,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 .friends-add-form label { font-size: 11.5px; font-weight: 700; letter-spacing: 0.03em; color: var(--text-secondary); }
 .friends-add-row { display: flex; gap: 8px; }
 .friends-add-row input { flex: 1; }
-/* Aviso de erro/sucesso ao adicionar amigo (ver FriendsPanel.jsx) - antes era so' um
-   <p class="auth-error"> generico, ficava colado no input e fininho demais (reportado pelo
-   usuario, com print). Card de verdade agora: icone, mais respiro, borda sutil. */
 .friends-alert {
   display: flex;
   align-items: center;
@@ -3625,8 +3174,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 .friends-alert-icon { flex-shrink: 0; }
 .friends-alert.error { background: var(--danger-soft); color: var(--danger); }
 .friends-alert.success { background: var(--success-soft); color: var(--success); }
-/* Card de previa de quem sera adicionado (ver preview em FriendsPanel.jsx) - aparece ao
-   digitar um nome de usuario que existe, com foto+nome e um botao pra confirmar o pedido. */
 .friends-preview-card {
   display: flex;
   align-items: center;
@@ -3641,10 +3188,6 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 .friends-preview-info strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .friends-preview-info span { font-size: 12px; color: var(--text-muted); }
 
-/* Linha de amigo/pedido/bloqueado na Home (ver FriendsPanel.jsx) - o hover ficava "colado",
-   quase sem respiro nenhum (padding:4px + margin:-4px pra compensar, ver historico), reportado
-   pelo usuario com print ("muito junto e sem padding no hover"). Agora e' um padding de
-   verdade, sem trique de margin negativa. */
 .friend-row {
   display: flex;
   align-items: center;
