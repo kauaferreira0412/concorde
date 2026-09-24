@@ -16,20 +16,24 @@ public class JwtService {
 
     private final SecretKey key;
     private final long expirationMinutes;
+    private final long rememberExpirationMinutes;
 
     public JwtService(@Value("${app.jwt.secret}") String secret,
-                       @Value("${app.jwt.expiration-minutes}") long expirationMinutes) {
+                       @Value("${app.jwt.expiration-minutes}") long expirationMinutes,
+                       @Value("${app.jwt.remember-expiration-minutes}") long rememberExpirationMinutes) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMinutes = expirationMinutes;
+        this.rememberExpirationMinutes = rememberExpirationMinutes;
     }
 
-    public String generateToken(Long userId, String username) {
+    public String generateToken(Long userId, String username, boolean rememberMe) {
         Instant now = Instant.now();
+        long minutes = rememberMe ? rememberExpirationMinutes : expirationMinutes;
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("username", username)
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(expirationMinutes * 60)))
+                .expiration(Date.from(now.plusSeconds(minutes * 60)))
                 .signWith(key)
                 .compact();
     }

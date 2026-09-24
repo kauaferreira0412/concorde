@@ -39,7 +39,7 @@ public class AuthService {
         if (!passwordEncoder.matches(req.password(), user.getPasswordHash())) {
             throw new IllegalArgumentException("Credenciais invalidas");
         }
-        return buildAuthResponse(user);
+        return buildAuthResponse(user, Boolean.TRUE.equals(req.rememberMe()));
     }
 
     @Transactional
@@ -114,8 +114,8 @@ public class AuthService {
         return userRepository.findAll().stream().filter(u -> u.getRole() == Role.ADMIN).count();
     }
 
-    private AuthResponse buildAuthResponse(User user) {
-        String token = jwtService.generateToken(user.getId(), user.getUsername());
+    private AuthResponse buildAuthResponse(User user, boolean rememberMe) {
+        String token = jwtService.generateToken(user.getId(), user.getUsername(), rememberMe);
         return new AuthResponse(token, toUserResponse(user));
     }
 

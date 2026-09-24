@@ -26,6 +26,7 @@ app:
   jwt:
     secret: "troque-este-segredo-por-um-valor-forte-de-32-bytes-no-minimo"
     expiration-minutes: 1440
+    remember-expiration-minutes: 43200
   desktop:
     min-version-override: ${DESKTOP_MIN_VERSION:}
     download-url: ${DESKTOP_DOWNLOAD_URL:https://187-127-37-101.sslip.io/login}
@@ -52,7 +53,4 @@ app:
   spotify:
     client-id: ${SPOTIFY_CLIENT_ID:}
     client-secret: ${SPOTIFY_CLIENT_SECRET:}
-    # Precisa bater EXATAMENTE com uma das Redirect URIs cadastradas no Spotify Developer
-    # Dashboard (ver SpotifyService/SettingsModal.jsx) - o padrao local usa 127.0.0.1 (nao
-    # "localhost") porque o Spotify so' aceita http:// sem certificado nesse endereco exato.
     redirect-uri: ${SPOTIFY_REDIRECT_URI:http://127.0.0.1:8080/api/spotify/callback}

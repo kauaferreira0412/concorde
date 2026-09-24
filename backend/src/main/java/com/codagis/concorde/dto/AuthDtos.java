@@ -11,7 +11,8 @@ public class AuthDtos {
 
     public record LoginRequest(
             @NotBlank String usernameOrEmail,
-            @NotBlank String password
+            @NotBlank String password,
+            Boolean rememberMe
     ) {}
 
     public record UserResponse(Long id, String username, String email, String avatarUrl, Role role, UserStatus status,
