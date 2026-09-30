@@ -108,8 +108,20 @@ async function waitWhilePaused(session, ffmpeg) {
 
 function buildFrame(session, data) {
   const sampleCount = data.length / 2;
-  const int16 = session.forceMuted ? new Int16Array(sampleCount) : new Int16Array(data.buffer, data.byteOffset, sampleCount);
-  return new AudioFrame(int16, SAMPLE_RATE, CHANNELS, int16.length);
+  if (session.forceMuted) {
+    const silent = new Int16Array(sampleCount);
+    return new AudioFrame(silent, SAMPLE_RATE, CHANNELS, silent.length);
+  }
+  const source = new Int16Array(data.buffer, data.byteOffset, sampleCount);
+  const volume = session.volume ?? 1;
+  if (volume >= 0.999) {
+    return new AudioFrame(source, SAMPLE_RATE, CHANNELS, source.length);
+  }
+  const scaled = new Int16Array(sampleCount);
+  for (let i = 0; i < sampleCount; i++) {
+    scaled[i] = Math.max(-32768, Math.min(32767, Math.round(source[i] * volume)));
+  }
+  return new AudioFrame(scaled, SAMPLE_RATE, CHANNELS, scaled.length);
 }
 
 async function paceIfAhead(session) {

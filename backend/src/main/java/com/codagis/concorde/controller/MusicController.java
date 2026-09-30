@@ -5,6 +5,7 @@ import com.codagis.concorde.enums.ChannelType;
 import com.codagis.concorde.repository.ChannelRepository;
 import com.codagis.concorde.repository.MembershipRepository;
 import com.codagis.concorde.security.CurrentUser;
+import com.codagis.concorde.service.PermissionService;
 import com.codagis.concorde.service.SpotifyService;
 import com.codagis.concorde.ws.VoicePresenceService;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,17 +27,20 @@ public class MusicController {
     private final VoicePresenceService voicePresenceService;
     private final CurrentUser currentUser;
     private final SpotifyService spotifyService;
+    private final PermissionService permissionService;
     private final String musicBotUrl;
     private final RestTemplate restTemplate = new RestTemplate();
 
     public MusicController(ChannelRepository channelRepository, MembershipRepository membershipRepository,
                             VoicePresenceService voicePresenceService, CurrentUser currentUser,
-                            SpotifyService spotifyService, @Value("${app.music-bot.url}") String musicBotUrl) {
+                            SpotifyService spotifyService, PermissionService permissionService,
+                            @Value("${app.music-bot.url}") String musicBotUrl) {
         this.channelRepository = channelRepository;
         this.membershipRepository = membershipRepository;
         this.voicePresenceService = voicePresenceService;
         this.currentUser = currentUser;
         this.spotifyService = spotifyService;
+        this.permissionService = permissionService;
         this.musicBotUrl = musicBotUrl;
     }
 
@@ -44,6 +48,7 @@ public class MusicController {
     public record PlayResponse(String title, Integer durationSec, boolean queued) {}
     public record RemoveFromQueueRequest(int index) {}
     public record OpenQueueRequest(String name) {}
+    public record VolumeRequest(int volume) {}
 
     @PostMapping("/{channelId}/music/play")
     public PlayResponse play(@PathVariable Long channelId, @RequestBody PlayRequest req) {
@@ -66,15 +71,21 @@ public class MusicController {
     public Map<?, ?> queue(@PathVariable Long channelId) {
         Channel channel = requireVoiceChannel(channelId);
         assertCanControlMusic(channel);
+        boolean canSetVolume = permissionService.isOwnerOrGlobalAdmin(channel.getServerId(), currentUser.id());
         Map<String, Object> empty = new HashMap<>();
         empty.put("queueId", null);
         empty.put("active", false);
         empty.put("name", null);
         empty.put("nowPlaying", null);
         empty.put("queue", List.of());
+        empty.put("volume", 100);
+        empty.put("canSetVolume", canSetVolume);
         try {
-            Map<?, ?> response = restTemplate.getForObject(musicBotUrl + "/queue/" + channelId, Map.class);
-            return response == null ? empty : response;
+            Map response = restTemplate.getForObject(musicBotUrl + "/queue/" + channelId, Map.class);
+            if (response == null) return empty;
+            Map<String, Object> merged = new HashMap<>(response);
+            merged.put("canSetVolume", canSetVolume);
+            return merged;
         } catch (RestClientException e) {
             return empty;
         }
@@ -130,6 +141,15 @@ public class MusicController {
         callBot("/pause", Map.of("channelId", channelId, "paused", false));
     }
 
+    @PostMapping("/{channelId}/music/volume")
+    public void volume(@PathVariable Long channelId, @RequestBody VolumeRequest req) {
+        Channel channel = requireVoiceChannel(channelId);
+        assertCanControlMusic(channel);
+        assertIsMaster(channel);
+        int clamped = Math.max(0, Math.min(100, req.volume()));
+        callBot("/volume", Map.of("channelId", channelId, "volume", clamped));
+    }
+
     private Channel requireVoiceChannel(Long channelId) {
         Channel channel = channelRepository.findById(channelId)
                 .orElseThrow(() -> new IllegalArgumentException("Canal não encontrado"));
@@ -145,6 +165,12 @@ public class MusicController {
                 .orElseThrow(() -> new IllegalStateException("Você não é membro desse servidor"));
         if (!voicePresenceService.isPresent(channel.getId(), userId)) {
             throw new IllegalStateException("Você precisa estar conectado nessa call para tocar música");
+        }
+    }
+
+    private void assertIsMaster(Channel channel) {
+        if (!permissionService.isOwnerOrGlobalAdmin(channel.getServerId(), currentUser.id())) {
+            throw new IllegalStateException("Só o dono do servidor pode ajustar o volume geral do bot");
         }
     }
 

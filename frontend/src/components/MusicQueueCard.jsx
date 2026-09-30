@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { subscribeToMusicQueue } from "../ws/chatSocket";
 import { TrashIcon, PlusIcon, XIcon, MusicNoteIcon, SkipForwardIcon } from "./icons.jsx";
+import VolumeSlider from "./VolumeSlider.jsx";
 
 function formatDuration(sec) {
   if (sec == null) return "?";
@@ -21,6 +22,7 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
   const [adding, setAdding] = useState(false);
   const [addQuery, setAddQuery] = useState("");
   const [error, setError] = useState("");
+  const volumeDebounceRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,7 +32,7 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
         if (!cancelled) setState(data);
       })
       .catch(() => {
-        if (!cancelled) setState({ queueId: null, active: false, name: null, nowPlaying: null, queue: [] });
+        if (!cancelled) setState({ queueId: null, active: false, name: null, nowPlaying: null, queue: [], volume: 100, canSetVolume: false });
       });
     return () => {
       cancelled = true;
@@ -39,7 +41,9 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
 
   useEffect(() => {
     if (!stompClient || !stompConnected) return undefined;
-    const sub = subscribeToMusicQueue(stompClient, channelId, (data) => setState(data));
+    const sub = subscribeToMusicQueue(stompClient, channelId, (data) =>
+      setState((prev) => ({ ...data, canSetVolume: prev?.canSetVolume ?? false }))
+    );
     return () => sub.unsubscribe();
   }, [stompClient, stompConnected, channelId]);
 
@@ -79,6 +83,14 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
     }
   }
 
+  function handleVolumeChange(value) {
+    setState((prev) => (prev ? { ...prev, volume: value } : prev));
+    clearTimeout(volumeDebounceRef.current);
+    volumeDebounceRef.current = setTimeout(() => {
+      api.post(`/api/channels/${channelId}/music/volume`, { volume: value }).catch(() => {});
+    }, 150);
+  }
+
   async function handleAdd(e) {
     e.preventDefault();
     const query = addQuery.trim();
@@ -103,7 +115,7 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
     );
   }
 
-  const { name, nowPlaying, queue } = state;
+  const { name, nowPlaying, queue, volume, canSetVolume } = state;
   const title = name || "Fila de música";
   const superseded = queueId && state.queueId && state.queueId !== queueId;
   const closed = superseded || !state.active;
@@ -129,6 +141,12 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
           <XIcon size={13} /> Encerrar fila
         </button>
       </div>
+
+      {canSetVolume && (
+        <div className="music-queue-volume">
+          <VolumeSlider value={volume ?? 100} onChange={handleVolumeChange} label="Volume geral do bot (todo mundo ouve nesse nível)" max={100} />
+        </div>
+      )}
 
       {nowPlaying ? (
         <div className="music-queue-now-playing">

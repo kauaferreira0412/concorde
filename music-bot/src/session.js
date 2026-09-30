@@ -40,6 +40,7 @@ function createSessionState(channelId, connection) {
     ffmpeg: null,
     idleTimer: null,
     forceMuted: false,
+    volume: 1,
     paused: false,
     resumePause: null,
     nowPlaying: null,

@@ -29,5 +29,6 @@ export function broadcastQueue(session) {
       ? { title: session.nowPlaying.title, durationSec: session.nowPlaying.durationSec }
       : null,
     queue: session.queue.map((item) => ({ title: item.title, durationSec: item.durationSec })),
+    volume: Math.round((session.volume ?? 1) * 100),
   });
 }

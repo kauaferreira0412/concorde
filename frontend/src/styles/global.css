@@ -1079,6 +1079,8 @@ h3.chat-heading {
 }
 .music-queue-title svg { flex-shrink: 0; color: var(--accent-text); }
 .music-queue-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.music-queue-volume { margin: 6px 0 10px; }
+.music-queue-volume .volume-slider-row { background: var(--bg-panel-2); border-radius: var(--radius-sm); padding: 6px 8px; }
 .music-queue-delete-btn {
   display: flex;
   align-items: center;

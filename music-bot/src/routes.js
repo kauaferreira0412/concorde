@@ -15,6 +15,7 @@ function serializeQueue(session) {
       ? { title: session.nowPlaying.title, durationSec: session.nowPlaying.durationSec }
       : null,
     queue: (session?.queue ?? []).map((item) => ({ title: item.title, durationSec: item.durationSec })),
+    volume: Math.round((session?.volume ?? 1) * 100),
   };
 }
 
@@ -101,6 +102,17 @@ router.post("/mute", (req, res) => {
   if (!channelId) return res.status(400).json({ error: "channelId é obrigatório" });
   const session = sessions.get(String(channelId));
   if (session) session.forceMuted = Boolean(muted);
+  res.json({ ok: true });
+});
+
+router.post("/volume", (req, res) => {
+  const { channelId, volume } = req.body || {};
+  if (!channelId) return res.status(400).json({ error: "channelId é obrigatório" });
+  const session = sessions.get(String(channelId));
+  if (!session) return res.status(400).json({ error: "Não tem nenhuma música tocando nesse canal" });
+  const clamped = Math.max(0, Math.min(100, Number(volume)));
+  session.volume = Number.isFinite(clamped) ? clamped / 100 : 1;
+  broadcastQueue(session);
   res.json({ ok: true });
 });
 
