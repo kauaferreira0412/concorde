@@ -75,6 +75,9 @@ export default function UpdateRequiredGate({ children }) {
         </button>
 
         <p className="auth-note">Desinstale a versão atual antes de instalar a nova, para evitar conflito entre as duas.</p>
+        <p className="auth-note" style={{ opacity: 0.55, fontSize: 11 }}>
+          Instalado: {installedBuildId || "desconhecido"} · Servidor: {info?.latestBuildId || "?"}
+        </p>
       </div>
 
       {showUninstallConfirm && (
