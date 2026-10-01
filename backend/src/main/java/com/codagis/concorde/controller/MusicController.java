@@ -49,6 +49,7 @@ public class MusicController {
     public record RemoveFromQueueRequest(int index) {}
     public record OpenQueueRequest(String name) {}
     public record VolumeRequest(int volume) {}
+    public record LoopRequest(boolean loop) {}
 
     @PostMapping("/{channelId}/music/play")
     public PlayResponse play(@PathVariable Long channelId, @RequestBody PlayRequest req) {
@@ -148,6 +149,13 @@ public class MusicController {
         assertIsMaster(channel);
         int clamped = Math.max(0, Math.min(100, req.volume()));
         callBot("/volume", Map.of("channelId", channelId, "volume", clamped));
+    }
+
+    @PostMapping("/{channelId}/music/loop")
+    public void loop(@PathVariable Long channelId, @RequestBody LoopRequest req) {
+        Channel channel = requireVoiceChannel(channelId);
+        assertCanControlMusic(channel);
+        callBot("/loop", Map.of("channelId", channelId, "loop", req.loop()));
     }
 
     private Channel requireVoiceChannel(Long channelId) {

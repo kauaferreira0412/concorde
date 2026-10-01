@@ -30,5 +30,6 @@ export function broadcastQueue(session) {
       : null,
     queue: session.queue.map((item) => ({ title: item.title, durationSec: item.durationSec })),
     volume: Math.round((session.volume ?? 1) * 100),
+    loop: Boolean(session.loop),
   });
 }

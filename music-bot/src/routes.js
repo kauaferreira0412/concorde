@@ -16,6 +16,7 @@ function serializeQueue(session) {
       : null,
     queue: (session?.queue ?? []).map((item) => ({ title: item.title, durationSec: item.durationSec })),
     volume: Math.round((session?.volume ?? 1) * 100),
+    loop: Boolean(session?.loop),
   };
 }
 
@@ -94,6 +95,16 @@ router.post("/skip", (req, res) => {
   stopPlayback(session);
   session.nowPlaying = null;
   advanceNext(session);
+  res.json({ ok: true });
+});
+
+router.post("/loop", (req, res) => {
+  const { channelId, loop } = req.body || {};
+  if (!channelId) return res.status(400).json({ error: "channelId é obrigatório" });
+  const session = sessions.get(String(channelId));
+  if (!session) return res.status(400).json({ error: "Não tem nenhuma música tocando nesse canal" });
+  session.loop = Boolean(loop);
+  broadcastQueue(session);
   res.json({ ok: true });
 });
 

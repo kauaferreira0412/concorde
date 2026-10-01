@@ -80,6 +80,15 @@ export async function startPlayback(session, item) {
     if (session.ffmpeg !== ffmpeg) return;
     session.ffmpeg = null;
     session.ytdlp = null;
+    if (session.loop && session.nowPlaying) {
+      const current = session.nowPlaying;
+      session.nowPlaying = null;
+      startPlayback(session, current).catch((err) => {
+        console.error(`[${session.channelId}] falha ao repetir a musica:`, err.message);
+        advanceNext(session);
+      });
+      return;
+    }
     session.nowPlaying = null;
     advanceNext(session);
   });

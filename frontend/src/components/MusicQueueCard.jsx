@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { subscribeToMusicQueue } from "../ws/chatSocket";
-import { TrashIcon, PlusIcon, XIcon, MusicNoteIcon, SkipForwardIcon } from "./icons.jsx";
+import { TrashIcon, PlusIcon, XIcon, MusicNoteIcon, SkipForwardIcon, RepeatIcon } from "./icons.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
 
 function formatDuration(sec) {
@@ -19,6 +19,7 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
   const [removingIndex, setRemovingIndex] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [skipping, setSkipping] = useState(false);
+  const [togglingLoop, setTogglingLoop] = useState(false);
   const [adding, setAdding] = useState(false);
   const [addQuery, setAddQuery] = useState("");
   const [error, setError] = useState("");
@@ -32,7 +33,7 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
         if (!cancelled) setState(data);
       })
       .catch(() => {
-        if (!cancelled) setState({ queueId: null, active: false, name: null, nowPlaying: null, queue: [], volume: 100, canSetVolume: false });
+        if (!cancelled) setState({ queueId: null, active: false, name: null, nowPlaying: null, queue: [], volume: 100, loop: false, canSetVolume: false });
       });
     return () => {
       cancelled = true;
@@ -83,6 +84,20 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
     }
   }
 
+  async function toggleLoop() {
+    setError("");
+    const next = !state?.loop;
+    setTogglingLoop(true);
+    try {
+      await api.post(`/api/channels/${channelId}/music/loop`, { loop: next });
+      setState((prev) => (prev ? { ...prev, loop: next } : prev));
+    } catch (err) {
+      setError(err.response?.data?.error || "Não foi possível ativar o loop");
+    } finally {
+      setTogglingLoop(false);
+    }
+  }
+
   function handleVolumeChange(value) {
     setState((prev) => (prev ? { ...prev, volume: value } : prev));
     clearTimeout(volumeDebounceRef.current);
@@ -115,7 +130,7 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
     );
   }
 
-  const { name, nowPlaying, queue, volume, canSetVolume } = state;
+  const { name, nowPlaying, queue, volume, loop, canSetVolume } = state;
   const title = name || "Fila de música";
   const superseded = queueId && state.queueId && state.queueId !== queueId;
   const closed = superseded || !state.active;
@@ -153,6 +168,15 @@ export default function MusicQueueCard({ channelId, queueId, stompClient, stompC
           <span className="music-queue-now-label">Tocando agora</span>
           <span className="music-queue-now-title">{nowPlaying.title}</span>
           <span className="music-queue-duration">{formatDuration(nowPlaying.durationSec)}</span>
+          <button
+            type="button"
+            className={"music-queue-loop-btn" + (loop ? " active" : "")}
+            title={loop ? "Loop ativado - clique pra desativar" : "Repetir essa música em loop"}
+            disabled={togglingLoop}
+            onClick={toggleLoop}
+          >
+            <RepeatIcon size={14} />
+          </button>
           <button
             type="button"
             className="music-queue-skip-btn"

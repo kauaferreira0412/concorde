@@ -41,6 +41,7 @@ function createSessionState(channelId, connection) {
     idleTimer: null,
     forceMuted: false,
     volume: 1,
+    loop: false,
     paused: false,
     resumePause: null,
     nowPlaying: null,

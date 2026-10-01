@@ -1160,6 +1160,23 @@ h3.chat-heading {
 }
 .music-queue-skip-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--accent-text); border-color: var(--accent); }
 .music-queue-skip-btn:disabled { opacity: 0.5; cursor: default; }
+.music-queue-loop-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.music-queue-loop-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--accent-text); border-color: var(--accent); }
+.music-queue-loop-btn:disabled { opacity: 0.5; cursor: default; }
+.music-queue-loop-btn.active { color: var(--accent-text); border-color: var(--accent); background: var(--bg-hover); }
 .music-queue-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .music-queue-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .music-queue-position { flex-shrink: 0; width: 18px; text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
