@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "Concorde",
+    "slug": "concorde-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "android": {
+      "package": "com.codagis.concorde",
+      "adaptiveIcon": {
+        "backgroundColor": "#1e1f22",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
+  }
+}
