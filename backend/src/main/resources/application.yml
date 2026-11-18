@@ -50,6 +50,8 @@ app:
       bucket: ${R2_BUCKET:}
       public-base-url: ${R2_PUBLIC_BASE_URL:}
     base-folder: ${STORAGE_BASE_FOLDER:potato}
+  gifs:
+    giphy-api-key: ${GIPHY_API_KEY:}
   spotify:
     client-id: ${SPOTIFY_CLIENT_ID:}
     client-secret: ${SPOTIFY_CLIENT_SECRET:}

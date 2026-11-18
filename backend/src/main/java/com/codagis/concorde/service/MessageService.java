@@ -196,12 +196,13 @@ public class MessageService {
         return toDtos(pinned);
     }
 
-    public List<ChatMessage> search(Long channelId, String query) {
-        if (query == null || query.isBlank()) {
+    public List<ChatMessage> search(Long channelId, com.codagis.concorde.dto.SearchFilters f) {
+        if (f.isEmpty()) {
             return List.of();
         }
-        List<Message> found = messageRepository
-                .findTop50ByChannelIdAndContentContainingIgnoreCaseOrderByIdDesc(channelId, query.trim());
+        List<Message> found = messageRepository.searchFiltered(channelId, f.text(), f.authorId(), f.hasImage(),
+                f.hasFile(), f.hasLink(), f.hasGif(), f.after(), f.before(),
+                org.springframework.data.domain.PageRequest.of(0, 50));
         return toDtos(found);
     }
 
@@ -273,7 +274,8 @@ public class MessageService {
                 m.getImageUrl(), m.getCreatedAt(), m.getEditedAt(), m.getReplyToId(), replyTo,
                 m.getRollNotation(), m.getRollSides(), m.getRollResultsCsv(), m.getRollTotal(),
                 groupReactions(reactions), m.isPinned(), poll,
-                m.getFileUrl(), m.getFileName(), m.getFileType(), m.getFileSize());
+                m.getFileUrl(), m.getFileName(), m.getFileType(), m.getFileSize(),
+                author != null ? author.getAccentColor() : null);
     }
 
     private PollDto buildPollDto(Long pollId) {

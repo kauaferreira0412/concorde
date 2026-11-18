@@ -31,10 +31,15 @@ import api from "../api/client";
 import Avatar from "./Avatar.jsx";
 import StatusDropdown from "./StatusDropdown.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
-import { BellIcon, KeyboardIcon, MicIcon, MusicNoteIcon, ShieldIcon, UserIcon, XIcon } from "./icons.jsx";
+import { BellIcon, KeyboardIcon, MicIcon, MusicNoteIcon, PaletteIcon, ShieldIcon, UserIcon, XIcon } from "./icons.jsx";
+import AppearanceSettings from "./AppearanceSettings.jsx";
+import ImageCropModal from "./ImageCropModal.jsx";
+import { getAutoPipEnabled, pipSupported, setAutoPipEnabled } from "../utils/screenSharePip";
+import AccentColorPicker, { accentStyle } from "./AccentColorPicker.jsx";
 
 const TABS = [
   { id: "perfil", label: "Perfil", Icon: UserIcon },
+  { id: "aparencia", label: "Aparência", Icon: PaletteIcon },
   { id: "audio", label: "Áudio e vídeo", Icon: MicIcon },
   { id: "atalhos", label: "Atalhos", Icon: KeyboardIcon },
   { id: "notificacoes", label: "Notificações", Icon: BellIcon },
@@ -82,6 +87,7 @@ export default function SettingsModal({ onClose }) {
   const { activeChannel, deafened, toggleDeafen, micGain, setMicGainPercent, masterVolume, setMasterVolumePercent } = useVoiceCall();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("perfil");
+  const [autoPip, setAutoPip] = useState(getAutoPipEnabled);
   const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
 
   function handleTabClick(tabId) {
@@ -95,6 +101,24 @@ export default function SettingsModal({ onClose }) {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState("");
   const avatarInputRef = useRef(null);
+  const bannerInputRef = useRef(null);
+  const [cropTarget, setCropTarget] = useState(null);
+  const [customStatus, setCustomStatus] = useState(() => user?.customStatus || "");
+  const [customStatusSaving, setCustomStatusSaving] = useState(false);
+
+  async function saveCustomStatus(text) {
+    setVisibilityError("");
+    setCustomStatusSaving(true);
+    try {
+      const { data } = await api.put("/api/users/me/custom-status", { text: text.trim() });
+      updateUser({ customStatus: data.customStatus || null });
+      setCustomStatus(data.customStatus || "");
+    } catch (err) {
+      setVisibilityError(err.response?.data?.error || "Não deu pra salvar o status agora");
+    } finally {
+      setCustomStatusSaving(false);
+    }
+  }
   const [visibilitySaving, setVisibilitySaving] = useState(false);
   const [visibilityError, setVisibilityError] = useState("");
 
@@ -369,20 +393,47 @@ export default function SettingsModal({ onClose }) {
     onClose();
   }
 
-  async function handleAvatarChange(e) {
+  // Escolheu um arquivo -> abre o recorte; confirmou -> envia.
+  function handleAvatarChange(e) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-
     setAvatarError("");
-    setAvatarUploading(true);
+    setCropTarget({ kind: "avatar", file });
+  }
+
+  function handleBannerChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setAvatarError("");
+    setCropTarget({ kind: "banner", file });
+  }
+
+  async function uploadCropped(kind, file) {
+    setCropTarget(null);
+    setAvatarError("");
+    setAvatarUploading(kind);
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const { data } = await api.post("/api/users/me/avatar", formData);
-      updateUser({ avatarUrl: data.avatarUrl });
+      const { data } = await api.post(`/api/users/me/${kind}`, formData);
+      updateUser(kind === "avatar" ? { avatarUrl: data.avatarUrl } : { bannerUrl: data.bannerUrl });
     } catch (err) {
-      setAvatarError(err.response?.data?.error || "Falha ao enviar a foto");
+      setAvatarError(err.response?.data?.error || (kind === "avatar" ? "Falha ao enviar a foto" : "Falha ao enviar o banner"));
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
+  async function handleRemoveBanner() {
+    setAvatarError("");
+    setAvatarUploading("banner");
+    try {
+      const { data } = await api.delete("/api/users/me/banner");
+      updateUser({ bannerUrl: data.bannerUrl || null });
+    } catch (err) {
+      setAvatarError(err.response?.data?.error || "Falha ao remover o banner");
     } finally {
       setAvatarUploading(false);
     }
@@ -429,31 +480,113 @@ export default function SettingsModal({ onClose }) {
           <div className="settings-content">
             {activeTab === "perfil" && (
               <>
-                <p className="settings-section-title">Foto de perfil</p>
-                <div className="avatar-picker">
-                  <Avatar name={user?.username} url={user?.avatarUrl} className="avatar-picker-preview" />
-                  <div>
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/gif,image/webp"
-                      ref={avatarInputRef}
-                      onChange={handleAvatarChange}
-                      hidden
-                    />
-                    <button type="button" onClick={() => avatarInputRef.current?.click()} disabled={avatarUploading}>
-                      {avatarUploading ? "Enviando..." : "Trocar foto"}
+                <p className="settings-section-title">Visual do perfil</p>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  ref={avatarInputRef}
+                  onChange={handleAvatarChange}
+                  hidden
+                />
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  ref={bannerInputRef}
+                  onChange={handleBannerChange}
+                  hidden
+                />
+                <div className="profile-editor" style={accentStyle(user?.accentColor)}>
+                  <button
+                    type="button"
+                    className={"profile-editor-banner" + (user?.bannerUrl ? " has-image" : "")}
+                    style={user?.bannerUrl ? { backgroundImage: `url("${user.bannerUrl}")` } : undefined}
+                    onClick={() => bannerInputRef.current?.click()}
+                    disabled={!!avatarUploading}
+                    title="Trocar banner"
+                  >
+                    <span className="profile-editor-hover">
+                      {avatarUploading === "banner" ? "Enviando..." : user?.bannerUrl ? "Trocar banner" : "Adicionar banner"}
+                    </span>
+                  </button>
+                  <div className="profile-editor-row">
+                    <button
+                      type="button"
+                      className="profile-editor-avatar"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={!!avatarUploading}
+                      title="Trocar foto"
+                    >
+                      <Avatar name={user?.username} url={user?.avatarUrl} className="avatar-picker-preview" />
+                      <span className="profile-editor-hover">{avatarUploading === "avatar" ? "..." : "Trocar"}</span>
                     </button>
-                    <p className="admin-hint" style={{ margin: "6px 0 0" }}>
-                      PNG, JPG, GIF ou WEBP, até 8MB.
-                    </p>
+                    <div className="profile-editor-name">
+                      <strong>{user?.nickname || user?.username}</strong>
+                      <span>@{user?.username}</span>
+                    </div>
+                  </div>
+                  <div className="profile-editor-actions">
+                    <button type="button" className="appearance-btn primary" onClick={() => avatarInputRef.current?.click()} disabled={!!avatarUploading}>
+                      {avatarUploading === "avatar" ? "Enviando..." : "Trocar foto"}
+                    </button>
+                    <button type="button" className="appearance-btn" onClick={() => bannerInputRef.current?.click()} disabled={!!avatarUploading}>
+                      {avatarUploading === "banner" ? "Enviando..." : user?.bannerUrl ? "Trocar banner" : "Adicionar banner"}
+                    </button>
+                    {user?.bannerUrl && (
+                      <button type="button" className="appearance-btn" onClick={handleRemoveBanner} disabled={!!avatarUploading}>
+                        Remover banner
+                      </button>
+                    )}
                   </div>
                 </div>
+                <p className="admin-hint" style={{ margin: 0 }}>
+                  PNG, JPG, WEBP ou GIF animado, até 8MB. Você escolhe o recorte antes de enviar (GIF vai inteiro, pra
+                  continuar animando).
+                </p>
                 {avatarError && <p className="auth-error">{avatarError}</p>}
+                <AccentColorPicker />
+                {cropTarget && (
+                  <ImageCropModal
+                    file={cropTarget.file}
+                    aspect={cropTarget.kind === "avatar" ? 1 : 3}
+                    outputWidth={cropTarget.kind === "avatar" ? 512 : 1500}
+                    shape={cropTarget.kind === "avatar" ? "rounded" : "banner"}
+                    title={cropTarget.kind === "avatar" ? "Recortar foto de perfil" : "Recortar banner"}
+                    onCancel={() => setCropTarget(null)}
+                    onConfirm={(f) => uploadCropped(cropTarget.kind, f)}
+                  />
+                )}
 
                 <div className="settings-divider" />
 
                 <p className="settings-section-title">Status</p>
                 <StatusDropdown value={user?.status || "ONLINE"} onChange={handleStatusChange} disabled={visibilitySaving} />
+                <div className="settings-field">
+                  <label className="settings-label">Status personalizado</label>
+                  <div className="settings-inline-save">
+                    <input
+                      value={customStatus}
+                      onChange={(e) => setCustomStatus(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && saveCustomStatus(customStatus)}
+                      placeholder="ex.: 🎲 mestrando às 21h"
+                      maxLength={80}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => saveCustomStatus(customStatus)}
+                      disabled={customStatusSaving || customStatus.trim() === (user?.customStatus || "")}
+                    >
+                      {customStatusSaving ? "Salvando..." : "Salvar"}
+                    </button>
+                    {user?.customStatus && (
+                      <button type="button" className="link-btn" onClick={() => saveCustomStatus("")} disabled={customStatusSaving}>
+                        Limpar
+                      </button>
+                    )}
+                  </div>
+                  <p className="admin-hint" style={{ margin: 0 }}>
+                    Aparece embaixo do seu nome na lista de membros e no seu perfil (some quando você está offline/invisível).
+                  </p>
+                </div>
                 {visibilityError && <p className="auth-error">{visibilityError}</p>}
 
                 <div className="settings-divider" />
@@ -674,6 +807,29 @@ export default function SettingsModal({ onClose }) {
                     {NOISE_SUPPRESSION_MODES.find((m) => m.value === noiseSuppressionMode)?.description}
                   </p>
                 </div>
+
+                {pipSupported && (
+                  <>
+                    <div className="settings-divider" />
+                    <p className="settings-section-title">Transmissões de tela</p>
+                    <label className="settings-checkbox-row">
+                      <input
+                        type="checkbox"
+                        checked={autoPip}
+                        onChange={(e) => {
+                          setAutoPip(e.target.checked);
+                          setAutoPipEnabled(e.target.checked);
+                        }}
+                      />
+                      Janela flutuante automática ao minimizar o Concorde
+                    </label>
+                    <p className="admin-hint" style={{ margin: 0 }}>
+                      Se você estiver assistindo a tela de alguém e minimizar o app (ou trocar de aba no navegador), a
+                      transmissão continua numa janelinha por cima das outras. Ao voltar pro Concorde ela fecha sozinha.
+                      Também dá pra abrir na hora pelo botão no canto da transmissão.
+                    </p>
+                  </>
+                )}
               </>
             )}
 
@@ -726,6 +882,8 @@ export default function SettingsModal({ onClose }) {
                 {notificationError && <p className="auth-error">{notificationError}</p>}
               </>
             )}
+
+            {activeTab === "aparencia" && <AppearanceSettings />}
 
             {activeTab === "conexoes" && (
               <>

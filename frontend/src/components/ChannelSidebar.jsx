@@ -4,15 +4,13 @@ import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
 import { useAlert } from "../context/AlertContext.jsx";
 import api from "../api/client";
-import { subscribeToVoicePresence } from "../ws/chatSocket";
+import { subscribeToVoicePresence, subscribeToVoiceSpeaking } from "../ws/chatSocket";
 import { useUnreadMessages } from "../utils/useUnreadMessages";
 import { useServerMembers } from "../utils/useServerMembers";
 import {
   CameraIcon,
   CameraOffIcon,
   ChevronDownIcon,
-  ChevronsLeftIcon,
-  ChevronsRightIcon,
   FileIcon,
   FolderIcon,
   HangUpIcon,
@@ -36,6 +34,7 @@ import {
   TrashIcon,
   UsersIcon,
   VolumeIcon,
+  UserIcon,
 } from "./icons.jsx";
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
@@ -81,6 +80,7 @@ export default function ChannelSidebar({
     pingMs,
     deafened,
     screenSharing,
+    screenShares,
     cameraEnabled,
     speakingIds,
     participants,
@@ -126,6 +126,7 @@ export default function ChannelSidebar({
   const categoryMenuRef = useRef(null);
   const [serverMenu, setServerMenu] = useState(null);
   const serverMenuRef = useRef(null);
+  const serverHeaderRef = useRef(null);
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [deletingCategory, setDeletingCategory] = useState(null);
@@ -209,6 +210,7 @@ export default function ChannelSidebar({
   useEffect(() => {
     if (!serverMenu) return;
     function handlePointerDown(e) {
+      if (serverHeaderRef.current?.contains(e.target)) return; // o próprio cabeçalho alterna o menu
       if (serverMenuRef.current && !serverMenuRef.current.contains(e.target)) setServerMenu(null);
     }
     function handleKeyDown(e) {
@@ -297,7 +299,7 @@ export default function ChannelSidebar({
         }}
         title={canManageChannels ? "Arraste pra uma categoria pra mover" : undefined}
       >
-        <MapIcon size={16} className="channel-item-icon" />
+        <MapIcon size={18} className="channel-item-icon" />
         {c.name}
       </button>
     );
@@ -354,15 +356,7 @@ export default function ChannelSidebar({
     }
   }
 
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("channelSidebarCollapsed") === "true");
 
-  function toggleCollapsed() {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("channelSidebarCollapsed", String(next));
-      return next;
-    });
-  }
 
   async function handleConfirmLogout() {
     if (activeChannel) await leaveChannel();
@@ -370,6 +364,8 @@ export default function ChannelSidebar({
   }
 
   const [presenceByChannel, setPresenceByChannel] = useState({});
+  // Quem está falando em cada canal de voz (vem do servidor, então funciona mesmo fora da call).
+  const [remoteSpeaking, setRemoteSpeaking] = useState({});
 
   useEffect(() => {
     if (voiceChannels.length === 0) return;
@@ -390,6 +386,26 @@ export default function ChannelSidebar({
         subs.push(
           subscribeToVoicePresence(stompClient, c.id, (list) => {
             setPresenceByChannel((prev) => ({ ...prev, [c.id]: list }));
+            // quem saiu do canal não pode ficar "falando" pra sempre
+            setRemoteSpeaking((prev) => {
+              const cur = prev[c.id];
+              if (!cur || cur.size === 0) return prev;
+              const ids = new Set(list.map((p) => p.userId));
+              const next = new Set([...cur].filter((id) => ids.has(id)));
+              return next.size === cur.size ? prev : { ...prev, [c.id]: next };
+            });
+          })
+        );
+        subs.push(
+          subscribeToVoiceSpeaking(stompClient, c.id, ({ userId, speaking }) => {
+            setRemoteSpeaking((prev) => {
+              const cur = prev[c.id] || new Set();
+              if (cur.has(userId) === speaking) return prev;
+              const next = new Set(cur);
+              if (speaking) next.add(userId);
+              else next.delete(userId);
+              return { ...prev, [c.id]: next };
+            });
           })
         );
       });
@@ -404,7 +420,7 @@ export default function ChannelSidebar({
     };
   }, [server?.id, stompClient, stompConnected, voiceChannels.map((c) => c.id).join(",")]);
 
-  const connectedList = voiceChannels.flatMap((c) => (presenceByChannel[c.id] || []).map((p) => ({ ...p, channelName: c.name })));
+  const connectedList = voiceChannels.flatMap((c) => (presenceByChannel[c.id] || []).map((p) => ({ ...p, channelId: c.id, channelName: c.name })));
 
   useEffect(() => {
     if (
@@ -436,9 +452,9 @@ export default function ChannelSidebar({
         title={canManageChannels ? "Arraste pra uma categoria pra mover" : undefined}
       >
         {c.adminOnly ? (
-          <MegaphoneIcon size={16} className="channel-item-icon" />
+          <MegaphoneIcon size={18} className="channel-item-icon" />
         ) : (
-          <HashIcon size={16} className="channel-item-icon" />
+          <HashIcon size={18} className="channel-item-icon" />
         )}
         {c.name}
         {(mentionedChannels[c.id] || unreadCounts[c.id] > 0) && (
@@ -455,6 +471,27 @@ export default function ChannelSidebar({
         )}
       </button>
     );
+  }
+
+  const liveIdentities = new Set((screenShares || []).map((s) => s.participantIdentity));
+
+  function identityOf(p, channelId) {
+    if (p.userId < 0) return p.userId === -channelId ? `musicbot-${channelId}` : `soundboardbot-${channelId}`;
+    return `user-${p.userId}`;
+  }
+
+  function isStreaming(p, channelId) {
+    if (p.screenSharing) return true;
+    if (activeChannel?.id !== channelId) return false;
+    if (p.userId === user?.id) return screenSharing;
+    return liveIdentities.has(identityOf(p, channelId));
+  }
+
+  function sortStreamersFirst(list, channelId) {
+    return list
+      .map((p, i) => ({ p, i, live: isStreaming(p, channelId) }))
+      .sort((a, b) => (a.live === b.live ? a.i - b.i : a.live ? -1 : 1))
+      .map((x) => x.p);
   }
 
   function renderVoiceChannel(c) {
@@ -494,17 +531,19 @@ export default function ChannelSidebar({
             moveParticipant(draggingParticipant.channelId, draggingParticipant.userId, c.id);
           }}
         >
-          <VolumeIcon size={16} className="channel-item-icon" />
+          <VolumeIcon size={18} className="channel-item-icon" />
           {c.name}
           {activeChannel?.id === c.id && <span className="channel-item-live">CONECTADO</span>}
         </button>
         {(presenceByChannel[c.id] || []).length > 0 && (
           <div className="channel-voice-participants">
-            {presenceByChannel[c.id].map((p) => {
-              const identity = p.userId < 0 ? (p.userId === -c.id ? `musicbot-${c.id}` : `soundboardbot-${c.id}`) : `user-${p.userId}`;
+            {sortStreamersFirst(presenceByChannel[c.id], c.id).map((p) => {
+              const identity = identityOf(p, c.id);
+              const streaming = isStreaming(p, c.id);
               const isMe = p.userId === user?.id;
-              const canAdjustVolume = activeChannel?.id === c.id && !isMe;
-              const canModerate = !isMe && hasAnyModPermission;
+              const speaking =
+                !p.deafened &&
+                (speakingIds.has(identity) || (activeChannel?.id !== c.id && !!remoteSpeaking[c.id]?.has(p.userId)));
               return (
                 <div
                   key={p.userId}
@@ -513,7 +552,6 @@ export default function ChannelSidebar({
                   onDragStart={() => setDraggingParticipant({ channelId: c.id, userId: p.userId })}
                   onDragEnd={() => setDraggingParticipant(null)}
                   onContextMenu={(e) => {
-                    if (!canAdjustVolume && !canModerate) return;
                     e.preventDefault();
                     api.get(`/api/channels/${c.id}/voice-presence`).then(({ data }) => {
                       setPresenceByChannel((prev) => ({ ...prev, [c.id]: data }));
@@ -528,19 +566,18 @@ export default function ChannelSidebar({
                     });
                   }}
                   title={
-                    canAdjustVolume || canModerate
-                      ? "Clique com o botão direito pra ver as opções"
-                      : canMove && !isMe
-                      ? "Arraste pra outro canal de voz pra mover"
-                      : undefined
+                    canMove && !isMe
+                      ? "Botão direito: opções · arraste pra outro canal de voz pra mover"
+                      : "Clique com o botão direito pra ver as opções"
                   }
                 >
                   <Avatar
                     name={p.username}
                     url={p.avatarUrl}
-                    className={"voice-avatar" + (speakingIds.has(identity) ? " speaking" : "")}
+                    className={"voice-avatar" + (speaking ? " speaking" : "")}
                   />
-                  <span>{p.username}</span>
+                  <span className={"channel-voice-participant-name" + (speaking ? " speaking" : "")}>{p.username}</span>
+                  {streaming && <span className="live-tag" title="Transmitindo a tela">AO VIVO</span>}
                   {p.deafened ? (
                     <HeadphonesOffIcon size={12} className="voice-status-icon" />
                   ) : (
@@ -600,40 +637,46 @@ export default function ChannelSidebar({
   const groupedChannels = groupByCategory();
 
   return (
-    <div className={"channel-sidebar" + (collapsed ? " collapsed" : "")}>
-      <div className="channel-sidebar-header">
-        {!collapsed && (
-          <div className="channel-sidebar-title">
-            {server && hasAnyServerSettings ? (
-              <button
-                type="button"
-                className="channel-sidebar-name-btn"
-                onClick={(e) => setServerMenu({ x: e.clientX, y: e.clientY })}
-                title="Configurações do servidor"
-              >
-                <strong>{server.name}</strong>
-                <ChevronDownIcon size={13} />
-              </button>
-            ) : (
-              <strong>{server?.name || "Selecione um servidor"}</strong>
-            )}
+    <div className="channel-sidebar">
+      {server && hasAnyServerSettings ? (
+        <button
+          type="button"
+          ref={serverHeaderRef}
+          className={"channel-sidebar-header clickable" + (serverMenu ? " open" : "")}
+          onClick={(e) => {
+            if (serverMenu) {
+              setServerMenu(null);
+              return;
+            }
+            const rect = e.currentTarget.getBoundingClientRect();
+            setServerMenu({ x: rect.left + 14, y: rect.bottom + 8 });
+          }}
+          title="Configurações do servidor"
+          aria-haspopup="menu"
+          aria-expanded={!!serverMenu}
+        >
+          <span className="channel-sidebar-title">
+            <strong>{server.name}</strong>
+            <span className="channel-sidebar-subtitle">
+              {members.length} membro{members.length === 1 ? "" : "s"} · {onlineCount} online
+            </span>
+          </span>
+          <span className="channel-sidebar-menu-chevron" aria-hidden="true">
+            <ChevronDownIcon size={16} />
+          </span>
+        </button>
+      ) : (
+        <div className="channel-sidebar-header">
+          <span className="channel-sidebar-title">
+            <strong>{server?.name || "Selecione um servidor"}</strong>
             {server && (
               <span className="channel-sidebar-subtitle">
                 {members.length} membro{members.length === 1 ? "" : "s"} · {onlineCount} online
               </span>
             )}
-          </div>
-        )}
-        <div className="channel-sidebar-header-actions">
-          <button
-            className="icon-btn collapse-toggle"
-            onClick={toggleCollapsed}
-            title={collapsed ? "Abrir menu de canais" : "Fechar menu de canais"}
-          >
-            {collapsed ? <ChevronsRightIcon /> : <ChevronsLeftIcon />}
-          </button>
+          </span>
         </div>
-      </div>
+      )}
 
       <div className="channel-sidebar-body">
       {server && connectedList.length > 0 && (
@@ -646,7 +689,22 @@ export default function ChannelSidebar({
           {connectedExpanded && (
             <div className="connected-list">
               {connectedList.map((p) => (
-                <div key={p.userId} className="connected-user">
+                <div
+                  key={p.userId}
+                  className="connected-user"
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setParticipantMenu({
+                      channelId: p.channelId,
+                      userId: p.userId,
+                      identity: identityOf(p, p.channelId),
+                      username: p.username,
+                      x: e.clientX,
+                      y: e.clientY,
+                    });
+                  }}
+                  title="Clique com o botão direito pra ver as opções"
+                >
                   <Avatar name={p.username} url={p.avatarUrl} className="voice-avatar small" />
                   <span className="connected-user-name">{p.username}</span>
                   <span className="connected-user-channel">
@@ -694,7 +752,7 @@ export default function ChannelSidebar({
                 onClick={() => setShowCharacterSheets(true)}
                 title="Ver os personagens dessa mesa"
               >
-                <FileIcon size={16} className="channel-item-icon" /> Personagens
+                <FileIcon size={18} className="channel-item-icon" /> Personagens
               </button>
             )}
 
@@ -818,7 +876,13 @@ export default function ChannelSidebar({
           </div>
           <span className="user-bar-text">
             <span className="user-bar-name">{user?.nickname || user?.username}</span>
-            {isAdmin && <span className="user-bar-role">Administrador</span>}
+            {user?.customStatus ? (
+              <span className="user-bar-role user-bar-custom" title={user.customStatus}>
+                {user.customStatus}
+              </span>
+            ) : (
+              isAdmin && <span className="user-bar-role">Administrador</span>
+            )}
           </span>
         </button>
         <div className="user-bar-actions">
@@ -1093,7 +1157,9 @@ export default function ChannelSidebar({
           const isForceMuted = presenceEntry?.forceMuted || false;
           const isForceDeafened = presenceEntry?.forceDeafened || false;
           const isBot = participantMenu.userId < 0;
-          if (!canAdjustVolume && !hasAnyModPermission) return null;
+          const isMe = participantMenu.userId === user?.id;
+          const inMyCall = isMe && activeChannel?.id === participantMenu.channelId;
+          const showMod = hasAnyModPermission && !isMe;
           return (
             <div
               className="volume-popover"
@@ -1102,7 +1168,48 @@ export default function ChannelSidebar({
             >
               <p className="volume-popover-title">{p?.name || participantMenu.username}</p>
 
-              {canAdjustVolume && (
+              <div className="participant-mod-actions">
+                {!isBot && (
+                  <button
+                    type="button"
+                    className="participant-mod-btn"
+                    onClick={() => {
+                      openProfile(participantMenu.userId);
+                      setParticipantMenu(null);
+                    }}
+                  >
+                    <UserIcon size={14} /> Ver perfil
+                  </button>
+                )}
+                {inMyCall && (
+                  <>
+                    <button
+                      type="button"
+                      className="participant-mod-btn"
+                      onClick={() => {
+                        toggleMic();
+                        setParticipantMenu(null);
+                      }}
+                    >
+                      {micEnabled ? <MicOffIcon size={14} /> : <MicIcon size={14} />}
+                      {micEnabled ? "Mutar meu mic" : "Ativar meu mic"}
+                    </button>
+                    <button
+                      type="button"
+                      className="participant-mod-btn"
+                      onClick={() => {
+                        toggleDeafen();
+                        setParticipantMenu(null);
+                      }}
+                    >
+                      {deafened ? <HeadphonesIcon size={14} /> : <HeadphonesOffIcon size={14} />}
+                      {deafened ? "Reativar meu áudio" : "Ensurdecer"}
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {canAdjustVolume && !isMe && (
                 <VolumeSlider
                   value={participantVolumes[p.identity] ?? 100}
                   onChange={(v) => setParticipantVolume(p.identity, v)}
@@ -1110,7 +1217,7 @@ export default function ChannelSidebar({
                 />
               )}
 
-              {hasAnyModPermission && (
+              {showMod && (
                 <div className="participant-mod-actions">
                   {myServerPermissions.has("MUTE_MEMBERS") && (
                     <button

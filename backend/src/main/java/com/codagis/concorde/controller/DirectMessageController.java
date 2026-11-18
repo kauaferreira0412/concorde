@@ -42,8 +42,13 @@ public class DirectMessageController {
     }
 
     @GetMapping("/channels/{channelId}/messages/search")
-    public List<DmMessage> search(@PathVariable Long channelId, @RequestParam("q") String query) {
-        return directMessageService.search(channelId, currentUser.id(), query);
+    public List<DmMessage> search(@PathVariable Long channelId, @RequestParam(value = "q", defaultValue = "") String query,
+                                     @RequestParam(required = false) Long authorId,
+                                     @RequestParam(required = false) String has,
+                                     @RequestParam(required = false) String after,
+                                     @RequestParam(required = false) String before) {
+        return directMessageService.search(channelId, currentUser.id(),
+                com.codagis.concorde.dto.SearchFilters.of(query, authorId, has, after, before));
     }
 
     @PostMapping(value = "/channels/{channelId}/attachments", consumes = "multipart/form-data")

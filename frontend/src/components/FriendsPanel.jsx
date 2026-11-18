@@ -4,7 +4,9 @@ import { useAlert } from "../context/AlertContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
 import Avatar from "./Avatar.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
-import { AlertTriangleIcon, BlockIcon, CheckIcon, MessageSquareIcon, TrashIcon, UserIcon, XIcon } from "./icons.jsx";
+import EmptyState from "./EmptyState.jsx";
+import { MobileBackButton } from "../context/LayoutContext.jsx";
+import { AlertTriangleIcon, BellIcon, BlockIcon, CheckIcon, MessageSquareIcon, PlusIcon, TrashIcon, UserIcon, UsersIcon, XIcon } from "./icons.jsx";
 
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", OFFLINE: "Offline" };
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
@@ -104,6 +106,8 @@ export default function FriendsPanel({ friends, requests, blocked, onSendRequest
   return (
     <div className="friends-panel">
       <div className="friends-panel-tabs">
+        <MobileBackButton />
+        <h1 className="friends-panel-title">AMIGOS</h1>
         {TABS.map((t) => (
           <button
             type="button"
@@ -173,7 +177,12 @@ export default function FriendsPanel({ friends, requests, blocked, onSendRequest
         {tab === "pending" && (
           <>
             {requests.incoming.length === 0 && requests.outgoing.length === 0 ? (
-              <p className="friends-panel-empty">Nenhum pedido de amizade pendente.</p>
+              <EmptyState
+                icon={<BellIcon size={30} />}
+                tone="orange"
+                title="NADA PENDENTE"
+                hint="Quando alguém te mandar um pedido de amizade, ele aparece aqui pra você aceitar."
+              />
             ) : (
               <>
                 {requests.incoming.length > 0 && (
@@ -228,7 +237,12 @@ export default function FriendsPanel({ friends, requests, blocked, onSendRequest
 
         {tab === "blocked" &&
           (blocked.length === 0 ? (
-            <p className="friends-panel-empty">Você não bloqueou ninguém.</p>
+            <EmptyState
+              icon={<BlockIcon size={30} />}
+              tone="accent"
+              title="NINGUÉM BLOQUEADO"
+              hint="Paz total por aqui. Se alguém encher o saco, dá pra bloquear pelo perfil da pessoa."
+            />
           ) : (
             <>
               <p className="friends-panel-section-title">BLOQUEADOS — {blocked.length}</p>
@@ -253,7 +267,25 @@ export default function FriendsPanel({ friends, requests, blocked, onSendRequest
 
         {tab === "online" &&
           (onlineFriends.length === 0 ? (
-            <p className="friends-panel-empty">Ninguém online agora.</p>
+            <EmptyState
+              icon={<UsersIcon size={30} />}
+              title="TÁ TODO MUNDO OFF"
+              hint={
+                friends.length === 0
+                  ? "Você ainda não adicionou ninguém. Bora chamar a galera?"
+                  : "Nenhum amigo online agora. Assim que alguém entrar, aparece aqui."
+              }
+            >
+              {friends.length === 0 ? (
+                <button type="button" className="btn-sticker" onClick={() => setTab("add")}>
+                  <PlusIcon size={18} /> ADICIONAR AMIGO
+                </button>
+              ) : (
+                <button type="button" className="empty-state-link" onClick={() => setTab("all")}>
+                  Ver todos os amigos ({friends.length})
+                </button>
+              )}
+            </EmptyState>
           ) : (
             <>
               <p className="friends-panel-section-title">ONLINE — {onlineFriends.length}</p>
@@ -263,9 +295,15 @@ export default function FriendsPanel({ friends, requests, blocked, onSendRequest
 
         {tab === "all" &&
           (friends.length === 0 ? (
-            <p className="friends-panel-empty">
-              Você ainda não tem nenhum amigo. Use "Adicionar amigo" pra mandar seu primeiro pedido.
-            </p>
+            <EmptyState
+              icon={<UserIcon size={30} />}
+              title="SUA LISTA TÁ VAZIA"
+              hint="Manda um pedido pelo nome de usuário e começa a conversar, chamar pra call e rolar dado junto."
+            >
+              <button type="button" className="btn-sticker" onClick={() => setTab("add")}>
+                <PlusIcon size={18} /> ADICIONAR AMIGO
+              </button>
+            </EmptyState>
           ) : (
             <>
               <p className="friends-panel-section-title">TODOS OS AMIGOS — {friends.length}</p>

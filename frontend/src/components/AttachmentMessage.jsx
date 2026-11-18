@@ -1,5 +1,6 @@
 import { DownloadIcon, FileIcon } from "./icons.jsx";
 import { formatFileSize } from "../utils/fileSize";
+import AudioPlayer from "./AudioPlayer.jsx";
 
 export default function AttachmentMessage({ url, name, type, size }) {
   if (!url) return null;
@@ -15,10 +16,7 @@ export default function AttachmentMessage({ url, name, type, size }) {
 
   if (kind === "audio") {
     return (
-      <div className="chat-audio-card">
-        <audio controls preload="metadata" className="chat-audio" src={url} />
-        <span className="chat-audio-name">{name}</span>
-      </div>
+      <AudioPlayer src={url} name={name} />
     );
   }
 

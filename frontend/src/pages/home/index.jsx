@@ -1,23 +1,29 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import ServerSidebar from "../../components/ServerSidebar.jsx";
 import FriendsPanel from "../../components/FriendsPanel.jsx";
 import DmChatWindow from "../../components/DmChatWindow.jsx";
+import DmProfilePanel from "../../components/DmProfilePanel.jsx";
 import Avatar from "../../components/Avatar.jsx";
+import EmptyState from "../../components/EmptyState.jsx";
 import ConfirmModal from "../../components/ConfirmModal.jsx";
 import SettingsModal from "../../components/SettingsModal.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useProfile } from "../../context/ProfileContext.jsx";
 import { attachmentSummary } from "../../utils/attachmentSummary";
-import { LogOutIcon, MessageSquareIcon, SettingsIcon, UsersIcon } from "../../components/icons.jsx";
+import { LogOutIcon, MessageSquareIcon, SearchIcon, SettingsIcon, UsersIcon } from "../../components/icons.jsx";
 import { useHomeContainer } from "./Container.jsx";
+import { LayoutProvider, usePageLayout } from "../../context/LayoutContext.jsx";
 import "./style.css";
 
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
+const STATUS_LABEL = { ONLINE: "online", AWAY: "ausente", DND: "não perturbe", OFFLINE: "invisível" };
 
 export default function HomePage() {
   const { user, isAdmin, logout } = useAuth();
   const { openProfile } = useProfile();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [dmFilter, setDmFilter] = useState("");
+  const layout = usePageLayout();
   const {
     navigate,
     servers,
@@ -44,8 +50,17 @@ export default function HomePage() {
     openFriendsView,
   } = useHomeContainer();
 
+  const visibleDms = useMemo(() => {
+    const q = dmFilter.trim().toLowerCase();
+    if (!q) return dmChannels;
+    return dmChannels.filter((c) =>
+      [c.otherNickname, c.otherUsername].some((n) => n && n.toLowerCase().includes(q))
+    );
+  }, [dmChannels, dmFilter]);
+
   return (
-    <div className="app-shell">
+    <LayoutProvider value={layout.value}>
+    <div {...layout.shellProps}>
       <ServerSidebar
         servers={servers}
         selectedServerId={null}
@@ -57,22 +72,44 @@ export default function HomePage() {
 
       <div className="home-sidebar">
         <div className="home-sidebar-header">
-          <strong>Concorde</strong>
+          <strong>CONCORDE</strong>
+          <span>suas conversas</span>
         </div>
-        <button type="button" className={"home-nav-item" + (view === "friends" ? " active" : "")} onClick={openFriendsView}>
-          <UsersIcon size={17} />
+        <label className="home-dm-search">
+          <SearchIcon size={16} />
+          <input
+            placeholder="Achar conversa"
+            value={dmFilter}
+            onChange={(e) => setDmFilter(e.target.value)}
+            aria-label="Achar conversa"
+          />
+        </label>
+        <div className="home-nav">
+        <button type="button" className={"home-nav-item" + (view === "friends" ? " active" : "")} onClick={() => {
+            openFriendsView();
+            layout.showMain();
+          }}>
+          <UsersIcon size={20} />
           Amigos
           {requests.incoming.length > 0 && <span className="home-nav-badge">{requests.incoming.length}</span>}
         </button>
 
         <p className="home-dm-list-title">CONVERSAS DIRETAS</p>
         <div className="home-dm-list">
-          {dmChannels.length === 0 ? (
-            <p className="friends-panel-empty" style={{ padding: "0 12px" }}>
-              Adicione um amigo pra começar a conversar.
-            </p>
+          {visibleDms.length === 0 ? (
+            <EmptyState
+              size="sm"
+              tone={dmChannels.length === 0 ? "accent" : "orange"}
+              icon={dmChannels.length === 0 ? <MessageSquareIcon size={22} /> : <SearchIcon size={22} />}
+              title={dmChannels.length === 0 ? "SEM CONVERSAS" : "NADA ENCONTRADO"}
+              hint={
+                dmChannels.length === 0
+                  ? "Abre o perfil de um amigo e manda a primeira mensagem."
+                  : `Nenhuma conversa com "${dmFilter.trim()}".`
+              }
+            />
           ) : (
-            dmChannels.map((c) => {
+            visibleDms.map((c) => {
               const isUnread = unreadDmIds.has(c.channelId);
               return (
                 <button
@@ -83,10 +120,13 @@ export default function HomePage() {
                     (view === "dm" && activeDm?.channelId === c.channelId ? " active" : "") +
                     (isUnread ? " unread" : "")
                   }
-                  onClick={() => openDmChannel(c)}
+                  onClick={() => {
+                    openDmChannel(c);
+                    layout.showMain();
+                  }}
                 >
                   <span className="member-avatar-wrap">
-                    <Avatar name={c.otherUsername} url={c.otherAvatarUrl} className="voice-avatar" />
+                    <Avatar name={c.otherUsername} url={c.otherAvatarUrl} className="home-dm-avatar" />
                     <span className={"status-dot " + (STATUS_DOT_CLASS[c.otherStatus] || "offline")} />
                   </span>
                   <span className="home-dm-item-info">
@@ -97,11 +137,12 @@ export default function HomePage() {
                       </span>
                     )}
                   </span>
-                  {isUnread && <span className="home-dm-item-unread-dot" />}
+                  {isUnread && <span className="home-dm-item-unread-dot" title="Mensagens novas" />}
                 </button>
               );
             })
           )}
+        </div>
         </div>
 
         <div className="user-bar">
@@ -112,7 +153,9 @@ export default function HomePage() {
             </div>
             <span className="user-bar-text">
               <span className="user-bar-name">{user?.nickname || user?.username}</span>
-              {isAdmin && <span className="user-bar-role">Administrador</span>}
+              <span className={"user-bar-role" + (user?.customStatus ? " user-bar-custom" : "")} title={user?.customStatus || undefined}>
+                {user?.customStatus || (isAdmin ? "administrador" : STATUS_LABEL[user?.status] || "online")}
+              </span>
             </span>
           </button>
           <div className="user-bar-actions">
@@ -137,14 +180,24 @@ export default function HomePage() {
           onRemove={removeFriend}
           onBlock={blockUser}
           onUnblock={unblockUser}
-          onOpenDm={openDmWithFriend}
+          onOpenDm={(f) => {
+            openDmWithFriend(f);
+            layout.showMain();
+          }}
         />
       ) : activeDm ? (
-        <DmChatWindow channel={activeDm} stompClient={stompClient} stompConnected={stompConnected} stompError={stompError} />
+        <>
+          <DmChatWindow channel={activeDm} stompClient={stompClient} stompConnected={stompConnected} stompError={stompError} />
+          <DmProfilePanel channel={activeDm} />
+        </>
       ) : (
         <div className="chat-window empty">
-          <MessageSquareIcon size={40} />
-          <p>Selecione uma conversa</p>
+          <EmptyState
+            icon={<MessageSquareIcon size={30} />}
+            tone="accent"
+            title="BORA PROSEAR?"
+            hint="Escolhe uma conversa aí do lado ou abre Amigos pra chamar alguém."
+          />
         </div>
       )}
 
@@ -160,5 +213,6 @@ export default function HomePage() {
         />
       )}
     </div>
+    </LayoutProvider>
   );
 }

@@ -12,6 +12,7 @@ import AuditLogModal from "../../components/AuditLogModal.jsx";
 import CustomEmojiModal from "../../components/CustomEmojiModal.jsx";
 import SettingsModal from "../../components/SettingsModal.jsx";
 import { useServersContainer } from "./Container.jsx";
+import { DrawerBackdrop, LayoutProvider, usePageLayout } from "../../context/LayoutContext.jsx";
 import "./style.css";
 
 export default function ServerPage() {
@@ -55,10 +56,11 @@ export default function ServerPage() {
     handleMoveChannelCategory,
     handleCategoryDeleted,
   } = useServersContainer();
+  const layout = usePageLayout({ hasMembers: !!selectedServerId });
 
   return (
-    <>
-      <div className="app-shell">
+    <LayoutProvider value={layout.value}>
+      <div {...layout.shellProps}>
         <ServerSidebar
           servers={servers}
           selectedServerId={selectedServerId}
@@ -70,7 +72,10 @@ export default function ServerPage() {
           server={selectedServer}
           channels={channels}
           selectedChannelId={selectedChannel?.id}
-          onSelectChannel={setSelectedChannel}
+          onSelectChannel={(c) => {
+            setSelectedChannel(c);
+            layout.showMain();
+          }}
           onCreateChannel={openCreateChannel}
           onDeleteChannel={handleDeleteChannel}
           onOpenSettings={() => setShowSettings(true)}
@@ -109,6 +114,7 @@ export default function ServerPage() {
         )}
 
         <MemberList serverId={selectedServerId} stompClient={stompClient} stompConnected={stompConnected} />
+        <DrawerBackdrop />
 
         {showCreateServer && (
           <CreateServerModal onClose={() => setShowCreateServer(false)} onCreate={handleCreateServer} />
@@ -140,6 +146,6 @@ export default function ServerPage() {
         {auditLogServer && <AuditLogModal server={auditLogServer} onClose={() => setAuditLogServer(null)} />}
         {emojiServer && <CustomEmojiModal server={emojiServer} onClose={() => setEmojiServer(null)} />}
       </div>
-    </>
+    </LayoutProvider>
   );
 }

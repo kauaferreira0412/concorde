@@ -121,6 +121,6 @@ public class AuthService {
 
     private UserResponse toUserResponse(User user) {
         return new UserResponse(user.getId(), user.getUsername(), user.getEmail(), user.getAvatarUrl(), user.getRole(),
-                user.getStatus(), user.getNickname(), user.getBio());
+                user.getStatus(), user.getNickname(), user.getBio(), user.getBannerUrl(), user.getCustomStatus(), user.getAccentColor());
     }
 }

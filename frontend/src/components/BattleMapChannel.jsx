@@ -1,5 +1,6 @@
 import { MapIcon } from "./icons.jsx";
 import BattleMap from "./BattleMap.jsx";
+import { MembersToggleButton, MobileBackButton } from "../context/LayoutContext.jsx";
 
 export default function BattleMapChannel({ channel, stompClient, stompConnected }) {
   if (!channel) return <div className="chat-window empty">Selecione um canal</div>;
@@ -7,6 +8,7 @@ export default function BattleMapChannel({ channel, stompClient, stompConnected 
   return (
     <div className="battle-map-channel">
       <div className="chat-header">
+        <MobileBackButton />
         <span className="chat-header-name">
           <MapIcon size={15} style={{ verticalAlign: -2, marginRight: 6 }} />
           {channel.name}

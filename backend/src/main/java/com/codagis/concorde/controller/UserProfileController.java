@@ -37,6 +37,8 @@ public class UserProfileController {
 
     private PublicProfileResponse toResponse(User user) {
         return new PublicProfileResponse(user.getId(), user.getUsername(), user.getNickname(), user.getAvatarUrl(),
-                user.getBio(), presenceService.effectiveStatus(user.getId()), user.getCreatedAt(), user.getRole());
+                user.getBio(), presenceService.effectiveStatus(user.getId()), user.getCreatedAt(), user.getRole(),
+                user.getBannerUrl(), presenceService.visibleCustomStatus(user.getId()),
+                user.getAccentColor());
     }
 }

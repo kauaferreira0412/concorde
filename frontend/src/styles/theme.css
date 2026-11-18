@@ -1,0 +1,179 @@
+/* =====================================================================
+   Tokens de tema — estilo "adesivo" (contorno grosso + sombra sólida)
+   ---------------------------------------------------------------------
+   --c-*  : cores editáveis pelo usuário (ThemeContext escreve inline no <html>)
+   --t-*  : tokens derivados (dependem do tema base, calculados com color-mix)
+   resto  : aliases antigos (--bg-panel, --accent...) usados pelo global.css
+   ===================================================================== */
+
+:root,
+:root[data-theme="dark"] {
+  --c-bg: #2B1A63;
+  --c-surface: #15122B;
+  --c-surface-2: #2A2550;
+  --c-ink: #000000;
+  --c-line: #3A3368;
+  --c-wave: #3A2585;
+  --c-text: #F4F1FF;
+  --c-text-muted: #B4ACD6;
+  --c-on-accent: #FFFDF7;
+  --c-on-pop: #1A1423;
+  --c-accent: #7C4DEB;
+  --c-mint: #6FE3CF;
+  --c-orange: #F6A56E;
+  --c-success: #3DDC97;
+  --c-danger: #E5484D;
+
+  --t-shadow-offset: 6px;
+  --t-text-faint: color-mix(in srgb, var(--c-text-muted) 85%, var(--c-surface));
+  --t-line-soft: var(--c-line);
+  --t-voice-bg: color-mix(in srgb, var(--c-success) 22%, var(--c-surface));
+  --t-accent-text: color-mix(in srgb, var(--c-accent) 45%, #FFFFFF);
+  --t-mint-text: var(--c-mint);
+  --t-orange-text: var(--c-orange);
+  --t-tone-a-bg: color-mix(in srgb, var(--c-accent) 45%, var(--c-surface));
+  --t-tone-a-fg: var(--c-text);
+  --t-tone-b-bg: color-mix(in srgb, var(--c-success) 35%, var(--c-surface));
+  --t-tone-b-fg: var(--c-text);
+  --t-tone-c-bg: var(--c-orange);
+  --t-tone-c-fg: var(--c-on-pop);
+  --t-mention-bg: var(--c-orange);
+  --t-mention-fg: var(--c-on-pop);
+  --t-offline-border: color-mix(in srgb, var(--c-line) 70%, var(--c-accent));
+  --t-meter-off: color-mix(in srgb, var(--c-text-muted) 30%, var(--c-surface));
+  --t-dashed: var(--t-accent-text);
+}
+
+:root[data-theme="light"] {
+  --c-bg: #8EE6D6;
+  --c-surface: #FFFDF7;
+  --c-surface-2: #F3EEFF;
+  --c-ink: #1A1423;
+  --c-line: #1A1423;
+  --c-wave: #7FD9C9;
+  --c-text: #1A1423;
+  --c-text-muted: #3B3346;
+  --c-on-accent: #FFFDF7;
+  --c-on-pop: #1A1423;
+  --c-accent: #6B3FD6;
+  --c-mint: #8EE6D6;
+  --c-orange: #F6A56E;
+  --c-success: #13806C;
+  --c-danger: #E5484D;
+
+  --t-shadow-offset: 5px;
+  --t-text-faint: color-mix(in srgb, var(--c-text-muted) 80%, var(--c-surface));
+  --t-line-soft: color-mix(in srgb, var(--c-line) 16%, var(--c-surface));
+  --t-voice-bg: color-mix(in srgb, var(--c-mint) 30%, var(--c-surface));
+  --t-accent-text: color-mix(in srgb, var(--c-accent) 80%, var(--c-ink));
+  --t-mint-text: color-mix(in srgb, var(--c-success) 85%, var(--c-ink));
+  --t-orange-text: color-mix(in srgb, var(--c-orange) 45%, #7A2A00);
+  --t-tone-a-bg: color-mix(in srgb, var(--c-accent) 18%, var(--c-surface));
+  --t-tone-a-fg: var(--c-text);
+  --t-tone-b-bg: color-mix(in srgb, var(--c-mint) 45%, var(--c-surface));
+  --t-tone-b-fg: var(--c-text);
+  --t-tone-c-bg: var(--c-orange);
+  --t-tone-c-fg: var(--c-on-pop);
+  --t-mention-bg: color-mix(in srgb, var(--c-orange) 35%, var(--c-surface));
+  --t-mention-fg: var(--c-text);
+  --t-offline-border: color-mix(in srgb, var(--c-ink) 60%, var(--c-surface));
+  --t-meter-off: color-mix(in srgb, var(--c-text-muted) 25%, var(--c-surface));
+  --t-dashed: var(--c-ink);
+}
+
+:root {
+  /* contorno e sombra */
+  --bw: 2.5px;
+  --bw-sm: 2px;
+  --sticker: var(--bw) solid var(--c-ink);
+  --sticker-sm: var(--bw-sm) solid var(--c-ink);
+  --pop-1: 3px 3px 0 var(--c-ink);
+  --pop-2: 4px 4px 0 var(--c-ink);
+  --pop-3: var(--t-shadow-offset) var(--t-shadow-offset) 0 var(--c-ink);
+  --pop-accent: 3px 3px 0 var(--c-accent);
+  --pop-accent-2: 4px 4px 0 var(--c-accent);
+
+  --t-hover: color-mix(in srgb, var(--c-accent) 12%, var(--c-surface));
+  --t-hover-strong: color-mix(in srgb, var(--c-accent) 22%, var(--c-surface));
+  --t-accent-hover: color-mix(in srgb, var(--c-accent) 88%, #FFFFFF);
+  --t-danger-hover: color-mix(in srgb, var(--c-danger) 88%, #FFFFFF);
+  --t-backdrop: color-mix(in srgb, var(--c-ink) 62%, transparent);
+
+  /* tipografia */
+  --font: "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Bungee", "Nunito", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Consolas, monospace;
+
+  /* ---------- aliases usados pelo restante do CSS ---------- */
+  --bg-app: var(--c-bg);
+  --bg-app-grad: var(--c-bg);
+  --bg-rail: var(--c-bg);
+  --bg-panel: var(--c-surface);
+  --bg-panel-2: var(--c-surface-2);
+  --bg-elevated: var(--c-surface);
+  --bg-hover: var(--t-hover);
+  --bg-input: var(--c-surface);
+
+  --border: var(--c-ink);
+  --border-soft: var(--t-line-soft);
+  --border-strong: var(--c-ink);
+
+  --text-primary: var(--c-text);
+  --text-secondary: var(--c-text-muted);
+  --text-muted: var(--t-text-faint);
+
+  --accent: var(--c-accent);
+  --accent-hover: var(--t-accent-hover);
+  --accent-press: color-mix(in srgb, var(--c-accent) 85%, #000000);
+  --accent-soft: color-mix(in srgb, var(--c-accent) 16%, transparent);
+  --accent-text: var(--t-accent-text);
+  --accent-ring: color-mix(in srgb, var(--c-accent) 45%, transparent);
+
+  --intel: var(--c-mint);
+  --intel-soft: color-mix(in srgb, var(--c-mint) 22%, transparent);
+
+  --success: var(--c-success);
+  --success-soft: color-mix(in srgb, var(--c-success) 18%, transparent);
+  --danger: var(--c-danger);
+  --danger-soft: color-mix(in srgb, var(--c-danger) 16%, transparent);
+  --warning: var(--c-orange);
+  --warning-soft: color-mix(in srgb, var(--c-orange) 22%, transparent);
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+  --shadow-sm: var(--pop-1);
+  --shadow-md: var(--pop-2);
+  --shadow-lg: var(--pop-3);
+  --glow-accent: var(--pop-1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ---------- Fundo do app + ondas ---------- */
+
+html {
+  background: var(--c-bg);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--c-wave);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120'%3E%3Cpath d='M0 30 Q60 0 120 30 T240 30 M0 90 Q60 60 120 90 T240 90' fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 240px 120px repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120'%3E%3Cpath d='M0 30 Q60 0 120 30 T240 30 M0 90 Q60 60 120 90 T240 90' fill='none' stroke='%23000' stroke-width='16' stroke-linecap='round'/%3E%3C/svg%3E") 0 0 / 240px 120px repeat;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+:root[data-waves="on"] body::before { opacity: 1; }
+
+/* ---------- Tons de avatar / nome (escolhidos por hash do nome) ---------- */
+
+[data-tone="a"] { --tone-bg: var(--t-tone-a-bg); --tone-fg: var(--t-tone-a-fg); --tone-name: var(--t-accent-text); }
+[data-tone="b"] { --tone-bg: var(--t-tone-b-bg); --tone-fg: var(--t-tone-b-fg); --tone-name: var(--t-mint-text); }
+[data-tone="c"] { --tone-bg: var(--t-tone-c-bg); --tone-fg: var(--t-tone-c-fg); --tone-name: var(--t-orange-text); }

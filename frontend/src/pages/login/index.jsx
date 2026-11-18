@@ -23,7 +23,7 @@ export default function LoginPage() {
     <div className="auth-screen">
       <form className="auth-card" onSubmit={handleSubmit}>
         <div className="auth-logo">
-          <img src={`${import.meta.env.BASE_URL}icon-192.png`} alt="" />
+          <img src={`${import.meta.env.BASE_URL}logo-badge-512.png`} alt="" />
         </div>
         <div className="auth-heading">
           <h1>Concorde</h1>

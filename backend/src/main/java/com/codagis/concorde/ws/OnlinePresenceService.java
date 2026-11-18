@@ -77,9 +77,18 @@ public class OnlinePresenceService {
         return result;
     }
 
-    private void broadcast(Long userId) {
-        messagingTemplate.convertAndSend("/topic/presence", new PresenceEvent(userId, effectiveStatus(userId)));
+    /** Status personalizado só aparece pra quem está visível (offline/invisível não mostra). */
+    public String visibleCustomStatus(Long userId) {
+        if (effectiveStatus(userId) == PresenceStatus.OFFLINE) return null;
+        return userRepository.findById(userId).map(u -> u.getCustomStatus()).orElse(null);
     }
 
-    public record PresenceEvent(Long userId, PresenceStatus status) {}
+    private void broadcast(Long userId) {
+        PresenceStatus status = effectiveStatus(userId);
+        String custom = status == PresenceStatus.OFFLINE ? null
+                : userRepository.findById(userId).map(u -> u.getCustomStatus()).orElse(null);
+        messagingTemplate.convertAndSend("/topic/presence", new PresenceEvent(userId, status, custom));
+    }
+
+    public record PresenceEvent(Long userId, PresenceStatus status, String customStatus) {}
 }
