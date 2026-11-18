@@ -8,5 +8,6 @@ import java.time.Instant;
 public class UserProfileDtos {
 
     public record PublicProfileResponse(Long id, String username, String nickname, String avatarUrl, String bio,
-                                         PresenceStatus status, Instant createdAt, Role role) {}
+                                         PresenceStatus status, Instant createdAt, Role role,
+                                         String bannerUrl, String customStatus, String accentColor) {}
 }

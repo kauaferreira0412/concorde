@@ -38,11 +38,11 @@ function createWindow(deepLinkUrl) {
     width: 1200,
     height: 800,
     title: "Concorde",
-    backgroundColor: "#050816",
+    backgroundColor: "#2B1A63",
     titleBarStyle: "hidden",
     titleBarOverlay: {
-      color: "#070b1a",
-      symbolColor: "#f4f6fd",
+      color: "#2B1A63",
+      symbolColor: "#F4F1FF",
       height: TITLEBAR_HEIGHT,
     },
     webPreferences: {
@@ -55,6 +55,15 @@ function createWindow(deepLinkUrl) {
   const startUrl = app.isPackaged ? "app://./index.html" : DEV_URL;
 
   mainWindow.loadURL(startUrl);
+
+  // Transmissão de tela vira janela flutuante (Picture-in-Picture) ao minimizar; volta ao restaurar.
+  // userGesture=true: o PiP do Chromium exige um gesto do usuário.
+  mainWindow.on("minimize", () => {
+    mainWindow.webContents.executeJavaScript("window.__concordeAutoPip && window.__concordeAutoPip()", true).catch(() => {});
+  });
+  mainWindow.on("restore", () => {
+    mainWindow.webContents.executeJavaScript("window.__concordeExitAutoPip && window.__concordeExitAutoPip()", true).catch(() => {});
+  });
 
   if (deepLinkUrl) {
     routeDeepLink(deepLinkUrl);
@@ -72,9 +81,9 @@ function createCameraPipWindow(channelId, appToken) {
     width: 900,
     height: 560,
     title: "Concorde — Câmeras",
-    backgroundColor: "#050816",
+    backgroundColor: "#2B1A63",
     titleBarStyle: "hidden",
-    titleBarOverlay: { color: "#070b1a", symbolColor: "#f4f6fd", height: TITLEBAR_HEIGHT },
+    titleBarOverlay: { color: "#2B1A63", symbolColor: "#F4F1FF", height: TITLEBAR_HEIGHT },
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -221,6 +230,18 @@ function applyZoomLevel(level) {
   }
 }
 
+ipcMain.handle("concorde:set-titlebar-colors", (event, colors) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || typeof win.setTitleBarOverlay !== "function") return;
+  const isHex = (v) => typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v);
+  if (!isHex(colors?.color) || !isHex(colors?.symbolColor)) return;
+  try {
+    win.setTitleBarOverlay({ color: colors.color, symbolColor: colors.symbolColor, height: TITLEBAR_HEIGHT });
+    win.setBackgroundColor(colors.color);
+  } catch {
+    // plataformas sem overlay (macOS usa traffic lights): ignora
+  }
+});
 ipcMain.handle("concorde:zoom-in", () => {
   if (!mainWindow) return;
   applyZoomLevel(Math.min(ZOOM_MAX, mainWindow.webContents.getZoomLevel() + ZOOM_STEP));
@@ -231,6 +252,29 @@ ipcMain.handle("concorde:zoom-out", () => {
 });
 ipcMain.handle("concorde:zoom-reset", () => {
   applyZoomLevel(0);
+});
+
+// Links externos (http/https/mailto) abrem no navegador padrão do sistema, nunca numa janela do Electron.
+function isExternalUrl(url) {
+  return typeof url === "string" && /^(https?:|mailto:)/i.test(url);
+}
+
+function isAppUrl(url) {
+  return url.startsWith("app://") || url.startsWith(DEV_URL);
+}
+
+app.on("web-contents-created", (_event, contents) => {
+  // target="_blank" / window.open
+  contents.setWindowOpenHandler(({ url }) => {
+    if (isExternalUrl(url) && !isAppUrl(url)) shell.openExternal(url);
+    return { action: "deny" };
+  });
+  // link clicado na mesma aba que tentaria sair do app
+  contents.on("will-navigate", (event, url) => {
+    if (isAppUrl(url)) return;
+    event.preventDefault();
+    if (isExternalUrl(url)) shell.openExternal(url);
+  });
 });
 
 ipcMain.handle("concorde:open-external", (_event, url) => {

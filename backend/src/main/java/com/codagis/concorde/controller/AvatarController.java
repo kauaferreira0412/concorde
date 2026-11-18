@@ -1,6 +1,8 @@
 package com.codagis.concorde.controller;
 
 import com.codagis.concorde.domain.User;
+import com.codagis.concorde.dto.AuthDtos.AccentColorRequest;
+import com.codagis.concorde.dto.AuthDtos.CustomStatusRequest;
 import com.codagis.concorde.dto.AuthDtos.ProfileRequest;
 import com.codagis.concorde.dto.AuthDtos.StatusRequest;
 import com.codagis.concorde.dto.AuthDtos.UserResponse;
@@ -43,6 +45,29 @@ public class AvatarController {
         return toResponse(user);
     }
 
+    @PostMapping(value = "/banner", consumes = "multipart/form-data")
+    @Transactional
+    public UserResponse uploadBanner(@RequestParam("file") MultipartFile file) {
+        Long userId = currentUser.id();
+        String url = storageService.upload(file, "banners/" + userId);
+
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalStateException("Usuario nao encontrado"));
+        user.setBannerUrl(url);
+        userRepository.save(user);
+
+        return toResponse(user);
+    }
+
+    @DeleteMapping("/banner")
+    @Transactional
+    public UserResponse removeBanner() {
+        Long userId = currentUser.id();
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalStateException("Usuario nao encontrado"));
+        user.setBannerUrl(null);
+        userRepository.save(user);
+        return toResponse(user);
+    }
+
     @PutMapping("/status")
     @Transactional
     public UserResponse setStatus(@Valid @RequestBody StatusRequest req) {
@@ -51,6 +76,28 @@ public class AvatarController {
         user.setStatus(req.status());
         userRepository.save(user);
         presenceService.onStatusChanged(userId);
+        return toResponse(user);
+    }
+
+    @PutMapping("/custom-status")
+    @Transactional
+    public UserResponse setCustomStatus(@Valid @RequestBody CustomStatusRequest req) {
+        Long userId = currentUser.id();
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalStateException("Usuario nao encontrado"));
+        user.setCustomStatus(blankToNull(req.text()));
+        userRepository.save(user);
+        presenceService.onStatusChanged(userId);
+        return toResponse(user);
+    }
+
+    @PutMapping("/accent-color")
+    @Transactional
+    public UserResponse setAccentColor(@Valid @RequestBody AccentColorRequest req) {
+        Long userId = currentUser.id();
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalStateException("Usuario nao encontrado"));
+        String color = blankToNull(req.color());
+        user.setAccentColor(color == null ? null : color.toUpperCase(java.util.Locale.ROOT));
+        userRepository.save(user);
         return toResponse(user);
     }
 
@@ -71,6 +118,6 @@ public class AvatarController {
 
     private UserResponse toResponse(User user) {
         return new UserResponse(user.getId(), user.getUsername(), user.getEmail(), user.getAvatarUrl(), user.getRole(),
-                user.getStatus(), user.getNickname(), user.getBio());
+                user.getStatus(), user.getNickname(), user.getBio(), user.getBannerUrl(), user.getCustomStatus(), user.getAccentColor());
     }
 }

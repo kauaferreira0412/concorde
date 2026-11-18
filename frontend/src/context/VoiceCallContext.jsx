@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { DisconnectReason, Room, RoomEvent, Track } from "livekit-client";
 import api from "../api/client";
 import { useAuth } from "./AuthContext.jsx";
@@ -37,6 +37,9 @@ import {
   publishVoiceLeave,
   publishVoiceMicState,
   publishVoiceMove,
+  publishVoiceScreenShare,
+  publishVoiceSpeaking,
+  subscribeToVoiceSpeaking,
   publishVoiceWatching,
   subscribeToVoiceControl,
   subscribeToVoicePresence,
@@ -85,6 +88,16 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const [micEnabled, setMicEnabledState] = useState(true);
   const [deafened, setDeafenedState] = useState(false);
   const [screenSharing, setScreenSharing] = useState(false);
+  // Anuncia na presença de voz quem está transmitindo (tag "AO VIVO" na lista lateral de qualquer canal).
+  useEffect(() => {
+    const channelId = activeChannel?.id;
+    if (!channelId || !stompClientRef.current || !stompConnectedRef.current) return;
+    try {
+      publishVoiceScreenShare(stompClientRef.current, channelId, screenSharing);
+    } catch {
+      // stomp caiu no meio: o reanúncio do join manda o estado de novo
+    }
+  }, [screenSharing, activeChannel?.id]);
   const [cameraEnabled, setCameraEnabledState] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [speakingIds, setSpeakingIds] = useState(new Set());
@@ -98,6 +111,91 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const [myPermissions, setMyPermissions] = useState([]);
   const [pingMs, setPingMs] = useState(null);
   const { level: micLevel, start: startMicMeter, stop: stopMicMeter } = useMicLevel();
+
+  // "Falando" do próprio usuário vem do medidor local do mic (instantâneo e sensível), não do LiveKit,
+  // que só marca acima de um limiar alto e com atraso. Liga na hora; desliga após um respiro.
+  const SPEAK_ON = 7;
+  const SPEAK_OFF = 4;
+  const SPEAK_HOLD_MS = 320;
+  const [localVoiceActive, setLocalVoiceActive] = useState(false);
+  const lastLoudAtRef = useRef(0);
+  const canSpeak = !!activeChannel && micEnabled && !deafened;
+  useEffect(() => {
+    if (!canSpeak) {
+      if (localVoiceActive) setLocalVoiceActive(false);
+      return undefined;
+    }
+    const now = performance.now();
+    if (micLevel >= SPEAK_ON || (localVoiceActive && micLevel >= SPEAK_OFF)) {
+      lastLoudAtRef.current = now;
+      if (!localVoiceActive) setLocalVoiceActive(true);
+      return undefined;
+    }
+    if (!localVoiceActive) return undefined;
+    const wait = Math.max(0, SPEAK_HOLD_MS - (now - lastLoudAtRef.current));
+    const t = setTimeout(() => setLocalVoiceActive(false), wait);
+    return () => clearTimeout(t);
+  }, [micLevel, canSpeak, localVoiceActive]);
+
+  // Avisa o servidor quando EU começo/paro de falar: quem está na call ou fora dela vê o anel verde sem atraso.
+  const sentSpeakingRef = useRef(false);
+  useEffect(() => {
+    const channelId = activeChannel?.id;
+    if (!channelId) {
+      sentSpeakingRef.current = false;
+      return;
+    }
+    if (sentSpeakingRef.current === localVoiceActive || !stompClientRef.current || !stompConnectedRef.current) return;
+    try {
+      publishVoiceSpeaking(stompClientRef.current, channelId, localVoiceActive);
+      sentSpeakingRef.current = localVoiceActive;
+    } catch {
+      // stomp caiu: o próximo evento manda de novo
+    }
+  }, [localVoiceActive, activeChannel?.id, stompConnected]);
+
+  // Quem fala na MINHA call: usa o aviso que cada um manda (rápido); pra quem nunca mandou (bots,
+  // versão antiga do app) continua valendo o LiveKit.
+  const [remoteSpeaking, setRemoteSpeaking] = useState(() => new Map());
+  useEffect(() => {
+    setRemoteSpeaking(new Map());
+    const channelId = activeChannel?.id;
+    if (!channelId || !stompClient || !stompConnected) return undefined;
+    let sub;
+    try {
+      sub = subscribeToVoiceSpeaking(stompClient, channelId, ({ userId, speaking }) => {
+        setRemoteSpeaking((prev) => {
+          if (prev.get(userId) === speaking) return prev;
+          const next = new Map(prev);
+          next.set(userId, speaking);
+          return next;
+        });
+      });
+    } catch {
+      return undefined;
+    }
+    return () => {
+      try {
+        sub?.unsubscribe();
+      } catch {
+        // conexão já caiu
+      }
+    };
+  }, [activeChannel?.id, stompClient, stompConnected]);
+
+  const mergedSpeakingIds = useMemo(() => {
+    const myIdentity = user?.id ? `user-${user.id}` : null;
+    const out = new Set();
+    for (const id of speakingIds) {
+      if (id === myIdentity) continue;
+      const m = /^user-(\d+)$/.exec(id);
+      if (m && remoteSpeaking.has(Number(m[1]))) continue;
+      out.add(id);
+    }
+    for (const [uid, on] of remoteSpeaking) if (on && uid !== user?.id) out.add(`user-${uid}`);
+    if (myIdentity && localVoiceActive) out.add(myIdentity);
+    return out;
+  }, [speakingIds, remoteSpeaking, localVoiceActive, user?.id]);
 
   const roomRef = useRef(null);
   const videoTracksRef = useRef(new Map());
@@ -232,6 +330,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     publishVoiceMicState(stompClientRef.current, channelId, micEnabledRef.current);
     publishVoiceDeafenState(stompClientRef.current, channelId, deafenedRef.current);
     publishVoiceWatching(stompClientRef.current, channelId, currentWatchingUserIds());
+    publishVoiceScreenShare(stompClientRef.current, channelId, screenSharingRef.current);
     try {
       presenceSubRef.current?.unsubscribe();
     } catch {
@@ -265,6 +364,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
             publishVoiceJoin(stompClientRef.current, channelId);
             publishVoiceMicState(stompClientRef.current, channelId, micEnabledRef.current);
             publishVoiceDeafenState(stompClientRef.current, channelId, deafenedRef.current);
+            publishVoiceScreenShare(stompClientRef.current, channelId, screenSharingRef.current);
           }
         })
         .catch(() => {});
@@ -895,18 +995,48 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     }
   }
 
+  // Como o usuário estava antes da ação do moderador: ao liberar, volta pra isso (nunca liga o mic à força).
+  const micBeforeForceRef = useRef(null);
+  const deafBeforeForceRef = useRef(null);
+
   async function applyForceMute(muted) {
-    forceMutedRef.current = muted;
-    if (roomRef.current && !deafenedRef.current && micEnabledRef.current === muted) {
-      await toggleMic();
+    if (muted) {
+      if (micBeforeForceRef.current === null) micBeforeForceRef.current = micEnabledRef.current;
+      forceMutedRef.current = true;
+      if (roomRef.current && !deafenedRef.current && micEnabledRef.current) await toggleMic();
+      return;
+    }
+    forceMutedRef.current = false;
+    const wasOn = micBeforeForceRef.current;
+    micBeforeForceRef.current = null;
+    if (roomRef.current && wasOn && !deafenedRef.current && !micEnabledRef.current) await toggleMic();
+    else if (activeChannelRef.current && stompClientRef.current && stompConnectedRef.current) {
+      publishVoiceMicState(stompClientRef.current, activeChannelRef.current.id, micEnabledRef.current);
     }
   }
 
   async function applyForceDeafen(deafened) {
-    forceDeafenedRef.current = deafened;
-    forceMutedRef.current = deafened;
-    if (roomRef.current && deafenedRef.current !== deafened) {
+    if (deafened) {
+      if (deafBeforeForceRef.current === null) deafBeforeForceRef.current = deafenedRef.current;
+      if (micBeforeForceRef.current === null) micBeforeForceRef.current = micEnabledRef.current;
+      forceDeafenedRef.current = true;
+      forceMutedRef.current = true;
+      if (roomRef.current && !deafenedRef.current) await toggleDeafen();
+      return;
+    }
+    forceDeafenedRef.current = false;
+    forceMutedRef.current = false;
+    const wasDeaf = deafBeforeForceRef.current;
+    const wasMicOn = micBeforeForceRef.current;
+    deafBeforeForceRef.current = null;
+    micBeforeForceRef.current = null;
+    if (roomRef.current && !wasDeaf && deafenedRef.current) {
       await toggleDeafen();
+      // sair do ensurdecido religa o mic; se a pessoa estava mutada antes, mantém mutada
+      if (wasMicOn === false && micEnabledRef.current) await toggleMic();
+    } else if (activeChannelRef.current && stompClientRef.current && stompConnectedRef.current) {
+      publishVoiceMicState(stompClientRef.current, activeChannelRef.current.id, micEnabledRef.current);
+      publishVoiceDeafenState(stompClientRef.current, activeChannelRef.current.id, deafenedRef.current);
     }
   }
 
@@ -1133,7 +1263,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         cameraEnabled,
         cameraTracks,
         participants,
-        speakingIds,
+        speakingIds: mergedSpeakingIds,
         micLevel,
         pingMs,
         screenShares,

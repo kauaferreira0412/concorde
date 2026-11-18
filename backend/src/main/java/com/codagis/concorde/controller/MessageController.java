@@ -27,7 +27,12 @@ public class MessageController {
     }
 
     @GetMapping("/{channelId}/messages/search")
-    public List<ChatMessage> search(@PathVariable Long channelId, @RequestParam("q") String query) {
-        return messageService.search(channelId, query);
+    public List<ChatMessage> search(@PathVariable Long channelId, @RequestParam(value = "q", defaultValue = "") String query,
+                                     @RequestParam(required = false) Long authorId,
+                                     @RequestParam(required = false) String has,
+                                     @RequestParam(required = false) String after,
+                                     @RequestParam(required = false) String before) {
+        return messageService.search(channelId,
+                com.codagis.concorde.dto.SearchFilters.of(query, authorId, has, after, before));
     }
 }

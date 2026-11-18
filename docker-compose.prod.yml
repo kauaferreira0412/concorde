@@ -44,6 +44,7 @@ services:
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
       SPOTIFY_REDIRECT_URI: https://${DOMAIN}/api/spotify/callback
+      GIPHY_API_KEY: ${GIPHY_API_KEY:-}
     dns:
       - 8.8.8.8
       - 1.1.1.1

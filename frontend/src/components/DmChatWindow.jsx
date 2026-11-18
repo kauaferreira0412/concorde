@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/client";
 import {
   subscribeToDm,
@@ -16,30 +16,47 @@ import { useAlert } from "../context/AlertContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
 import { useAudioRecorder } from "../utils/useAudioRecorder";
 import { attachmentSummary } from "../utils/attachmentSummary";
-import Avatar from "./Avatar.jsx";
+import Avatar, { toneFor } from "./Avatar.jsx";
+import EmptyState from "./EmptyState.jsx";
+import GifPicker from "./GifPicker.jsx";
+import ChatImage from "./ChatImage.jsx";
+import LinkPreview from "./LinkPreview.jsx";
+import MessageSearchPanel from "./MessageSearchPanel.jsx";
+import { useFileDrop } from "../utils/useFileDrop";
+import { MembersToggleButton, MobileBackButton } from "../context/LayoutContext.jsx";
+import RecordingBar from "./RecordingBar.jsx";
+import AudioPlayer from "./AudioPlayer.jsx";
+import DaySeparator, { isGroupedWith, isNewDay } from "./DaySeparator.jsx";
 import MessageText from "./MessageText.jsx";
 import AttachmentMessage from "./AttachmentMessage.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import ImageLightbox from "./ImageLightbox.jsx";
 import DiceRollCard from "./DiceRollCard.jsx";
 import EmojiPicker from "./EmojiPicker.jsx";
-import { CheckIcon, MicIcon, PencilIcon, PinIcon, PlusIcon, ReplyIcon, SearchIcon, SmileIcon, TrashIcon, XIcon } from "./icons.jsx";
+import { CheckIcon, MessageSquareIcon, MicIcon, PencilIcon, PinIcon, PlusIcon, ReplyIcon, SearchIcon, SendIcon, SmileIcon, TrashIcon, XIcon } from "./icons.jsx";
+import { accentStyle } from "./AccentColorPicker.jsx";
 
 const ROLL_COMMAND_RE = /^\/(?:roll|r)\s+(.+)$/i;
 const ROLL_NOTATION_RE = /^(\d{0,2})d(\d{1,3})\s*([+-]\s*\d{1,3})?$/i;
 const SPOTIFY_COMMAND_RE = /^\/spotify(?:\s+@?(\S+))?\s*$/i;
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
+const DM_STATUS_LABEL = { ONLINE: "online", AWAY: "ausente", DND: "não perturbe", OFFLINE: "offline" };
 
 export default function DmChatWindow({ channel, stompClient, stompConnected, stompError }) {
   const { user } = useAuth();
+
+  // Cor de destaque do autor; nas minhas mensagens usa a atual (muda na hora quando troco nas configurações).
+  const authorAccent = (m) => (m.authorId === user?.id ? user?.accentColor : m.authorAccentColor) || null;
   const { openProfile } = useProfile();
   const { showAlert } = useAlert();
 
   const [messages, setMessages] = useState([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [draft, setDraft] = useState("");
   const [pendingImage, setPendingImage] = useState(null);
   const [pendingFile, setPendingFile] = useState(null);
   const recorder = useAudioRecorder();
+  const { dragging: fileDragging, dropProps } = useFileDrop((f) => pickFile(f), !!stompConnected);
   const [sending, setSending] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -47,8 +64,46 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [lightboxImage, setLightboxImage] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const dmPeople = useMemo(
+    () =>
+      channel
+        ? [
+            { userId: user?.id, username: user?.username, nickname: user?.nickname, avatarUrl: user?.avatarUrl },
+            {
+              userId: channel.otherUserId,
+              username: channel.otherUsername,
+              nickname: channel.otherNickname,
+              avatarUrl: channel.otherAvatarUrl,
+            },
+          ]
+        : [],
+    [channel, user]
+  );
   const [reactionPickerFor, setReactionPickerFor] = useState(null);
   const [showDraftEmojiPicker, setShowDraftEmojiPicker] = useState(false);
+
+  // Seletores de emoji (do campo de mensagem e de reação) fecham ao clicar fora ou apertar Esc.
+  useEffect(() => {
+    if (!showDraftEmojiPicker && reactionPickerFor == null) return undefined;
+    function close() {
+      setShowDraftEmojiPicker(false);
+      setReactionPickerFor(null);
+    }
+    function onDown(e) {
+      if (e.target.closest?.(".emoji-picker, .emoji-picker-toggle")) return;
+      close();
+    }
+    function onKey(e) {
+      if (e.key === "Escape") close();
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [showDraftEmojiPicker, reactionPickerFor]);
   const [typingUsers, setTypingUsers] = useState(new Map());
   const [showPinned, setShowPinned] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState([]);
@@ -68,6 +123,7 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
   useEffect(() => {
     if (!channelId) return;
     setMessages([]);
+    setHistoryLoaded(false);
     setEditingId(null);
     setReplyingTo(null);
     setShowPinned(false);
@@ -78,7 +134,9 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
     setTypingUsers(new Map());
     clearPendingImage();
     clearPendingFile();
-    api.get(`/api/dm/channels/${channelId}/messages`).then(({ data }) => setMessages(data));
+    api.get(`/api/dm/channels/${channelId}/messages`).then(({ data }) => setMessages(data))
+      .catch(() => {})
+      .finally(() => setHistoryLoaded(true));
   }, [channelId]);
 
   useEffect(() => {
@@ -398,21 +456,6 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
     setShowSearch((prev) => !prev);
   }
 
-  useEffect(() => {
-    if (!showSearch || !channelId) return;
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      return;
-    }
-    setSearching(true);
-    const handle = setTimeout(() => {
-      api
-        .get(`/api/dm/channels/${channelId}/messages/search`, { params: { q: searchQuery.trim() } })
-        .then(({ data }) => setSearchResults(data))
-        .finally(() => setSearching(false));
-    }, 300);
-    return () => clearTimeout(handle);
-  }, [searchQuery, showSearch, channelId]);
 
   function jumpFromPanel(id) {
     setShowPinned(false);
@@ -423,25 +466,44 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
   const emptyCustomEmojis = useMemo(() => [], []);
 
   if (!channel) {
-    return <div className="chat-window empty">Selecione uma conversa</div>;
+    return (
+      <div className="chat-window empty">
+        <EmptyState icon={<MessageSquareIcon size={30} />} tone="accent" title="ESCOLHE UMA CONVERSA" />
+      </div>
+    );
   }
 
   return (
-    <div className="chat-window">
+    <div className={"chat-window" + (fileDragging ? " file-dragging" : "")} {...dropProps}>
+      {fileDragging && (
+        <div className="chat-drop-overlay" aria-hidden="true">
+          <div className="chat-drop-card">
+            <span className="chat-drop-icon">
+              <PlusIcon size={30} />
+            </span>
+            <strong>SOLTA PRA ENVIAR</strong>
+            <span>{channel.otherNickname || channel.otherUsername}</span>
+          </div>
+        </div>
+      )}
       <div className="chat-header">
+        <MobileBackButton />
         <button type="button" className="chat-header-dm-user" onClick={() => openProfile(channel.otherUserId)}>
           <span className="member-avatar-wrap">
-            <Avatar name={channel.otherUsername} url={channel.otherAvatarUrl} className="voice-avatar" />
+            <Avatar name={channel.otherUsername} url={channel.otherAvatarUrl} className="chat-header-dm-avatar" />
             <span className={"status-dot " + (STATUS_DOT_CLASS[channel.otherStatus] || "offline")} />
           </span>
-          <span className="chat-header-name">{channel.otherNickname || channel.otherUsername}</span>
         </button>
+        <div className="chat-header-info" key={channelId}>
+          <h1 className="chat-header-title">{channel.otherNickname || channel.otherUsername}</h1>
+          <p className="chat-header-subtitle">{DM_STATUS_LABEL[channel.otherStatus] || "offline"} · conversa direta</p>
+        </div>
         <div className="chat-header-actions">
-          <button type="button" className={"icon-btn" + (showPinned ? " icon-btn-active" : "")} onClick={openPinned} title="Mensagens fixadas">
-            <PinIcon size={16} />
+          <button type="button" className={"icon-btn icon-btn-boxed" + (showPinned ? " icon-btn-active" : "")} onClick={openPinned} title="Mensagens fixadas">
+            <PinIcon size={18} />
           </button>
-          <button type="button" className={"icon-btn" + (showSearch ? " icon-btn-active" : "")} onClick={openSearch} title="Buscar no histórico">
-            <SearchIcon size={16} />
+          <button type="button" className={"icon-btn icon-btn-boxed" + (showSearch ? " icon-btn-active" : "")} onClick={openSearch} title="Buscar no histórico">
+            <SearchIcon size={18} />
           </button>
         </div>
       </div>
@@ -463,27 +525,13 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
       )}
 
       {showSearch && (
-        <div className="chat-side-panel">
-          <input
-            autoFocus
-            className="chat-side-panel-search"
-            placeholder="Buscar mensagens nessa conversa..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searching ? (
-            <p className="chat-side-panel-empty">Buscando...</p>
-          ) : searchQuery.trim() && searchResults.length === 0 ? (
-            <p className="chat-side-panel-empty">Nada encontrado.</p>
-          ) : (
-            searchResults.map((m) => (
-              <button type="button" key={m.id} className="chat-side-panel-item" onClick={() => jumpFromPanel(m.id)}>
-                <strong>{m.authorUsername}</strong>
-                <span>{attachmentSummary(m)}</span>
-              </button>
-            ))
-          )}
-        </div>
+        <MessageSearchPanel
+          endpoint={`/api/dm/channels/${channelId}/messages/search`}
+          people={dmPeople}
+          meId={user?.id}
+          placeholder="Buscar nessa conversa… (de:, tem:, antes:, depois:)"
+          onJump={jumpFromPanel}
+        />
       )}
 
       {stompError ? (
@@ -492,27 +540,52 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
         <div className="chat-status">Conectando ao chat em tempo real...</div>
       ) : null}
       {uploadError && <div className="chat-status error">⚠️ {uploadError}</div>}
-      <div className="chat-messages">
-        {messages.map((m) => (
+      <div className="chat-messages" key={channelId}>
+        {historyLoaded && messages.length === 0 && (
+          <EmptyState
+            icon={<Avatar name={channel.otherUsername} url={channel.otherAvatarUrl} className="empty-state-avatar" />}
+            tone="accent"
+            title={`COMEÇO DA CONVERSA`}
+            hint={`Esse é o início do seu papo com ${channel.otherNickname || channel.otherUsername}. Manda um oi!`}
+          />
+        )}
+        {messages.map((m, i) => {
+          const grouped = isGroupedWith(messages[i - 1], m);
+          return (
+          <Fragment key={m.id}>
+          {isNewDay(messages[i - 1], m) && <DaySeparator date={m.createdAt} />}
           <div
-            key={m.id}
             ref={(el) => {
               if (el) messageRefs.current.set(m.id, el);
               else messageRefs.current.delete(m.id);
             }}
-            className="chat-message"
+            className={"chat-message" + (grouped ? " grouped" : "")}
           >
-            <button type="button" className="chat-avatar-btn" onClick={() => openProfile(m.authorId)} title={`Ver perfil de ${m.authorUsername}`}>
-              <Avatar name={m.authorUsername} url={m.authorAvatarUrl} className="chat-avatar" />
-            </button>
+            {grouped ? (
+              <span className="chat-gutter-time" aria-hidden="true">{new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+            ) : (
+              <button type="button" className="chat-avatar-btn" onClick={() => openProfile(m.authorId)} title={`Ver perfil de ${m.authorUsername}`}>
+                <Avatar name={m.authorUsername} url={m.authorAvatarUrl} className="chat-avatar" />
+              </button>
+            )}
             <div className="chat-message-body">
-              <div>
-                <button type="button" className="chat-author" onClick={() => openProfile(m.authorId)}>
-                  {m.authorUsername}
-                </button>
-                <span className="chat-time">{new Date(m.createdAt).toLocaleTimeString()}</span>
-                {m.editedAt && <span className="chat-edited">(editado)</span>}
-              </div>
+              {grouped ? (
+                m.editedAt && <span className="chat-edited chat-edited-grouped">(editado)</span>
+              ) : (
+                <div>
+                  <button
+                    type="button"
+                    className={"chat-author" + (authorAccent(m) ? " has-accent" : "")}
+                    data-tone={toneFor(m.authorUsername)}
+                    style={accentStyle(authorAccent(m))}
+                    onClick={() => openProfile(m.authorId)}
+                  >
+                    {m.authorUsername}
+                  </button>
+                  <span className="chat-time">{new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                  {m.editedAt && <span className="chat-edited">(editado)</span>}
+                </div>
+              )}
 
               {m.replyToId && (
                 <button
@@ -566,11 +639,8 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
                   ) : (
                     <MessageText content={m.content} openProfile={openProfile} />
                   )}
-                  {m.imageUrl && (
-                    <button type="button" className="chat-image-btn" onClick={() => setLightboxImage(m.imageUrl)}>
-                      <img src={m.imageUrl} alt="Imagem enviada no chat" className="chat-image" />
-                    </button>
-                  )}
+                  {m.content && <LinkPreview text={m.content} />}
+                  {m.imageUrl && <ChatImage url={m.imageUrl} onOpen={() => setLightboxImage(m.imageUrl)} />}
                   {m.fileUrl && <AttachmentMessage url={m.fileUrl} name={m.fileName} type={m.fileType} size={m.fileSize} />}
 
                   {m.reactions?.length > 0 && (
@@ -603,7 +673,7 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
             {editingId !== m.id && (
               <div className="chat-message-actions">
                 <button
-                  className="icon-btn"
+                  className="icon-btn emoji-picker-toggle"
                   onClick={() => setReactionPickerFor((prev) => (prev === m.id ? null : m.id))}
                   title="Reagir"
                 >
@@ -634,7 +704,9 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
               </div>
             )}
           </div>
-        ))}
+          </Fragment>
+          );
+        })}
         {typingUsers.size > 0 && (
           <div className="chat-typing-indicator">
             {[...typingUsers.values()].join(", ")} {typingUsers.size === 1 ? "está" : "estão"} digitando...
@@ -661,7 +733,7 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
       {pendingFile && (
         <div className="chat-pending-attachment">
           {pendingFile.type.startsWith("audio/") ? (
-            <audio controls src={pendingFile.previewUrl} className="chat-pending-audio" />
+            <AudioPlayer src={pendingFile.previewUrl} name={pendingFile.name} compact />
           ) : pendingFile.type.startsWith("video/") ? (
             <video controls src={pendingFile.previewUrl} className="chat-pending-video" />
           ) : (
@@ -692,7 +764,7 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
         </div>
       )}
 
-      <form className="chat-input" onSubmit={handleSend}>
+      <form className={"chat-input" + (recorder.recording ? " is-recording" : "")} onSubmit={handleSend}>
         <input type="file" ref={fileInputRef} onChange={handlePickImage} hidden />
         <button
           type="button"
@@ -701,7 +773,7 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
           disabled={!stompConnected || sending || recorder.recording}
           title="Enviar arquivo"
         >
-          <PlusIcon />
+          <PlusIcon size={20} />
         </button>
         <button
           type="button"
@@ -710,17 +782,38 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
           disabled={!stompConnected || sending}
           title={recorder.recording ? "Parar gravação" : "Gravar mensagem de voz"}
         >
-          <MicIcon size={16} />
+          <MicIcon size={18} />
         </button>
+        <div className="chat-gif-wrap">
+          <button
+            type="button"
+            className={"icon-btn chat-gif-btn" + (showGifPicker ? " icon-btn-active" : "")}
+            onClick={() => setShowGifPicker((v) => !v)}
+            disabled={!stompConnected || sending || recorder.recording}
+            title="Enviar GIF"
+          >
+            GIF
+          </button>
+          {showGifPicker && (
+            <GifPicker
+              onClose={() => setShowGifPicker(false)}
+              onPick={(gif) => {
+                sendDmMessage(stompClient, channelId, "", gif.url, replyingTo?.id, null);
+                setShowGifPicker(false);
+                setReplyingTo(null);
+              }}
+            />
+          )}
+        </div>
         <div className="chat-emoji-btn-wrap">
           <button
             type="button"
-            className={"icon-btn chat-emoji-draft-btn" + (showDraftEmojiPicker ? " icon-btn-active" : "")}
+            className={"icon-btn chat-emoji-draft-btn emoji-picker-toggle" + (showDraftEmojiPicker ? " icon-btn-active" : "")}
             onClick={() => setShowDraftEmojiPicker((prev) => !prev)}
             disabled={!stompConnected || sending || recorder.recording}
             title="Inserir emoji na mensagem"
           >
-            <SmileIcon size={16} />
+            <SmileIcon size={18} />
           </button>
           {showDraftEmojiPicker && (
             <div className="emoji-picker-composer-wrap">
@@ -728,16 +821,7 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
             </div>
           )}
         </div>
-        {recorder.recording && (
-          <div className="chat-recording-indicator">
-            <span className="chat-recording-dot" />
-            Gravando... {String(Math.floor(recorder.seconds / 60)).padStart(2, "0")}:
-            {String(recorder.seconds % 60).padStart(2, "0")}
-            <button type="button" className="link-btn" onClick={recorder.cancel}>
-              Cancelar
-            </button>
-          </div>
-        )}
+        {recorder.recording && <RecordingBar recorder={recorder} onStop={handleStopRecording} />}
         <div className="chat-input-field" style={recorder.recording ? { display: "none" } : undefined}>
           <textarea
             ref={draftInputRef}
@@ -751,13 +835,13 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
                 ? "Adicionar legenda (opcional)..."
                 : sending
                 ? "Enviando..."
-                : `Conversar com ${channel.otherNickname || channel.otherUsername} (**negrito**, *itálico*, /roll 2d20 pra rolar dado, Ctrl+V cola imagem, Shift+Enter quebra linha)`
+                : `Manda pro ${channel.otherNickname || channel.otherUsername}… (/roll, **negrito**, Ctrl+V cola imagem)`
             }
             disabled={!stompConnected || sending}
           />
         </div>
-        <button type="submit" disabled={!stompConnected || sending || (!draft.trim() && !pendingImage && !pendingFile)}>
-          Enviar
+        <button type="submit" className="chat-send-btn" disabled={!stompConnected || sending || (!draft.trim() && !pendingImage && !pendingFile)}>
+          <span className="chat-send-label">ENVIAR</span> <SendIcon size={16} />
         </button>
       </form>
 

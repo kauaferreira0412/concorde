@@ -31,7 +31,7 @@ public class VoicePresenceService {
         boolean effectiveForceMuted = forceMuted || forceDeafened;
         byChannel.computeIfAbsent(channelId, k -> new ConcurrentHashMap<>())
                 .put(userId, new VoiceParticipantInfo(userId, username, avatarUrl, !effectiveForceMuted, forceDeafened,
-                        effectiveForceMuted, forceDeafened, List.of()));
+                        effectiveForceMuted, forceDeafened, List.of(), false));
         sessionChannel.put(sessionId, channelId);
         sessionUser.put(sessionId, userId);
         currentSession.computeIfAbsent(channelId, k -> new ConcurrentHashMap<>()).put(userId, sessionId);
@@ -70,7 +70,7 @@ public class VoicePresenceService {
             return;
         }
         update(channelId, userId, current -> new VoiceParticipantInfo(userId, current.username(), current.avatarUrl(),
-                micEnabled, current.deafened(), current.forceMuted(), current.forceDeafened(), current.watchingUserIds()));
+                micEnabled, current.deafened(), current.forceMuted(), current.forceDeafened(), current.watchingUserIds(), current.screenSharing()));
     }
 
     public void setDeafened(String sessionId, boolean deafened) {
@@ -80,7 +80,7 @@ public class VoicePresenceService {
             return;
         }
         update(channelId, userId, current -> new VoiceParticipantInfo(userId, current.username(), current.avatarUrl(),
-                current.micEnabled(), deafened, current.forceMuted(), current.forceDeafened(), current.watchingUserIds()));
+                current.micEnabled(), deafened, current.forceMuted(), current.forceDeafened(), current.watchingUserIds(), current.screenSharing()));
     }
 
     public void setWatching(String sessionId, List<Long> watchingUserIds) {
@@ -91,17 +91,29 @@ public class VoicePresenceService {
         }
         List<Long> safeIds = watchingUserIds == null ? List.of() : watchingUserIds;
         update(channelId, userId, current -> new VoiceParticipantInfo(userId, current.username(), current.avatarUrl(),
-                current.micEnabled(), current.deafened(), current.forceMuted(), current.forceDeafened(), safeIds));
+                current.micEnabled(), current.deafened(), current.forceMuted(), current.forceDeafened(), safeIds, current.screenSharing()));
+    }
+
+    public void setScreenSharing(String sessionId, boolean screenSharing) {
+        Long channelId = sessionChannel.get(sessionId);
+        Long userId = sessionUser.get(sessionId);
+        if (channelId == null || userId == null) {
+            return;
+        }
+        update(channelId, userId, current -> new VoiceParticipantInfo(userId, current.username(), current.avatarUrl(),
+                current.micEnabled(), current.deafened(), current.forceMuted(), current.forceDeafened(),
+                current.watchingUserIds(), screenSharing));
     }
 
     public void setForceMuted(Long channelId, Long targetUserId, boolean forceMuted) {
         update(channelId, targetUserId, current -> new VoiceParticipantInfo(targetUserId, current.username(),
-                current.avatarUrl(), !forceMuted, current.deafened(), forceMuted, current.forceDeafened(), current.watchingUserIds()));
+                current.avatarUrl(), forceMuted ? false : current.micEnabled(), current.deafened(), forceMuted, current.forceDeafened(), current.watchingUserIds(), current.screenSharing()));
     }
 
     public void setForceDeafened(Long channelId, Long targetUserId, boolean forceDeafened) {
         update(channelId, targetUserId, current -> new VoiceParticipantInfo(targetUserId, current.username(),
-                current.avatarUrl(), !forceDeafened, forceDeafened, forceDeafened, forceDeafened, current.watchingUserIds()));
+                current.avatarUrl(), forceDeafened ? false : current.micEnabled(), forceDeafened ? true : current.deafened(),
+                forceDeafened, forceDeafened, current.watchingUserIds(), current.screenSharing()));
     }
 
     public boolean isForceMuted(Long channelId, Long userId) {
@@ -131,7 +143,7 @@ public class VoicePresenceService {
     public void joinBot(Long channelId, String name, String avatarUrl) {
         byChannel.computeIfAbsent(channelId, k -> new ConcurrentHashMap<>())
                 .put(botUserId(channelId), new VoiceParticipantInfo(botUserId(channelId), name, avatarUrl,
-                        true, false, false, false, List.of()));
+                        true, false, false, false, List.of(), false));
         broadcast(channelId);
     }
 
@@ -150,7 +162,7 @@ public class VoicePresenceService {
     public void joinSoundboardBot(Long channelId, String name, String avatarUrl) {
         Long id = soundboardBotUserId(channelId);
         byChannel.computeIfAbsent(channelId, k -> new ConcurrentHashMap<>())
-                .put(id, new VoiceParticipantInfo(id, name, avatarUrl, true, false, false, false, List.of()));
+                .put(id, new VoiceParticipantInfo(id, name, avatarUrl, true, false, false, false, List.of(), false));
         broadcast(channelId);
     }
 

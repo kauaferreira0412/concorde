@@ -6,14 +6,19 @@ import { useProfile } from "../context/ProfileContext.jsx";
 import { useAlert } from "../context/AlertContext.jsx";
 import { ChevronsLeftIcon, ChevronsRightIcon, MusicNoteIcon, PencilIcon, TrashIcon, UsersIcon } from "./icons.jsx";
 import Avatar from "./Avatar.jsx";
+import EmptyState from "./EmptyState.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
+import { DrawerCloseButton, useLayout } from "../context/LayoutContext.jsx";
 
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", OFFLINE: "Offline" };
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
 
 export default function MemberList({ serverId, stompClient, stompConnected }) {
   const members = useServerMembers(serverId, stompClient, stompConnected);
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("memberListCollapsed") === "true");
+  const [collapsedPref, setCollapsed] = useState(() => localStorage.getItem("memberListCollapsed") === "true");
+  const { drawerMode } = useLayout();
+  // Na gaveta (tablet/celular) a lista aparece sempre aberta.
+  const collapsed = collapsedPref && !drawerMode;
   const [myServerPermissions, setMyServerPermissions] = useState(new Set());
 
   useEffect(() => {
@@ -55,13 +60,17 @@ export default function MemberList({ serverId, stompClient, stompConnected }) {
     <div className={"member-list" + (collapsed ? " collapsed" : "")}>
       <div className="member-list-header">
         {!collapsed && <span className="channel-group-title">MEMBROS — {members.length}</span>}
-        <button
-          className="icon-btn"
-          onClick={toggleCollapsed}
-          title={collapsed ? "Abrir lista de membros" : "Fechar lista de membros"}
-        >
-          {collapsed ? <ChevronsLeftIcon /> : <ChevronsRightIcon />}
-        </button>
+        {drawerMode ? (
+          <DrawerCloseButton />
+        ) : (
+          <button
+            className="icon-btn"
+            onClick={toggleCollapsed}
+            title={collapsed ? "Abrir lista de membros" : "Fechar lista de membros"}
+          >
+            {collapsed ? <ChevronsLeftIcon /> : <ChevronsRightIcon />}
+          </button>
+        )}
       </div>
 
       {!collapsed && (
@@ -89,10 +98,12 @@ export default function MemberList({ serverId, stompClient, stompConnected }) {
             </>
           )}
           {members.length === 0 && (
-            <div className="member-list-empty">
-              <UsersIcon size={22} />
-              <p>Nenhum membro ainda</p>
-            </div>
+            <EmptyState
+              size="sm"
+              icon={<UsersIcon size={22} />}
+              title="SÓ VOCÊ AQUI"
+              hint="Convida a galera pelo menu do servidor."
+            />
           )}
         </div>
       )}
@@ -179,6 +190,11 @@ export function MemberRow({ member, serverId, canManage, nowPlaying }) {
             <span className="member-row-name">{displayNickname || member.username}</span>
             {member.role === "ADMIN" && <span className="admin-badge">ADMIN</span>}
           </span>
+          {member.customStatus && member.status !== "OFFLINE" && (
+            <span className="member-row-custom" title={member.customStatus}>
+              {member.customStatus}
+            </span>
+          )}
           {nowPlaying && (
             <span className="member-row-spotify" title={`Ouvindo ${nowPlaying.trackName} — ${nowPlaying.artistNames}`}>
               <MusicNoteIcon size={11} />

@@ -9,7 +9,7 @@ public class VoiceDtos {
 
     public record VoiceParticipantInfo(Long userId, String username, String avatarUrl, boolean micEnabled,
                                         boolean deafened, boolean forceMuted, boolean forceDeafened,
-                                        List<Long> watchingUserIds) {}
+                                        List<Long> watchingUserIds, boolean screenSharing) {}
 
     public record VoiceControlEvent(String type, Long targetUserId, Long toChannelId, String toChannelName,
                                      Boolean muted, Boolean deafened) {}

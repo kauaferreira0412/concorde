@@ -166,13 +166,14 @@ public class DirectMessageService {
         return toDtos(directMessageRepository.findByChannelIdAndPinnedTrueOrderByPinnedAtDesc(channelId));
     }
 
-    public List<DmMessage> search(Long channelId, Long requesterId, String query) {
+    public List<DmMessage> search(Long channelId, Long requesterId, com.codagis.concorde.dto.SearchFilters f) {
         assertParticipant(channelId, requesterId);
-        if (query == null || query.isBlank()) {
+        if (f.isEmpty()) {
             return List.of();
         }
-        return toDtos(directMessageRepository
-                .findTop50ByChannelIdAndContentContainingIgnoreCaseOrderByIdDesc(channelId, query.trim()));
+        return toDtos(directMessageRepository.searchFiltered(channelId, f.text(), f.authorId(), f.hasImage(),
+                f.hasFile(), f.hasLink(), f.hasGif(), f.after(), f.before(),
+                org.springframework.data.domain.PageRequest.of(0, 50)));
     }
 
     public List<DmMessage> history(Long channelId, Long requesterId) {
@@ -254,7 +255,8 @@ public class DirectMessageService {
                 m.getImageUrl(), m.getCreatedAt(), m.getEditedAt(), m.getReplyToId(), replyTo,
                 m.getRollNotation(), m.getRollSides(), m.getRollResultsCsv(), m.getRollTotal(),
                 groupReactions(reactions), m.isPinned(),
-                m.getFileUrl(), m.getFileName(), m.getFileType(), m.getFileSize());
+                m.getFileUrl(), m.getFileName(), m.getFileType(), m.getFileSize(),
+                author != null ? author.getAccentColor() : null);
     }
 
     private List<ReactionSummary> groupReactions(List<DirectMessageReaction> reactions) {

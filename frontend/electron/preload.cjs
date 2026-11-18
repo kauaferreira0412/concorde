@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld("concordeDesktop", {
     return () => ipcRenderer.removeListener("concorde:global-shortcut", listener);
   },
 
+  setTitleBarColors: (colors) => ipcRenderer.invoke("concorde:set-titlebar-colors", colors),
   zoomIn: () => ipcRenderer.invoke("concorde:zoom-in"),
   zoomOut: () => ipcRenderer.invoke("concorde:zoom-out"),
   zoomReset: () => ipcRenderer.invoke("concorde:zoom-reset"),

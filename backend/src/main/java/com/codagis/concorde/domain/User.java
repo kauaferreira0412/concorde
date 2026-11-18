@@ -43,6 +43,17 @@ public class User {
 
     private String avatarUrl;
 
+    /** Imagem de capa do perfil (opcional). */
+    private String bannerUrl;
+
+    /** Status personalizado curto ("jogando TCG", "mestrando às 21h"). */
+    @Column(length = 80)
+    private String customStatus;
+
+    /** Cor de destaque do perfil (#RRGGBB): tinge o card e o nome no chat. */
+    @Column(length = 7)
+    private String accentColor;
+
     @Column(length = 32)
     private String nickname;
 

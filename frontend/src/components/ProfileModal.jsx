@@ -5,7 +5,9 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useAlert } from "../context/AlertContext.jsx";
 import { useSpotifyNowPlaying } from "../utils/useSpotifyNowPlaying";
 import Avatar from "./Avatar.jsx";
+import CustomStatusEditor from "./CustomStatusEditor.jsx";
 import { CheckIcon, MessageSquareIcon, MusicNoteIcon, PlusIcon, ShieldIcon } from "./icons.jsx";
+import { accentStyle } from "./AccentColorPicker.jsx";
 
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", OFFLINE: "Offline" };
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
@@ -87,12 +89,19 @@ export default function ProfileModal({ userId, onClose }) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal profile-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className={"modal profile-modal" + (profile?.accentColor ? " has-accent" : "")}
+        style={accentStyle(profile?.accentColor)}
+        onClick={(e) => e.stopPropagation()}
+      >
         {loadError && <p className="auth-error" style={{ margin: 20 }}>{loadError}</p>}
 
         {profile && (
           <>
-            <div className="profile-banner" />
+            <div
+              className={"profile-banner" + (profile.bannerUrl ? " has-image" : "")}
+              style={profile.bannerUrl ? { backgroundImage: `url("${profile.bannerUrl}")` } : undefined}
+            />
 
             <div className="profile-header">
               <div className="member-avatar-wrap profile-avatar-wrap">
@@ -111,6 +120,14 @@ export default function ProfileModal({ userId, onClose }) {
                 )}
               </div>
               <p className="profile-username">@{profile.username}</p>
+              {isMe ? (
+                <CustomStatusEditor
+                  value={profile.customStatus}
+                  onSaved={(customStatus) => setProfile((p) => (p ? { ...p, customStatus } : p))}
+                />
+              ) : (
+                profile.customStatus && <p className="profile-custom-status">{profile.customStatus}</p>
+              )}
               <span className={"profile-status-pill " + STATUS_DOT_CLASS[profile.status]}>
                 <span className={"status-dot " + STATUS_DOT_CLASS[profile.status]} />
                 {STATUS_LABEL[profile.status]}

@@ -169,6 +169,26 @@ export function publishVoiceDeafenState(client, channelId, deafened) {
   });
 }
 
+export function publishVoiceScreenShare(client, channelId, screenSharing) {
+  client.publish({
+    destination: `/app/channel.${channelId}.voice.screenshare`,
+    body: JSON.stringify({ screenSharing }),
+  });
+}
+
+export function publishVoiceSpeaking(client, channelId, speaking) {
+  client.publish({
+    destination: `/app/channel.${channelId}.voice.speaking`,
+    body: JSON.stringify({ speaking }),
+  });
+}
+
+export function subscribeToVoiceSpeaking(client, channelId, onEvent) {
+  return client.subscribe(`/topic/channel.${channelId}.voice.speaking`, (frame) => {
+    onEvent(JSON.parse(frame.body));
+  });
+}
+
 export function publishVoiceWatching(client, channelId, watchingUserIds) {
   client.publish({
     destination: `/app/channel.${channelId}.voice.watching`,

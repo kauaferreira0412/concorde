@@ -1,16 +1,15 @@
 .auth-logo {
-  width: 76px;
-  height: 76px;
-  border-radius: 50%;
-  background: var(--bg-panel-2);
-  border: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 0 0 6px var(--accent-soft);
+  width: 112px;
+  height: 112px;
+  border-radius: 32px;
+  background: var(--c-mint);
+  border: 3px solid var(--c-ink);
+  box-shadow: var(--pop-accent-2);
+  overflow: hidden;
   margin-bottom: 4px;
+  transform: rotate(-4deg);
 }
-.auth-logo img { width: 56px; height: 56px; object-fit: contain; }
+.auth-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .auth-field {
   position: relative;
@@ -29,12 +28,13 @@
   pointer-events: none;
   flex-shrink: 0;
 }
-.auth-field:focus-within .auth-field-icon { color: var(--accent-text); }
+.auth-field:focus-within .auth-field-icon { color: var(--t-accent-text); }
 .auth-field-toggle {
   position: absolute;
   right: 6px;
   background: transparent;
   border: none;
+  box-shadow: none;
   padding: 6px;
   color: var(--text-muted);
   display: flex;
@@ -55,11 +55,12 @@
 .auth-remember input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 
 .auth-download-card {
-  margin-top: 20px;
-  width: 380px;
+  margin-top: 22px;
+  width: 400px;
+  max-width: 100%;
   background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border: var(--sticker);
+  border-radius: var(--radius-xl);
   padding: 24px 28px;
   display: flex;
   flex-direction: column;
@@ -69,11 +70,12 @@
   box-shadow: var(--shadow-md);
 }
 .auth-download-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent-text);
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  border: var(--sticker);
+  background: var(--c-mint);
+  color: var(--c-on-pop);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,8 +85,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-weight: 400;
 }
 .auth-download-card p {
   margin: 0;
@@ -97,13 +98,14 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--accent);
-  color: #fff;
+  background: var(--c-accent);
+  color: var(--c-on-accent);
   text-decoration: none;
-  font-weight: 600;
-  font-size: 13.5px;
-  padding: 11px 20px;
-  border-radius: var(--radius-md);
-  box-shadow: var(--glow-accent);
+  font-family: var(--font-display);
+  font-size: 13px;
+  padding: 12px 20px;
+  border: var(--sticker);
+  border-radius: 14px;
+  box-shadow: var(--pop-1);
 }
-.auth-download-btn:hover { background: var(--accent-hover); }
+.auth-download-btn:hover { background: var(--t-accent-hover); }

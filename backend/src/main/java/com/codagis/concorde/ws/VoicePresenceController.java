@@ -11,6 +11,7 @@ import com.codagis.concorde.service.PermissionService;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
@@ -25,21 +26,27 @@ public class VoicePresenceController {
     private final MembershipRepository membershipRepository;
     private final DisplayNameService displayNameService;
     private final PermissionService permissionService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public VoicePresenceController(VoicePresenceService presenceService, UserRepository userRepository,
                                     ChannelRepository channelRepository, MembershipRepository membershipRepository,
-                                    DisplayNameService displayNameService, PermissionService permissionService) {
+                                    DisplayNameService displayNameService, PermissionService permissionService,
+                                    SimpMessagingTemplate messagingTemplate) {
         this.presenceService = presenceService;
         this.userRepository = userRepository;
         this.channelRepository = channelRepository;
         this.membershipRepository = membershipRepository;
         this.displayNameService = displayNameService;
         this.permissionService = permissionService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     public record MicStatePayload(boolean micEnabled) {}
     public record DeafenStatePayload(boolean deafened) {}
     public record WatchingPayload(java.util.List<Long> watchingUserIds) {}
+    public record ScreenSharePayload(boolean screenSharing) {}
+    public record SpeakingPayload(boolean speaking) {}
+    public record SpeakingEvent(Long userId, boolean speaking) {}
 
     @MessageMapping("/channel.{channelId}.voice.join")
     public void join(@DestinationVariable Long channelId, @Header("simpSessionId") String sessionId, Principal principal) {
@@ -88,6 +95,21 @@ public class VoicePresenceController {
     @MessageMapping("/channel.{channelId}.voice.watching")
     public void watching(@DestinationVariable Long channelId, WatchingPayload payload, @Header("simpSessionId") String sessionId) {
         presenceService.setWatching(sessionId, payload.watchingUserIds());
+    }
+
+    @MessageMapping("/channel.{channelId}.voice.screenshare")
+    public void screenShare(@DestinationVariable Long channelId, ScreenSharePayload payload,
+                            @Header("simpSessionId") String sessionId) {
+        presenceService.setScreenSharing(sessionId, payload.screenSharing());
+    }
+
+    /** Quem está falando agora: evento leve (não reenvia a lista toda) pro anel verde na sidebar de todo mundo. */
+    @MessageMapping("/channel.{channelId}.voice.speaking")
+    public void speaking(@DestinationVariable Long channelId, SpeakingPayload payload, Principal principal) {
+        Long userId = userIdOf(principal);
+        if (!presenceService.isPresent(channelId, userId)) return;
+        messagingTemplate.convertAndSend("/topic/channel." + channelId + ".voice.speaking",
+                new SpeakingEvent(userId, payload.speaking()));
     }
 
     private Long userIdOf(Principal principal) {

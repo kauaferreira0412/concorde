@@ -27,7 +27,7 @@ public class ServerDtos {
     public record ServerWithChannels(ServerResponse server, List<ChannelResponse> channels) {}
 
     public record MemberResponse(Long userId, String username, String nickname, String avatarUrl, PresenceStatus status,
-                                  Role role, Set<Long> roleIds) {}
+                                  Role role, Set<Long> roleIds, String customStatus, String accentColor) {}
 
     public record CreateCategoryRequest(@NotBlank String name) {}
 

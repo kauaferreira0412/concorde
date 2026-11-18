@@ -16,7 +16,8 @@ public class AuthDtos {
     ) {}
 
     public record UserResponse(Long id, String username, String email, String avatarUrl, Role role, UserStatus status,
-                                String nickname, String bio) {}
+                                String nickname, String bio, String bannerUrl, String customStatus,
+                                String accentColor) {}
 
     public record AuthResponse(String token, UserResponse user) {}
 
@@ -27,6 +28,11 @@ public class AuthDtos {
     ) {}
 
     public record StatusRequest(@NotNull UserStatus status) {}
+
+    public record AccentColorRequest(
+            @jakarta.validation.constraints.Pattern(regexp = "^(#[0-9a-fA-F]{6})?$", message = "Cor inválida") String color) {}
+
+    public record CustomStatusRequest(@jakarta.validation.constraints.Size(max = 80) String text) {}
 
     public record ProfileRequest(@Size(max = 32) String nickname, @Size(max = 190) String bio) {}
 }

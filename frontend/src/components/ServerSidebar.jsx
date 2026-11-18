@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useDmNotifications } from "../context/DmNotificationsContext.jsx";
 import api from "../api/client";
 import Avatar from "./Avatar.jsx";
-import { HeadphonesIcon } from "./icons.jsx";
+import { HeadphonesIcon, PlusIcon } from "./icons.jsx";
 
 const MAX_AVATARS = 8;
 
@@ -43,8 +43,9 @@ export default function ServerSidebar({ servers, selectedServerId, homeActive, o
           className={"server-icon home has-icon" + (homeActive ? " active" : "")}
           onClick={onHome}
           title="Página inicial (amigos e mensagens)"
+          aria-label="Mensagens diretas"
         >
-          <img src={`${import.meta.env.BASE_URL}icon-192.png`} alt="" className="server-icon-img" />
+          <img src={`${import.meta.env.BASE_URL}logo-badge.png`} alt="" className="server-icon-img" />
         </button>
         {hasUnreadDm && <span className="server-icon-unread-dot" title="Você tem mensagens privadas não lidas" />}
       </div>
@@ -62,14 +63,15 @@ export default function ServerSidebar({ servers, selectedServerId, homeActive, o
             <button
               className={"server-icon" + (isActive ? " active" : "") + (s.iconUrl ? " has-icon" : "")}
               onClick={() => onSelect(s.id)}
+              aria-label={s.name}
             >
               {s.iconUrl ? <img src={s.iconUrl} alt="" className="server-icon-img" /> : s.name.slice(0, 2).toUpperCase()}
             </button>
           </div>
         );
       })}
-      <button className="server-icon add" title="Criar servidor" onClick={onCreateServer}>
-        +
+      <button className="server-icon add" title="Criar servidor" aria-label="Criar servidor" onClick={onCreateServer}>
+        <PlusIcon size={22} />
       </button>
 
       {hoveredServer &&

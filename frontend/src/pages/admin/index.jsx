@@ -64,10 +64,19 @@ export default function AdminPage() {
         <form className="admin-card" onSubmit={handleCreateUser}>
           <h2>Criar usuário</h2>
           <p className="admin-hint">Não existe cadastro público — só você pode criar contas.</p>
-          <input placeholder="Usuário" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} />
-          <input placeholder="Email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+          <input
+            placeholder="Usuário (3 a 32 caracteres)"
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+            required
+            minLength={3}
+            maxLength={32}
+          />
+          <input placeholder="Email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} required />
           <input
             placeholder="Senha inicial (mín. 6 caracteres)"
+            required
+            minLength={6}
             type="password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}

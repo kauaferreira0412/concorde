@@ -160,7 +160,9 @@ public class ServerService {
         var statusById = presenceService.effectiveStatusOf(userIds);
         return userRepository.findAllById(userIds).stream()
                 .map(u -> new MemberResponse(u.getId(), u.getUsername(), nicknameByUserId.get(u.getId()),
-                        u.getAvatarUrl(), statusById.get(u.getId()), u.getRole(), roleIdsByUserId.get(u.getId())))
+                        u.getAvatarUrl(), statusById.get(u.getId()), u.getRole(), roleIdsByUserId.get(u.getId()),
+                        statusById.get(u.getId()) == PresenceStatus.OFFLINE ? null : u.getCustomStatus(),
+                        u.getAccentColor()))
                 .sorted((a, b) -> {
                     boolean aOffline = a.status() == PresenceStatus.OFFLINE;
                     boolean bOffline = b.status() == PresenceStatus.OFFLINE;
