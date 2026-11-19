@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { NavigationContainer, DarkTheme } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { registerGlobals } from "@livekit/react-native";
 import { loadSession, saveSession, setExpiredHandler } from "./src/api";
-import { colors } from "./src/theme";
+import { ThemeProvider, useAppTheme } from "./src/theme/ThemeContext";
 import LoginScreen from "./src/screens/LoginScreen";
-import ServersScreen from "./src/screens/ServersScreen";
-import ChannelsScreen from "./src/screens/ChannelsScreen";
+import HomeScreen from "./src/screens/HomeScreen";
 import ChatScreen from "./src/screens/ChatScreen";
 import VoiceCallScreen from "./src/screens/VoiceCallScreen";
 
@@ -18,12 +17,8 @@ registerGlobals();
 
 const Stack = createNativeStackNavigator();
 
-const navTheme = {
-  ...DarkTheme,
-  colors: { ...DarkTheme.colors, background: colors.bg, card: colors.panel, text: colors.text, primary: colors.accent },
-};
-
-export default function App() {
+function Root() {
+  const colors = useAppTheme();
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState(null);
 
@@ -47,6 +42,11 @@ export default function App() {
     setUser(null);
   }
 
+  const navTheme = {
+    ...DarkTheme,
+    colors: { ...DarkTheme.colors, background: colors.bg, card: colors.surface, text: colors.text, primary: colors.accent, border: colors.line },
+  };
+
   if (!ready) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center", alignItems: "center" }}>
@@ -56,35 +56,31 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
+    <>
       <StatusBar style="light" />
       <NavigationContainer theme={navTheme}>
-        <Stack.Navigator>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
           {user ? (
             <>
-              <Stack.Screen
-                name="Servers"
-                component={ServersScreen}
-                options={{
-                  title: "Concorde",
-                  headerRight: () => (
-                    <Pressable onPress={handleLogout}>
-                      <Text style={{ color: colors.muted }}>Sair</Text>
-                    </Pressable>
-                  ),
-                }}
-              />
-              <Stack.Screen name="Channels" component={ChannelsScreen} />
-              <Stack.Screen name="Chat" component={ChatScreen} />
-              <Stack.Screen name="VoiceCall" component={VoiceCallScreen} options={{ headerBackVisible: false }} />
+              <Stack.Screen name="Home">{(props) => <HomeScreen {...props} user={user} onLogout={handleLogout} />}</Stack.Screen>
+              <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: true }} />
+              <Stack.Screen name="VoiceCall" component={VoiceCallScreen} />
             </>
           ) : (
-            <Stack.Screen name="Login" options={{ headerShown: false }}>
-              {() => <LoginScreen onLogin={handleLogin} />}
-            </Stack.Screen>
+            <Stack.Screen name="Login">{() => <LoginScreen onLogin={handleLogin} />}</Stack.Screen>
           )}
         </Stack.Navigator>
       </NavigationContainer>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <Root />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
