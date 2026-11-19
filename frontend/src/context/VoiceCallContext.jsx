@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { DisconnectReason, Room, RoomEvent, Track } from "livekit-client";
+import { AudioPresets, DisconnectReason, Room, RoomEvent, Track } from "livekit-client";
 import api from "../api/client";
 import { useAuth } from "./AuthContext.jsx";
 import { useAlert } from "./AlertContext.jsx";
@@ -46,6 +46,7 @@ import {
 } from "../ws/chatSocket";
 import ScreenSharePicker from "../components/ScreenSharePicker.jsx";
 import { startWindowAudioTrack } from "../utils/windowAudioTrack";
+import { getAutoListenAudioShare } from "../utils/audioShareListen";
 import { startSystemAudioExcludingSelfTrack } from "../utils/systemAudioTrack";
 
 const VoiceCallContext = createContext(null);
@@ -88,16 +89,25 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const [micEnabled, setMicEnabledState] = useState(true);
   const [deafened, setDeafenedState] = useState(false);
   const [screenSharing, setScreenSharing] = useState(false);
+  // Transmissão só de áudio (som do PC/janela/aba, sem vídeo): toca sozinha pra todo mundo da call.
+  const [audioSharing, setAudioSharingState] = useState(false);
+  const audioSharingRef = useRef(false);
+  const audioShareTrackRef = useRef(null);
+  const [audioPickerOpen, setAudioPickerOpen] = useState(false);
+  const [audioShares, setAudioShares] = useState([]);
+  // de quem eu estou ouvindo a transmissão de áudio (com o automático desligado, começa vazio)
+  const listeningAudioRef = useRef(new Set());
+  const declinedAudioRef = useRef(new Set());
   // Anuncia na presença de voz quem está transmitindo (tag "AO VIVO" na lista lateral de qualquer canal).
   useEffect(() => {
     const channelId = activeChannel?.id;
     if (!channelId || !stompClientRef.current || !stompConnectedRef.current) return;
     try {
-      publishVoiceScreenShare(stompClientRef.current, channelId, screenSharing);
+      publishVoiceScreenShare(stompClientRef.current, channelId, screenSharing || audioSharing);
     } catch {
       // stomp caiu no meio: o reanúncio do join manda o estado de novo
     }
-  }, [screenSharing, activeChannel?.id]);
+  }, [screenSharing, audioSharing, activeChannel?.id]);
   const [cameraEnabled, setCameraEnabledState] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [speakingIds, setSpeakingIds] = useState(new Set());
@@ -182,6 +192,24 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       }
     };
   }, [activeChannel?.id, stompClient, stompConnected]);
+
+  // Troquei a opção do GIF com a call aberta: avisa os outros pela metadata do LiveKit e redesenha o meu card.
+  const gifOnSpeakPref = !!user?.avatarAnimateOnSpeak;
+  useEffect(() => {
+    const room = roomRef.current;
+    if (!room || !connected) return;
+    refreshParticipants(room);
+    let meta = {};
+    try {
+      meta = room.localParticipant.metadata ? JSON.parse(room.localParticipant.metadata) : {};
+    } catch {
+      meta = {};
+    }
+    if (!!meta.gifOnSpeak === gifOnSpeakPref) return;
+    room.localParticipant
+      .setMetadata(JSON.stringify({ ...meta, avatarUrl: user?.avatarUrl || meta.avatarUrl, gifOnSpeak: gifOnSpeakPref }))
+      .catch(() => {});
+  }, [gifOnSpeakPref, connected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mergedSpeakingIds = useMemo(() => {
     const myIdentity = user?.id ? `user-${user.id}` : null;
@@ -330,7 +358,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     publishVoiceMicState(stompClientRef.current, channelId, micEnabledRef.current);
     publishVoiceDeafenState(stompClientRef.current, channelId, deafenedRef.current);
     publishVoiceWatching(stompClientRef.current, channelId, currentWatchingUserIds());
-    publishVoiceScreenShare(stompClientRef.current, channelId, screenSharingRef.current);
+    publishVoiceScreenShare(stompClientRef.current, channelId, screenSharingRef.current || audioSharingRef.current);
     try {
       presenceSubRef.current?.unsubscribe();
     } catch {
@@ -364,7 +392,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
             publishVoiceJoin(stompClientRef.current, channelId);
             publishVoiceMicState(stompClientRef.current, channelId, micEnabledRef.current);
             publishVoiceDeafenState(stompClientRef.current, channelId, deafenedRef.current);
-            publishVoiceScreenShare(stompClientRef.current, channelId, screenSharingRef.current);
+            publishVoiceScreenShare(stompClientRef.current, channelId, screenSharingRef.current || audioSharingRef.current);
           }
         })
         .catch(() => {});
@@ -408,12 +436,35 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  function gifOnSpeakOf(participant) {
+    try {
+      return participant.metadata ? !!JSON.parse(participant.metadata)?.gifOnSpeak : false;
+    } catch {
+      return false;
+    }
+  }
+
   function avatarUrlOf(participant) {
     try {
       return participant.metadata ? JSON.parse(participant.metadata)?.avatarUrl || null : null;
     } catch {
       return null;
     }
+  }
+
+  // Ouço essa transmissão de áudio? Automático ligado = sim, a não ser que eu tenha saído dela.
+  function wantsAudioShare(identity) {
+    if (listeningAudioRef.current.has(identity)) return true;
+    if (declinedAudioRef.current.has(identity)) return false;
+    return getAutoListenAudioShare();
+  }
+
+  function isAudioOnlyPub(pub) {
+    return !!pub && pub.source === Track.Source.ScreenShareAudio && pub.trackName === "audio_only";
+  }
+
+  function isSoundboardBot(identity) {
+    return /^soundboardbot-\d+$/.test(identity || "");
   }
 
   function userIdFromIdentity(identity) {
@@ -432,20 +483,41 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         identity: local.identity,
         name: `${userRef.current?.username || local.identity} (você)`,
         avatarUrl: userRef.current?.avatarUrl || avatarUrlOf(local),
+        gifOnSpeak: !!userRef.current?.avatarAnimateOnSpeak,
         micEnabled: local.isMicrophoneEnabled,
         deafened: deafenedRef.current,
         isLocal: true,
       },
-      ...[...activeRoom.remoteParticipants.values()].map((p) => ({
+      // o bot do soundboard só toca o áudio: não aparece como alguém na call
+      ...[...activeRoom.remoteParticipants.values()].filter((p) => !isSoundboardBot(p.identity)).map((p) => ({
         identity: p.identity,
         name: p.name || p.identity,
         avatarUrl: avatarUrlOf(p),
+        gifOnSpeak: gifOnSpeakOf(p),
         micEnabled: p.isMicrophoneEnabled,
         deafened: deafenedOf(p.identity),
         isLocal: false,
       })),
     ];
     setParticipants(list);
+    const shares = [];
+    if (audioSharingRef.current) {
+      shares.push({ identity: local.identity, name: userRef.current?.username || local.identity, avatarUrl: userRef.current?.avatarUrl || null, isLocal: true });
+    }
+    for (const p of activeRoom.remoteParticipants.values()) {
+      const pub = p.getTrackPublication(Track.Source.ScreenShareAudio);
+      if (isAudioOnlyPub(pub)) {
+        if (wantsAudioShare(p.identity)) listeningAudioRef.current.add(p.identity);
+        shares.push({
+          identity: p.identity,
+          name: p.name || p.identity,
+          avatarUrl: avatarUrlOf(p),
+          isLocal: false,
+          listening: listeningAudioRef.current.has(p.identity),
+        });
+      }
+    }
+    setAudioShares(shares);
   }
 
   function syncScreenShares() {
@@ -494,7 +566,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     }
     const participant = roomRef.current?.remoteParticipants.get(entry.participantIdentity);
     const audioPub = participant?.getTrackPublication(Track.Source.ScreenShareAudio);
-    if (audioPub) {
+    if (audioPub && !isAudioOnlyPub(audioPub)) {
       try {
         await audioPub.setSubscribed(nextWatching);
       } catch (err) {
@@ -506,7 +578,9 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   function userIdFromIdentity(identity) {
     const match = /^user-(\d+)$/.exec(identity || "");
     if (match) return match[1];
-    if (/^(musicbot|soundboardbot)-\d+$/.test(identity || "")) return identity;
+    // o soundboard tem um volume só, valendo em qualquer canal
+    if (/^soundboardbot-\d+$/.test(identity || "")) return "soundboardbot";
+    if (/^musicbot-\d+$/.test(identity || "")) return identity;
     return null;
   }
 
@@ -608,6 +682,17 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     electronScreenTracksRef.current.audio?.stop();
     electronScreenTracksRef.current.audio?._concordeCleanup?.();
     electronScreenTracksRef.current = { video: null, audio: null };
+    if (audioShareTrackRef.current) {
+      audioShareTrackRef.current.stop();
+      audioShareTrackRef.current._concordeCleanup?.();
+      audioShareTrackRef.current = null;
+    }
+    audioSharingRef.current = false;
+    setAudioSharingState(false);
+    setAudioShares([]);
+    setAudioPickerOpen(false);
+    listeningAudioRef.current = new Set();
+    declinedAudioRef.current = new Set();
     cameraTracksRef.current.clear();
     setCameraTracks([]);
     setCameraEnabled(false);
@@ -680,11 +765,16 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           syncCameraTracks();
         } else if (track.kind === Track.Kind.Audio) {
           const silenced = deafenedRef.current;
-          if (pub.source === Track.Source.ScreenShareAudio) {
+          if (pub.source === Track.Source.ScreenShareAudio && !isAudioOnlyPub(pub)) {
             if (!watchedShareIdentitiesRef.current.has(participant.identity)) {
               pub.setSubscribed(false);
               return;
             }
+          }
+          if (isAudioOnlyPub(pub) && !wantsAudioShare(participant.identity)) {
+            pub.setSubscribed(false);
+            refreshParticipants(newRoom);
+            return;
           }
           const el = track.attach();
           if (deafenedRef.current) el.muted = true;
@@ -717,14 +807,32 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         }
         track.detach().forEach((el) => el.remove());
       });
-      newRoom.on(RoomEvent.TrackUnpublished, (pub) => {
-        if (pub.source === Track.Source.ScreenShare) removeVideoTrack(pub.trackSid);
+      newRoom.on(RoomEvent.TrackUnpublished, (pub, participant) => {
+        if (isAudioOnlyPub(pub)) {
+          // a próxima transmissão dessa pessoa volta a seguir a preferência "entrar automaticamente"
+          listeningAudioRef.current.delete(participant?.identity);
+          declinedAudioRef.current.delete(participant?.identity);
+          playScreenShareStopSound();
+          refreshParticipants(newRoom);
+        }
+        if (pub.source === Track.Source.ScreenShare) {
+          removeVideoTrack(pub.trackSid);
+          playScreenShareStopSound(); // alguém da call fechou a live
+        }
       });
       newRoom.on(RoomEvent.TrackPublished, (pub, participant) => {
         if (pub.source !== Track.Source.ScreenShare && pub.source !== Track.Source.ScreenShareAudio) return;
+        if (isAudioOnlyPub(pub)) {
+          // transmissão só de áudio: entra direto se o automático estiver ligado; senão aparece o "Ouvir"
+          if (!wantsAudioShare(participant.identity)) pub.setSubscribed(false);
+          playScreenShareStartSound();
+          refreshParticipants(newRoom);
+          return;
+        }
         const watching = watchedShareIdentitiesRef.current.has(participant.identity);
         if (!watching) pub.setSubscribed(false);
         if (pub.source === Track.Source.ScreenShare) {
+          playScreenShareStartSound(); // alguém da call abriu a live
           upsertScreenShare(pub.trackSid, {
             track: watching ? pub.track : null,
             pub,
@@ -786,19 +894,21 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         playLeaveSound();
         showAlert(message);
       });
-      newRoom.on(RoomEvent.ParticipantConnected, () => {
+      newRoom.on(RoomEvent.ParticipantConnected, (participant) => {
         refreshParticipants(newRoom);
-        playJoinSound();
+        if (!isSoundboardBot(participant.identity)) playJoinSound();
       });
       newRoom.on(RoomEvent.ParticipantDisconnected, (participant) => {
         refreshParticipants(newRoom);
-        playLeaveSound();
+        if (!isSoundboardBot(participant.identity)) playLeaveSound();
         for (const [sid, entry] of [...videoTracksRef.current.entries()]) {
           if (entry.participantIdentity === participant.identity) videoTracksRef.current.delete(sid);
         }
         syncScreenShares();
         if (cameraTracksRef.current.delete(participant.identity)) syncCameraTracks();
       });
+      // alguém trocou a opção "GIF só mexe ao falar" no meio da call
+      newRoom.on(RoomEvent.ParticipantMetadataChanged, () => refreshParticipants(newRoom));
       newRoom.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
         setSpeakingIds(new Set(speakers.map((p) => p.identity)));
       });
@@ -936,7 +1046,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           pub.track.setVolume(silenced ? 0 : effectiveVolume(resolveParticipantVolume(participant.identity)));
           pub.track.attachedElements.forEach((el) => (el.muted = silenced));
         } else if (pub.source === Track.Source.ScreenShareAudio) {
-          if (!watchedShareIdentitiesRef.current.has(participant.identity)) {
+          if (
+            isAudioOnlyPub(pub)
+              ? !wantsAudioShare(participant.identity)
+              : !watchedShareIdentitiesRef.current.has(participant.identity)
+          ) {
             pub.setSubscribed(false);
             return;
           }
@@ -1158,6 +1272,123 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     playScreenShareStopSound();
   }
 
+  async function publishAudioShare(track) {
+    const room = roomRef.current;
+    if (!room || !track) return;
+    audioShareTrackRef.current = track;
+    track.onended = () => {
+      if (audioSharingRef.current) stopAudioShare();
+    };
+    await room.localParticipant.publishTrack(track, {
+      source: Track.Source.ScreenShareAudio,
+      name: "audio_only",
+      audioPreset: AudioPresets?.musicHighQuality,
+      dtx: false,
+      red: false,
+    });
+    audioSharingRef.current = true;
+    setAudioSharingState(true);
+    refreshParticipants(room);
+    playScreenShareStartSound();
+  }
+
+  async function stopAudioShare() {
+    const room = roomRef.current;
+    const track = audioShareTrackRef.current;
+    audioShareTrackRef.current = null;
+    audioSharingRef.current = false;
+    setAudioSharingState(false);
+    if (track) {
+      track.onended = null;
+      try {
+        await room?.localParticipant.unpublishTrack(track, true);
+      } catch {
+        track.stop();
+      }
+      await track._concordeCleanup?.();
+    }
+    if (room) refreshParticipants(room);
+    playScreenShareStopSound();
+  }
+
+  /** Entrar/sair de uma transmissão de áudio de outra pessoa. */
+  async function toggleListenAudioShare(identity) {
+    const room = roomRef.current;
+    const participant = room?.remoteParticipants.get(identity);
+    const pub = participant?.getTrackPublication(Track.Source.ScreenShareAudio);
+    if (!pub || !isAudioOnlyPub(pub)) return;
+    const next = !listeningAudioRef.current.has(identity);
+    if (next) {
+      listeningAudioRef.current.add(identity);
+      declinedAudioRef.current.delete(identity);
+    } else {
+      listeningAudioRef.current.delete(identity);
+      declinedAudioRef.current.add(identity);
+    }
+    try {
+      await pub.setSubscribed(next);
+    } catch (err) {
+      console.warn("Não foi possível mudar a inscrição do áudio:", err);
+    }
+    refreshParticipants(room);
+  }
+
+  /** Liga/desliga a transmissão só de áudio. */
+  async function toggleAudioShare() {
+    const room = roomRef.current;
+    if (!room) return;
+    if (audioSharingRef.current) {
+      await stopAudioShare();
+      return;
+    }
+    if (screenSharingRef.current) {
+      showAlert("Pare a transmissão de tela antes - ela já manda o áudio junto.");
+      return;
+    }
+    if (isElectronDesktop) {
+      setAudioPickerOpen(true);
+      return;
+    }
+    try {
+      // o navegador só deixa capturar áudio junto com uma tela/aba; o vídeo é descartado na hora
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        systemAudio: "include",
+        selfBrowserSurface: "exclude",
+      });
+      stream.getVideoTracks().forEach((t) => t.stop());
+      const audioTrack = stream.getAudioTracks()[0];
+      if (!audioTrack) {
+        showAlert('Nenhum áudio veio junto - escolha uma ABA (ou a tela inteira no Windows) e marque "Compartilhar áudio".');
+        return;
+      }
+      await publishAudioShare(audioTrack);
+    } catch (err) {
+      if (err?.name !== "NotAllowedError") showAlert("Não foi possível transmitir o áudio: " + err.message);
+    }
+  }
+
+  async function startElectronAudioShare(source) {
+    setAudioPickerOpen(false);
+    try {
+      let audioTrack = null;
+      if (source.type === "screen") {
+        audioTrack = await startSystemAudioExcludingSelfTrack();
+      } else {
+        const hwnd = Number(source.id.split(":")[1]);
+        if (Number.isFinite(hwnd) && hwnd > 0) audioTrack = await startWindowAudioTrack(hwnd);
+      }
+      if (!audioTrack) {
+        showAlert("Não foi possível capturar o áudio agora - tente de novo ou escolha outra janela.");
+        return;
+      }
+      await publishAudioShare(audioTrack);
+    } catch (err) {
+      showAlert("Não foi possível transmitir o áudio: " + err.message);
+    }
+  }
+
   function closeScreenPicker() {
     setScreenPickerOpen(false);
   }
@@ -1264,6 +1495,8 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         cameraTracks,
         participants,
         speakingIds: mergedSpeakingIds,
+        soundboardVolume: activeChannel ? participantVolumes[`soundboardbot-${activeChannel.id}`] ?? (getSavedParticipantVolume("soundboardbot") ?? 100) : 100,
+        setSoundboardVolume: (v) => activeChannel && setParticipantVolume(`soundboardbot-${activeChannel.id}`, v),
         micLevel,
         pingMs,
         screenShares,
@@ -1282,6 +1515,10 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         toggleMic,
         toggleDeafen,
         toggleScreenShare,
+        audioSharing,
+        audioShares,
+        toggleAudioShare,
+        toggleListenAudioShare,
         toggleCamera,
         myPermissions,
         moveParticipant,
@@ -1292,6 +1529,9 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     >
       {children}
       {screenPickerOpen && <ScreenSharePicker onSelect={startElectronScreenShare} onClose={closeScreenPicker} />}
+      {audioPickerOpen && (
+        <ScreenSharePicker mode="audio" onSelect={startElectronAudioShare} onClose={() => setAudioPickerOpen(false)} />
+      )}
     </VoiceCallContext.Provider>
   );
 }

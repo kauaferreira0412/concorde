@@ -125,6 +125,57 @@ export default function ChannelSidebar({
   const [categoryMenu, setCategoryMenu] = useState(null);
   const categoryMenuRef = useRef(null);
   const [serverMenu, setServerMenu] = useState(null);
+  const [createMenu, setCreateMenu] = useState(null);
+
+  // O card grande da call pede o mesmo menu de opções (botão direito) por um evento da janela.
+  useEffect(() => {
+    function onOpen(e) {
+      const d = e.detail;
+      if (!d) return;
+      setParticipantMenu({ ...d });
+    }
+    window.addEventListener("concorde:participant-menu", onOpen);
+    return () => window.removeEventListener("concorde:participant-menu", onOpen);
+  }, []);
+  const createMenuRef = useRef(null);
+  useEffect(() => {
+    if (!createMenu) return undefined;
+    function onDown(e) {
+      if (createMenuRef.current?.contains(e.target) || e.target.closest?.(".channel-list-add")) return;
+      setCreateMenu(null);
+    }
+    function onKey(e) {
+      if (e.key === "Escape") setCreateMenu(null);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [createMenu]);
+
+  function createItems(close) {
+    const items = [
+      { key: "TEXT", icon: <HashIcon size={14} />, label: "Canal de texto", run: () => onCreateChannel("TEXT") },
+      { key: "VOICE", icon: <VolumeIcon size={14} />, label: "Canal de voz", run: () => onCreateChannel("VOICE") },
+    ];
+    if (server?.type === "RPG") items.push({ key: "MAP", icon: <MapIcon size={14} />, label: "Canal de mapa", run: () => onCreateChannel("MAP") });
+    items.push({ key: "CAT", icon: <FolderIcon size={14} />, label: "Categoria", run: () => setCreatingCategory(true) });
+    return items.map((it) => (
+      <button
+        key={it.key}
+        type="button"
+        className="participant-mod-btn"
+        onClick={() => {
+          close();
+          it.run();
+        }}
+      >
+        {it.icon} {it.label}
+      </button>
+    ));
+  }
   const serverMenuRef = useRef(null);
   const serverHeaderRef = useRef(null);
   const [creatingCategory, setCreatingCategory] = useState(false);
@@ -420,7 +471,7 @@ export default function ChannelSidebar({
     };
   }, [server?.id, stompClient, stompConnected, voiceChannels.map((c) => c.id).join(",")]);
 
-  const connectedList = voiceChannels.flatMap((c) => (presenceByChannel[c.id] || []).map((p) => ({ ...p, channelId: c.id, channelName: c.name })));
+  const connectedList = voiceChannels.flatMap((c) => visiblePresence(c.id).map((p) => ({ ...p, channelId: c.id, channelName: c.name })));
 
   useEffect(() => {
     if (
@@ -474,6 +525,11 @@ export default function ChannelSidebar({
   }
 
   const liveIdentities = new Set((screenShares || []).map((s) => s.participantIdentity));
+
+  // o bot do soundboard só toca o som; não aparece na lista de quem está na call
+  function visiblePresence(channelId) {
+    return (presenceByChannel[channelId] || []).filter((p) => !(p.userId < 0 && p.userId !== -channelId));
+  }
 
   function identityOf(p, channelId) {
     if (p.userId < 0) return p.userId === -channelId ? `musicbot-${channelId}` : `soundboardbot-${channelId}`;
@@ -535,9 +591,9 @@ export default function ChannelSidebar({
           {c.name}
           {activeChannel?.id === c.id && <span className="channel-item-live">CONECTADO</span>}
         </button>
-        {(presenceByChannel[c.id] || []).length > 0 && (
+        {visiblePresence(c.id).length > 0 && (
           <div className="channel-voice-participants">
-            {sortStreamersFirst(presenceByChannel[c.id], c.id).map((p) => {
+            {sortStreamersFirst(visiblePresence(c.id), c.id).map((p) => {
               const identity = identityOf(p, c.id);
               const streaming = isStreaming(p, c.id);
               const isMe = p.userId === user?.id;
@@ -551,6 +607,9 @@ export default function ChannelSidebar({
                   draggable={canMove && !isMe}
                   onDragStart={() => setDraggingParticipant({ channelId: c.id, userId: p.userId })}
                   onDragEnd={() => setDraggingParticipant(null)}
+                  onClick={() => {
+                    if (p.userId > 0) openProfile(p.userId);
+                  }}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     api.get(`/api/channels/${c.id}/voice-presence`).then(({ data }) => {
@@ -567,8 +626,8 @@ export default function ChannelSidebar({
                   }}
                   title={
                     canMove && !isMe
-                      ? "Botão direito: opções · arraste pra outro canal de voz pra mover"
-                      : "Clique com o botão direito pra ver as opções"
+                      ? "Clique: perfil · botão direito: opções · arraste pra outro canal de voz pra mover"
+                      : "Clique pra ver o perfil · botão direito pra mais opções"
                   }
                 >
                   <Avatar
@@ -703,7 +762,8 @@ export default function ChannelSidebar({
                       y: e.clientY,
                     });
                   }}
-                  title="Clique com o botão direito pra ver as opções"
+                  onClick={() => p.userId > 0 && openProfile(p.userId)}
+                  title="Clique pra ver o perfil · botão direito pra mais opções"
                 >
                   <Avatar name={p.username} url={p.avatarUrl} className="voice-avatar small" />
                   <span className="connected-user-name">{p.username}</span>
@@ -756,15 +816,29 @@ export default function ChannelSidebar({
               </button>
             )}
 
-            {canManageChannels && (
-              <button className="channel-item add category-add" onClick={() => setCreatingCategory(true)}>
-                <PlusIcon size={13} /> categoria
-              </button>
-            )}
+            <div className="channel-list-head">
+              <span className="channel-group-title">CANAIS</span>
+              {canManageChannels && (
+                <button
+                  type="button"
+                  className={"channel-list-add" + (createMenu ? " open" : "")}
+                  title="Criar canal ou categoria"
+                  aria-label="Criar canal ou categoria"
+                  aria-expanded={!!createMenu}
+                  onClick={(e) => {
+                    if (createMenu) return setCreateMenu(null);
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setCreateMenu({ x: r.left, y: r.bottom + 6 });
+                  }}
+                >
+                  <PlusIcon size={14} />
+                </button>
+              )}
+            </div>
 
             {groupedChannels.uncategorized.map(renderChannel)}
 
-            {canManageChannels && groupedChannels.groups.length > 0 && (
+            {canManageChannels && draggingChannelId && groupedChannels.groups.length > 0 && (
               <div
                 className={"channel-uncategorized-drop" + (dragOverCategoryId === "none" ? " drop-target" : "")}
                 onDragOver={(e) => {
@@ -784,21 +858,6 @@ export default function ChannelSidebar({
               </div>
             )}
 
-            {canManageChannels && (
-              <>
-                <button className="channel-item add" onClick={() => onCreateChannel("TEXT")}>
-                  + canal de texto
-                </button>
-                <button className="channel-item add" onClick={() => onCreateChannel("VOICE")}>
-                  + canal de voz
-                </button>
-                {server?.type === "RPG" && (
-                  <button className="channel-item add" onClick={() => onCreateChannel("MAP")}>
-                    + canal de mapa
-                  </button>
-                )}
-              </>
-            )}
 
             {groupedChannels.groups.map((group) => (
               <div key={group.category.id}>
@@ -956,6 +1015,17 @@ export default function ChannelSidebar({
         </div>
       )}
 
+      {createMenu && (
+        <div
+          className="volume-popover create-menu"
+          ref={createMenuRef}
+          style={{ left: Math.min(createMenu.x, window.innerWidth - 220), top: createMenu.y }}
+        >
+          <p className="volume-popover-title">Criar</p>
+          <div className="participant-mod-actions">{createItems(() => setCreateMenu(null))}</div>
+        </div>
+      )}
+
       {serverMenu && server && (
         <div
           className="volume-popover"
@@ -966,6 +1036,12 @@ export default function ChannelSidebar({
           }}
         >
           <p className="volume-popover-title">{server.name}</p>
+          {canManageChannels && (
+            <>
+              <div className="participant-mod-actions">{createItems(() => setServerMenu(null))}</div>
+              <div className="popover-divider" />
+            </>
+          )}
           <div className="participant-mod-actions">
             {(isAdmin || myServerPermissions.has("MANAGE_SERVER")) && (
               <button

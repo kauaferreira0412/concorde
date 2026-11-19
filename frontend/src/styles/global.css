@@ -5460,3 +5460,413 @@ button.stream-card-screen {
 .accent-swatch-custom[style] { background: var(--swatch); }
 .accent-swatch-custom span { color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
 .accent-swatch-custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; border: 0; padding: 0; }
+
+/* Reordenar servidores arrastando */
+.server-icon-wrap.dragging { opacity: 0.4; }
+.server-icon-wrap.drop-before::before,
+.server-icon-wrap.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--c-mint);
+  box-shadow: 0 0 0 2px var(--c-ink);
+  pointer-events: none;
+  z-index: 2;
+}
+.server-icon-wrap.drop-before::before { top: -6px; }
+.server-icon-wrap.drop-after::after { bottom: -6px; }
+
+/* Cabeçalho "CANAIS" com o + que abre o menu de criar */
+.channel-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px 4px 10px;
+}
+.channel-list-add {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  border: var(--sticker);
+  background: var(--c-surface-2);
+  color: var(--c-text);
+  box-shadow: var(--pop-1);
+  cursor: pointer;
+  transition: transform 0.14s ease, background 0.14s ease;
+}
+.channel-list-add:hover { background: var(--c-accent); color: var(--c-on-accent); }
+.channel-list-add.open { background: var(--c-accent); color: var(--c-on-accent); }
+.channel-list-add.open svg { transform: rotate(45deg); }
+.channel-list-add svg { transition: transform 0.18s ease; }
+.popover-divider { height: 2px; margin: 6px 4px; background: var(--t-border, rgba(127,127,127,0.25)); border-radius: 2px; }
+.channel-uncategorized-drop { animation: fade-in 0.15s ease backwards; }
+canvas.avatar-frozen { padding: 0; }
+
+/* =====================================================================
+   Barra da call sempre numa linha + soundboard em grade
+   ===================================================================== */
+.voice-channel { container-type: inline-size; container-name: voicech; }
+.call-toolbar { flex-wrap: nowrap; }
+@container voicech (max-width: 560px) {
+  .call-toolbar { gap: 8px; padding: 8px; border-radius: 18px; bottom: 12px; }
+  .call-toolbar-btn { width: 46px; height: 46px; border-radius: 13px; }
+  .call-toolbar-leave { height: 46px; width: 56px; padding: 0; justify-content: center; border-radius: 13px; }
+  .call-toolbar-leave-label { display: none; }
+}
+@container voicech (max-width: 360px) {
+  .call-toolbar { gap: 6px; padding: 6px; }
+  .call-toolbar-btn { width: 40px; height: 40px; border-radius: 11px; }
+  .call-toolbar-leave { height: 40px; width: 46px; border-radius: 11px; }
+}
+
+.soundboard { position: relative; }
+.soundboard-header { margin-bottom: 12px; align-items: baseline; }
+.soundboard-title { display: flex; align-items: center; gap: 8px; }
+.soundboard-count {
+  font-size: 11px; font-weight: 900; padding: 1px 8px; border-radius: 999px;
+  background: var(--c-accent); color: var(--c-on-accent);
+}
+.soundboard-sub { font-size: 12px; font-weight: 700; color: var(--c-text-muted); }
+
+.soundboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 10px;
+}
+.soundboard-tile {
+  position: relative;
+  min-height: 64px;
+  border: var(--sticker);
+  border-radius: 16px;
+  background: var(--c-surface-2);
+  box-shadow: var(--pop-1);
+  padding: 0;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+.soundboard-tile:hover { transform: translate(-1px, -2px); box-shadow: var(--pop-2); }
+.soundboard-tile-play,
+.soundboard-add {
+  width: 100%;
+  height: 100%;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  color: var(--c-text);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+.soundboard-tile-play { background: transparent !important; border: none !important; box-shadow: none !important; }
+.soundboard-add {
+  border: 2.5px dashed var(--t-dashed) !important;
+  border-radius: 16px;
+  color: var(--c-text-muted);
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.soundboard-add:hover { color: var(--c-text); border-color: var(--c-accent) !important; }
+.soundboard-add.uploading { opacity: 0.6; cursor: progress; }
+.soundboard-tile-icon {
+  width: 34px; height: 34px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 11px; border: var(--sticker);
+  background: var(--c-accent); color: var(--c-on-accent);
+}
+.soundboard-add .soundboard-tile-icon { background: var(--c-surface-2); color: inherit; border-style: dashed; }
+.soundboard-tile-name {
+  font-size: 13px; font-weight: 800; line-height: 1.25;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word;
+}
+.soundboard-tile.playing { background: var(--c-mint); }
+.soundboard-tile.playing .soundboard-tile-play { color: var(--c-on-pop); }
+.soundboard-tile.playing .soundboard-tile-icon { background: var(--c-surface); color: var(--c-text); animation: sb-pulse 0.4s ease; }
+@keyframes sb-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.18); } 100% { transform: scale(1); } }
+.soundboard-tile-remove {
+  position: absolute; top: -8px; right: -8px;
+  width: 24px; height: 24px; padding: 0 !important;
+  display: inline-flex !important; align-items: center; justify-content: center;
+  border-radius: 999px !important; border: var(--sticker) !important;
+  background: var(--c-surface) !important; color: var(--c-text-muted);
+  box-shadow: var(--pop-1) !important;
+  opacity: 0; transform: scale(0.8);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+.soundboard-tile:hover .soundboard-tile-remove,
+.soundboard-tile-remove:focus-visible { opacity: 1; transform: scale(1); }
+.soundboard-tile-remove:hover { background: var(--c-danger) !important; color: var(--c-on-accent); }
+@media (hover: none) { .soundboard-tile-remove { opacity: 1; transform: scale(1); } }
+.soundboard-tile.skeleton { opacity: 0.5; animation: fade-in 0.8s ease infinite alternate; }
+.soundboard.drag-active { outline: 3px dashed var(--c-accent); outline-offset: -6px; }
+.soundboard-drop-hint {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  border-radius: 20px; background: color-mix(in oklab, var(--c-surface) 80%, transparent);
+  font-family: var(--font-display); font-size: 14px; color: var(--c-text); pointer-events: none;
+}
+@container voicech (max-width: 560px) {
+  .soundboard-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+  .soundboard-sub { display: none; }
+}
+
+/* volume do soundboard */
+.soundboard-header { align-items: center; }
+.soundboard-volume { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.soundboard-volume-label { font-size: 12px; font-weight: 800; color: var(--c-text-muted); white-space: nowrap; }
+.soundboard-volume .volume-slider-row { min-width: 160px; }
+p.soundboard-sub { margin: -4px 0 12px; }
+@container voicech (max-width: 560px) {
+  .soundboard-volume-label { display: none; }
+  .soundboard-volume .volume-slider-row { min-width: 120px; }
+}
+
+/* card da call e linhas da sidebar: clicáveis (perfil) */
+.voice-person.clickable { cursor: pointer; }
+.voice-person.clickable:focus-visible { outline: 3px solid var(--c-accent); outline-offset: 3px; }
+.channel-voice-participant, .connected-user { cursor: pointer; }
+
+/* =====================================================================
+   Celular estilo app: abas embaixo, telas de ponta a ponta
+   (só abaixo de 760px; desktop/tablet não mudam)
+   ===================================================================== */
+.mobile-tabbar { display: none; }
+
+@media (max-width: 760px) {
+  :root { --tabbar-h: calc(64px + env(safe-area-inset-bottom)); }
+
+  .app-shell { padding: 0; gap: 0; }
+  .app-shell[data-pane="nav"] { padding-bottom: var(--tabbar-h); }
+
+  /* ---- abas ---- */
+  .mobile-tabbar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    height: var(--tabbar-h);
+    padding: 0 6px env(safe-area-inset-bottom);
+    background: var(--c-surface);
+    border-top: var(--sticker);
+    box-shadow: 0 -3px 0 color-mix(in oklab, var(--c-ink) 35%, transparent);
+    animation: rise-in 0.35s var(--ease-spring) backwards;
+  }
+  .app-shell[data-pane="main"] .mobile-tabbar { display: none; }
+  /* Amigos é uma aba principal: a barra continua lá */
+  .app-shell[data-pane="main"] .mobile-tabbar.persistent { display: flex; animation: none; }
+  .app-shell[data-pane="main"]:has(.mobile-tabbar.persistent) { padding-bottom: var(--tabbar-h); }
+  .app-shell:has(.mobile-tabbar.persistent) .friends-panel .layout-back-btn { display: none; }
+  .mobile-tab {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 2px;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--c-text-muted);
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mobile-tab-icon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 32px;
+    border-radius: 999px;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.18s var(--ease-spring);
+  }
+  .mobile-tab-label { font-size: 11px; font-weight: 900; letter-spacing: 0.2px; white-space: nowrap; }
+  .mobile-tab.active { color: var(--c-text); }
+  .mobile-tab.active .mobile-tab-icon { background: var(--c-accent); color: var(--c-on-accent); transform: translateY(-1px); }
+  .mobile-tab:active .mobile-tab-icon { transform: scale(0.92); }
+  .mobile-tab-dot {
+    position: absolute; top: 2px; right: 12px; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--c-danger); border: 2px solid var(--c-surface);
+  }
+  .mobile-tab-badge {
+    position: absolute; top: -2px; right: 6px; min-width: 18px; height: 18px; padding: 0 5px;
+    border-radius: 999px; background: var(--c-danger); color: #fff; font-size: 10px; font-weight: 900;
+    display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--c-surface);
+  }
+  .mobile-tab-you { background: transparent !important; }
+  .mobile-tab-avatar {
+    width: 28px; height: 28px; border-radius: 10px; border: 2px solid var(--c-ink);
+    font-size: 10px; display: inline-flex; align-items: center; justify-content: center;
+    background: var(--tone-bg); color: var(--tone-fg); font-family: var(--font-display); object-fit: cover;
+  }
+  .mobile-tab.active .mobile-tab-avatar { box-shadow: 0 0 0 3px var(--c-accent); }
+  .mobile-tab-you .status-dot { position: absolute; right: 10px; bottom: 0; width: 11px; height: 11px; }
+
+  /* ---- lista (trilho de servidores + canais/DMs) ---- */
+  .server-sidebar {
+    width: 72px;
+    flex-basis: 72px;
+    padding: calc(10px + env(safe-area-inset-top)) 0 12px;
+    gap: 10px;
+  }
+  .channel-sidebar, .home-sidebar {
+    border-radius: 22px 0 0 0;
+    border-right: none;
+    border-bottom: none;
+    box-shadow: none;
+    margin-top: env(safe-area-inset-top);
+  }
+  .channel-sidebar-header, .home-sidebar-header { padding: 16px 14px 12px 16px; }
+  /* perfil/config/sair moram na aba "Você" */
+  .channel-sidebar .user-bar, .home-sidebar .user-bar { display: none; }
+  .channel-item { min-height: 44px; padding: 10px 12px; font-size: 15px; }
+  .channel-voice-participant { min-height: 38px; }
+  .home-dm-item { min-height: 56px; }
+  .voice-status-bar { margin: 8px 10px 10px; }
+
+  /* ---- conversa/call em tela cheia ---- */
+  .chat-window, .voice-channel, .battle-map-channel, .friends-panel {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .chat-header {
+    padding-top: max(10px, env(safe-area-inset-top));
+    position: relative;
+    z-index: 2;
+    background: var(--c-surface);
+  }
+  .chat-input { padding: 8px 10px calc(10px + env(safe-area-inset-bottom)); gap: 8px; }
+  .chat-input .icon-btn { width: 42px; height: 42px; border-radius: 13px; }
+  .call-toolbar { bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .voice-body { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
+
+  /* gaveta de membros ocupa a lateral inteira */
+  .member-list, .member-list.collapsed { top: 0; right: 0; bottom: 0; border-radius: 22px 0 0 22px; }
+
+  /* ---- folha "Você" ---- */
+  .you-sheet-backdrop { z-index: 80; }
+  .modal.you-sheet { padding: 0 0 calc(14px + env(safe-area-inset-bottom)); overflow: hidden; gap: 0; }
+  .you-sheet-grabber {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 1;
+    width: 44px; height: 5px; border-radius: 999px; background: color-mix(in oklab, var(--c-ink) 55%, transparent);
+  }
+  .you-sheet-banner {
+    height: 84px; background: var(--profile-accent, var(--c-accent));
+    background-size: cover; background-position: center; border-bottom: var(--sticker);
+  }
+  .you-sheet-head { display: flex; align-items: flex-start; gap: 12px; padding: 0 18px; margin-top: -34px; }
+  .you-sheet-head .member-avatar-wrap { position: relative; flex-shrink: 0; }
+  .you-sheet-avatar {
+    width: 72px; height: 72px; border-radius: 22px; border: 3px solid var(--c-ink);
+    background: var(--tone-bg); color: var(--tone-fg); font-family: var(--font-display); font-size: 22px;
+    display: flex; align-items: center; justify-content: center; object-fit: cover; box-shadow: var(--pop-1);
+  }
+  .you-sheet-head .status-dot { position: absolute; right: -2px; bottom: -2px; width: 18px; height: 18px; }
+  .you-sheet-name { display: flex; flex-direction: column; min-width: 0; padding-top: 40px; align-self: flex-start; }
+  .you-sheet-name strong { font-family: var(--font-display); font-size: 18px; color: var(--c-text); }
+  .you-sheet-name span { font-size: 13px; font-weight: 700; color: var(--c-text-muted); }
+  .you-sheet-name .you-sheet-status { color: var(--c-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .you-sheet-actions { display: flex; flex-direction: column; gap: 8px; padding: 16px 16px 4px; }
+  .you-sheet-item {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    padding: 14px 16px !important; border-radius: 16px !important;
+    background: var(--c-surface-2) !important; color: var(--c-text) !important;
+    border: var(--sticker) !important; box-shadow: var(--pop-1) !important;
+    font-size: 15px; font-weight: 800; text-align: left;
+  }
+  .you-sheet-item.danger { color: var(--c-danger) !important; }
+}
+
+/* ---- Amigos no celular: título + "Adicionar" em cima, abas segmentadas embaixo ---- */
+.tab-label-short { display: none; }
+@media (max-width: 760px) {
+  .friends-panel-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: center;
+    gap: 10px 6px;
+    padding: calc(12px + env(safe-area-inset-top)) 12px 12px;
+    min-height: 0;
+    overflow: visible;
+    background: var(--c-surface);
+  }
+  /* Amigos é uma aba: sem "voltar" */
+  .friends-panel-tabs .layout-back-btn { display: none; }
+  .friends-panel-title { grid-row: 1; grid-column: 1 / 4; margin: 0; font-size: 22px; }
+  .friends-panel-tab.add {
+    grid-row: 1;
+    grid-column: 4;
+    justify-self: end;
+    margin: 0;
+    padding: 8px 12px;
+    white-space: nowrap;
+    box-shadow: var(--pop-1);
+  }
+  .friends-panel-tab.add .tab-label-long { display: none; }
+  .friends-panel-tab.add .tab-label-short { display: inline; }
+  .friends-panel-tab:not(.add) {
+    grid-row: 2;
+    justify-content: center;
+    padding: 9px 4px;
+    font-size: 12px;
+    min-width: 0;
+    border-radius: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .friends-panel-tab-badge { padding: 0 5px; font-size: 10px; }
+  .friends-panel-body { padding: 12px 12px 20px; }
+  .friend-row { padding: 10px; }
+  .friends-add-form input { width: 100%; }
+}
+@media (max-width: 760px) {
+  /* "Amigos" já é uma aba lá embaixo */
+  .home-nav > .home-nav-item:first-child { display: none; }
+}
+
+/* =====================================================================
+   Transmissão só de áudio
+   ===================================================================== */
+.call-toolbar-btn.audio-share-btn.on { background: var(--c-mint); color: var(--c-on-pop); }
+.audio-live-tag { background: var(--c-mint) !important; color: var(--c-on-pop) !important; display: inline-flex; align-items: center; gap: 3px; }
+.audio-shares-hint { font-size: 12px; font-weight: 700; color: var(--c-text-muted); }
+.audio-shares-list { display: flex; flex-direction: column; gap: 10px; }
+.audio-share-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  border: var(--sticker); border-radius: 16px; background: var(--c-surface-2); box-shadow: var(--pop-1);
+}
+.audio-share-row.me { background: color-mix(in oklab, var(--c-mint) 22%, var(--c-surface-2)); }
+.audio-share-row .voice-avatar { width: 40px; height: 40px; border-radius: 13px; flex-shrink: 0; }
+.audio-share-info { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 8px; min-width: 0; flex: 1; align-items: center; }
+.audio-share-info strong { font-size: 14px; font-weight: 900; color: var(--c-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.audio-share-sub { grid-column: 1 / -1; font-size: 12px; font-weight: 700; color: var(--c-text-muted); }
+.audio-share-eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+.audio-share-eq i { width: 3px; height: 4px; border-radius: 2px; background: var(--c-mint); animation: audio-eq 0.9s ease-in-out infinite; }
+.audio-share-eq i:nth-child(2) { animation-delay: 0.15s; }
+.audio-share-eq i:nth-child(3) { animation-delay: 0.3s; }
+.audio-share-eq i:nth-child(4) { animation-delay: 0.45s; }
+@keyframes audio-eq { 0%, 100% { height: 4px; } 50% { height: 14px; } }
+@media (prefers-reduced-motion: reduce) { .audio-share-eq i { animation: none; height: 8px; } }
+.audio-share-volume { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.audio-share-volume .volume-slider-row { min-width: 150px; }
+@container voicech (max-width: 560px) {
+  .audio-share-row { flex-wrap: wrap; }
+  .audio-share-volume { width: 100%; }
+  .audio-share-volume .volume-slider-row { flex: 1; min-width: 0; }
+  .audio-shares-hint { display: none; }
+}
+
+.audio-share-row.idle .audio-share-eq { opacity: 0.35; }
+.audio-share-row .btn-accent-sm { flex-shrink: 0; }

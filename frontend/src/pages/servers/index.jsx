@@ -13,6 +13,8 @@ import CustomEmojiModal from "../../components/CustomEmojiModal.jsx";
 import SettingsModal from "../../components/SettingsModal.jsx";
 import { useServersContainer } from "./Container.jsx";
 import { DrawerBackdrop, LayoutProvider, usePageLayout } from "../../context/LayoutContext.jsx";
+import MobileTabBar, { rememberLastServer } from "../../components/MobileTabBar.jsx";
+import { useEffect } from "react";
 import "./style.css";
 
 export default function ServerPage() {
@@ -57,6 +59,11 @@ export default function ServerPage() {
     handleCategoryDeleted,
   } = useServersContainer();
   const layout = usePageLayout({ hasMembers: !!selectedServerId });
+
+  // a aba "Servidores" do celular volta pro último servidor aberto
+  useEffect(() => {
+    rememberLastServer(selectedServerId);
+  }, [selectedServerId]);
 
   return (
     <LayoutProvider value={layout.value}>
@@ -115,6 +122,9 @@ export default function ServerPage() {
 
         <MemberList serverId={selectedServerId} stompClient={stompClient} stompConnected={stompConnected} />
         <DrawerBackdrop />
+        {layout.isMobile && (
+          <MobileTabBar active="servers" onOpenSettings={() => setShowSettings(true)} onLogout={logout} />
+        )}
 
         {showCreateServer && (
           <CreateServerModal onClose={() => setShowCreateServer(false)} onCreate={handleCreateServer} />

@@ -115,7 +115,14 @@ export default function FriendsPanel({ friends, requests, blocked, onSendRequest
             className={"friends-panel-tab" + (tab === t.key ? " active" : "") + (t.key === "add" ? " add" : "")}
             onClick={() => setTab(t.key)}
           >
-            {t.label}
+            {t.key === "add" ? (
+              <>
+                <span className="tab-label-long">{t.label}</span>
+                <span className="tab-label-short" aria-hidden="true">+ Adicionar</span>
+              </>
+            ) : (
+              t.label
+            )}
             {t.key === "pending" && pendingCount > 0 && <span className="friends-panel-tab-badge">{pendingCount}</span>}
           </button>
         ))}

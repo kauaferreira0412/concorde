@@ -159,11 +159,12 @@ public class VoicePresenceService {
         broadcast(channelId);
     }
 
+    /**
+     * O bot do soundboard só existe pra tocar o áudio no LiveKit: não entra na lista de presença
+     * (ninguém vê ele "entrando na call"). Mantido o método pra não mudar quem chama.
+     */
     public void joinSoundboardBot(Long channelId, String name, String avatarUrl) {
-        Long id = soundboardBotUserId(channelId);
-        byChannel.computeIfAbsent(channelId, k -> new ConcurrentHashMap<>())
-                .put(id, new VoiceParticipantInfo(id, name, avatarUrl, true, false, false, false, List.of(), false));
-        broadcast(channelId);
+        // intencionalmente invisível
     }
 
     public void leaveSoundboardBot(Long channelId) {

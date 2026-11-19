@@ -63,7 +63,8 @@ public class VoiceController {
 
         String room = "channel-" + channelId;
         String identity = "user-" + userId;
-        String token = liveKitService.generateAccessToken(room, identity, displayName, avatarUrl);
+        boolean gifOnSpeak = user.map(u -> u.isAvatarAnimateOnSpeakEnabled()).orElse(false);
+        String token = liveKitService.generateAccessToken(room, identity, displayName, avatarUrl, gifOnSpeak);
 
         Channel channel = channelRepository.findById(channelId).orElse(null);
         boolean forceMuted = false;

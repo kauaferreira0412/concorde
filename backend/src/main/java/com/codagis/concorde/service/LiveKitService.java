@@ -54,6 +54,11 @@ public class LiveKitService {
     }
 
     public String generateAccessToken(String roomName, String identity, String displayName, String avatarUrl) {
+        return generateAccessToken(roomName, identity, displayName, avatarUrl, false);
+    }
+
+    public String generateAccessToken(String roomName, String identity, String displayName, String avatarUrl,
+                                      boolean gifOnSpeak) {
         Instant now = Instant.now();
 
         Map<String, Object> videoGrant = new HashMap<>();
@@ -62,6 +67,7 @@ public class LiveKitService {
         videoGrant.put("canPublish", true);
         videoGrant.put("canSubscribe", true);
         videoGrant.put("canPublishData", true);
+        videoGrant.put("canUpdateOwnMetadata", true);
         videoGrant.put("canPublishSources", new String[]{"camera", "microphone", "screen_share", "screen_share_audio"});
 
         var builder = Jwts.builder()
@@ -72,9 +78,7 @@ public class LiveKitService {
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(ttlMinutes * 60)));
 
-        if (avatarUrl != null && !avatarUrl.isBlank()) {
-            builder.claim("metadata", toMetadataJson(avatarUrl));
-        }
+        builder.claim("metadata", toMetadataJson(avatarUrl, gifOnSpeak));
 
         return builder.signWith(key, Jwts.SIG.HS256).compact();
     }
@@ -101,9 +105,12 @@ public class LiveKitService {
                 .compact();
     }
 
-    private String toMetadataJson(String avatarUrl) {
+    private String toMetadataJson(String avatarUrl, boolean gifOnSpeak) {
         try {
-            return JSON.writeValueAsString(Map.of("avatarUrl", avatarUrl));
+            Map<String, Object> meta = new HashMap<>();
+            if (avatarUrl != null && !avatarUrl.isBlank()) meta.put("avatarUrl", avatarUrl);
+            meta.put("gifOnSpeak", gifOnSpeak);
+            return JSON.writeValueAsString(meta);
         } catch (Exception e) {
             return "{}";
         }

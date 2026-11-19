@@ -54,6 +54,17 @@ public class User {
     @Column(length = 7)
     private String accentColor;
 
+    /** Ordem pessoal dos servidores na barra lateral (ids separados por vírgula). */
+    @Column(length = 2000)
+    private String serverOrder;
+
+    /** Na call, a foto (GIF) só se mexe enquanto a pessoa fala. */
+    private Boolean avatarAnimateOnSpeak;
+
+    public boolean isAvatarAnimateOnSpeakEnabled() {
+        return Boolean.TRUE.equals(avatarAnimateOnSpeak);
+    }
+
     @Column(length = 32)
     private String nickname;
 
