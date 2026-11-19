@@ -3,14 +3,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTokens } from "../theme/ThemeContext";
 import { Txt } from "./kit";
 import Icon from "./icons";
+import { Enter } from "./anim";
 
 /** Folha que sobe de baixo (menus de ações), no estilo adesivo. */
 export default function Sheet({ visible, onClose, title, children }) {
   const t = useTokens();
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={{ flex: 1, backgroundColor: t.backdrop }} onPress={onClose} />
+      <Enter kind="rise" distance={60} style={{ maxHeight: "85%" }}>
       <View
         style={{
           backgroundColor: t.surface,
@@ -20,7 +22,7 @@ export default function Sheet({ visible, onClose, title, children }) {
           borderBottomWidth: 0,
           borderColor: t.ink,
           paddingBottom: insets.bottom + 12,
-          maxHeight: "85%",
+          flexShrink: 1,
         }}
       >
         <View style={{ alignItems: "center", paddingTop: 8 }}>
@@ -35,6 +37,7 @@ export default function Sheet({ visible, onClose, title, children }) {
           {children}
         </ScrollView>
       </View>
+      </Enter>
     </Modal>
   );
 }

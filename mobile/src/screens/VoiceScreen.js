@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Modal, Platform, Pressable, ScrollView, StatusBar, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Modal, Platform, Pressable, ScrollView, StatusBar, UIManager, View, findNodeHandle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VideoTrack } from "@livekit/react-native";
 import { startIOSPIP } from "@livekit/react-native-webrtc";
@@ -12,8 +12,26 @@ import Sheet, { SheetItem } from "../ui/Sheet";
 import Slider from "../ui/Slider";
 import TopBar from "../ui/TopBar";
 import Icon from "../ui/icons";
+import { Enter } from "../ui/anim";
+import { useLayout } from "../ui/layout";
 
 const PIP = { enabled: true, startAutomatically: true, stopAutomatically: true, preferredSize: { width: 16, height: 9 } };
+
+/** Abre o PiP do vídeo. Tenta o comando da biblioteca e, na arquitetura nova, o nome direto. */
+function openPip(viewRef) {
+  if (!viewRef.current) return false;
+  try {
+    startIOSPIP(viewRef);
+    return true;
+  } catch {
+    try {
+      UIManager.dispatchViewManagerCommand(findNodeHandle(viewRef.current), "startIOSPIP", []);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
 
 function ParticipantCard({ p, onPress, mirrorLocal }) {
   const t = useTokens();
@@ -76,7 +94,14 @@ function StreamPlayer({ stream, onStop, onFullscreen, height = 210, fullscreen }
       )}
       <View style={{ position: "absolute", top: 8, right: 8, flexDirection: "row", gap: 8 }}>
         {Platform.OS === "ios" && stream.hasVideo ? (
-          <IconBtn icon="pip" size={38} label="Picture in Picture" onPress={() => viewRef.current && startIOSPIP(viewRef)} />
+          <IconBtn
+            icon="pip"
+            size={38}
+            label="Picture in Picture"
+            onPress={() => {
+              if (!openPip(viewRef)) Alert.alert("Picture in Picture", "Não deu pra abrir agora. Minimize o app com a live aberta que ele abre sozinho.");
+            }}
+          />
         ) : null}
         {onFullscreen ? <IconBtn icon="maximize" size={38} label="Tela cheia" onPress={onFullscreen} /> : null}
         <IconBtn icon="x" size={38} label={fullscreen ? "Fechar" : "Parar de assistir"} onPress={onStop} />
@@ -305,6 +330,7 @@ export default function VoiceScreen({ route, navigation, user }) {
   const inThisCall = voice.channel && target && voice.channel.id === target.id;
   const [fullscreen, setFullscreen] = useState(false);
   const [selected, setSelected] = useState(null);
+  const layout = useLayout();
 
   useEffect(() => {
     if (target && !inThisCall && !voice.connecting) voice.join(target);
@@ -332,8 +358,9 @@ export default function VoiceScreen({ route, navigation, user }) {
 
   // a câmera local entra no card "Você"
   const people = voice.participants.map((p) => (p.isLocal && voice.localCamera ? { ...p, camera: voice.localCamera } : p));
+  const cols = layout.wide ? layout.columns(230, 4) : 2;
   const rows = [];
-  for (let i = 0; i < people.length; i += 2) rows.push(people.slice(i, i + 2));
+  for (let i = 0; i < people.length; i += cols) rows.push(people.slice(i, i + cols));
   const selectedP = selected ? people.find((p) => p.identity === selected) : null;
 
   return (
@@ -382,9 +409,13 @@ export default function VoiceScreen({ route, navigation, user }) {
         {rows.map((row, i) => (
           <View key={i} style={{ flexDirection: "row", gap: 12 }}>
             {row.map((p) => (
-              <ParticipantCard key={p.identity} p={p} mirrorLocal={voice.facing === "user"} onPress={() => setSelected(p.identity)} />
+              <Enter key={p.identity} kind="pop" style={{ flex: 1 }}>
+                <ParticipantCard p={p} mirrorLocal={voice.facing === "user"} onPress={() => setSelected(p.identity)} />
+              </Enter>
             ))}
-            {row.length === 1 ? <View style={{ flex: 1 }} /> : null}
+            {Array.from({ length: cols - row.length }, (_, k) => (
+              <View key={`f${k}`} style={{ flex: 1 }} />
+            ))}
           </View>
         ))}
       </ScrollView>

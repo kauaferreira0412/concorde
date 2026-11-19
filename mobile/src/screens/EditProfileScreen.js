@@ -115,7 +115,7 @@ export default function EditProfileScreen({ navigation, user, onUserUpdate }) {
         right={saving ? <ActivityIndicator color={t.onAccent} /> : <IconBtn icon="check" tone="mint" size={40} label="Salvar" onPress={saveAll} />}
       />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={{ padding: 14, gap: 16, paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ width: "100%", maxWidth: 720, alignSelf: "center", padding: 14, gap: 16, paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
           <Sticker radius={22} shadow={t.shadow}>
             <Pressable onPress={() => pick("banner")}>
               <ProfileBanner bannerUrl={user?.bannerUrl} accent={user?.accentColor} accent2={user?.accentColor2} height={110} />

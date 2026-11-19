@@ -14,6 +14,7 @@ import { Avatar, Field, IconBtn, Sticker, Txt } from "../ui/kit";
 import Icon from "../ui/icons";
 import Sheet, { SheetItem } from "../ui/Sheet";
 import { EmojiSheet, GifSheet, QUICK_REACTIONS } from "./Pickers";
+import { Enter } from "../ui/anim";
 
 const GROUP_MS = 5 * 60 * 1000;
 const URL_RE = /(https?:\/\/[^\s<]+)/g;
@@ -302,6 +303,8 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
   const [customEmojiList, setCustomEmojiList] = useState([]);
   const clientRef = useRef(null);
   const listRef = useRef(null);
+  // mensagens que já estavam no histórico não animam; só as que chegam depois
+  const historyIdsRef = useRef(new Set());
 
   const isDm = kind === "dm";
   const topic = isDm ? `/topic/dm.${channelId}` : `/topic/channel.${channelId}`;
@@ -322,7 +325,11 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
     setMessages(null);
     api
       .get(`${base}/messages`)
-      .then(({ data }) => active && setMessages(data))
+      .then(({ data }) => {
+        if (!active) return;
+        historyIdsRef.current = new Set(data.map((m) => m.id));
+        setMessages(data);
+      })
       .catch(() => active && setMessages([]));
 
     const client = createChatClient(getToken());
@@ -474,7 +481,8 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
               keyExtractor={(item) => String(item.id)}
               contentContainerStyle={{ padding: 14 }}
               onScrollToIndexFailed={() => {}}
-              renderItem={({ item, index }) => (
+              renderItem={({ item, index }) => {
+                const msg = (
                 <Message
                   m={item}
                   prev={data[index + 1]}
@@ -487,7 +495,9 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
                   onJump={jumpTo}
                   onVote={!isDm ? (pollId, optionId) => publish("poll.vote", { pollId, optionId }) : undefined}
                 />
-              )}
+                );
+                return historyIdsRef.current.has(item.id) ? msg : <Enter kind="rise">{msg}</Enter>;
+              }}
               ListEmptyComponent={
                 <Txt weight={800} color={t.textMuted} style={{ textAlign: "center", padding: 20, transform: [{ scaleY: -1 }] }}>
                   {emptyText || "Ninguém falou nada ainda. Manda a primeira!"}

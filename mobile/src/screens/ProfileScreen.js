@@ -138,7 +138,7 @@ export default function ProfileScreen({ route, navigation, user }) {
           <ActivityIndicator color={t.text} style={{ marginTop: 40 }} />
         )
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 120 }}>
+        <ScrollView contentContainerStyle={{ width: "100%", maxWidth: 720, alignSelf: "center", padding: 14, paddingBottom: 120 }}>
           <Sticker radius={22} shadow={t.shadow} shadowColor={profile.accentColor ? profile.accentColor2 || profile.accentColor : undefined}>
             <ProfileBanner bannerUrl={profile.bannerUrl} accent={profile.accentColor} accent2={profile.accentColor2} />
             <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: -40, alignItems: "flex-end" }}>

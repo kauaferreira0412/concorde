@@ -177,7 +177,7 @@ export default function MeScreen({ navigation, user, onLogout, embedded }) {
   return (
     <Screen>
       <TopBar title="VOCÊ" subtitle="Perfil e aparência" onBack={embedded ? undefined : () => navigation.goBack()} />
-      <ScrollView contentContainerStyle={{ padding: 14, gap: 16, paddingBottom: 130 }}>
+      <ScrollView contentContainerStyle={{ width: "100%", maxWidth: 720, alignSelf: "center", padding: 14, gap: 16, paddingBottom: 130 }}>
         <Sticker radius={22} shadow={t.shadow}>
           <ProfileBanner bannerUrl={user?.bannerUrl} accent={user?.accentColor} accent2={user?.accentColor2} height={90} />
           <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: -32, alignItems: "flex-end" }}>

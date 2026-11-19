@@ -5,6 +5,8 @@ import { useTokens } from "../theme/ThemeContext";
 import { Screen, Sticker, Txt } from "../ui/kit";
 import Icon from "../ui/icons";
 import TopBar from "../ui/TopBar";
+import { Enter, stagger } from "../ui/anim";
+import { useLayout } from "../ui/layout";
 
 function sortByUserOrder(servers, order) {
   if (!Array.isArray(order) || order.length === 0) return servers;
@@ -53,6 +55,8 @@ export default function ServersScreen({ navigation, user }) {
   const [servers, setServers] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const layout = useLayout();
+  const cols = layout.wide ? layout.columns(190, 6) : 2;
 
   const load = useCallback(async () => {
     try {
@@ -86,7 +90,8 @@ export default function ServersScreen({ navigation, user }) {
       ) : (
         <FlatList
           data={servers}
-          numColumns={2}
+          key={`cols-${cols}`}
+          numColumns={cols}
           keyExtractor={(item) => String(item.id)}
           columnWrapperStyle={{ gap: 12 }}
           contentContainerStyle={{ padding: 14, gap: 12, paddingBottom: 120 }}
@@ -103,8 +108,12 @@ export default function ServersScreen({ navigation, user }) {
           }
           renderItem={({ item, index }) => (
             <>
-              <ServerTile server={item} onPress={() => navigation.navigate("Channels", { server: item })} />
-              {servers.length % 2 === 1 && index === servers.length - 1 ? <View style={{ flex: 1 }} /> : null}
+              <Enter kind="pop" delay={stagger(index)} style={{ flex: 1 }}>
+                <ServerTile server={item} onPress={() => navigation.navigate("Channels", { server: item })} />
+              </Enter>
+              {index === servers.length - 1
+                ? Array.from({ length: (cols - (servers.length % cols)) % cols }, (_, i) => <View key={`f${i}`} style={{ flex: 1 }} />)
+                : null}
             </>
           )}
         />

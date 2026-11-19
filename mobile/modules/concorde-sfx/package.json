@@ -1,0 +1,10 @@
+{
+  "name": "concorde-sfx",
+  "version": "1.0.0",
+  "description": "Sons curtos do Concorde (entrar, sair, mutar...) tocados como sons de sistema, sem mexer na sessao de audio da call",
+  "main": "index.js",
+  "license": "MIT",
+  "author": "Concorde",
+  "homepage": "https://github.com/kauaferreira0412/concorde",
+  "private": true
+}

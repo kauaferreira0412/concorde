@@ -88,18 +88,18 @@ function Root() {
           onReady={() => setCurrentRoute(navigationRef.getCurrentRoute()?.name)}
           onStateChange={() => setCurrentRoute(navigationRef.getCurrentRoute()?.name)}
         >
-          <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
+          <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg }, animation: "slide_from_right", gestureEnabled: true }}>
             {user ? (
               <>
                 <Stack.Screen name="Home">
                   {(props) => <HomeScreen {...props} user={user} onLogout={handleLogout} onUserUpdate={handleUserUpdate} />}
                 </Stack.Screen>
-                <Stack.Screen name="Channels" component={ChannelsScreen} />
+                <Stack.Screen name="Channels">{(props) => <ChannelsScreen {...props} user={user} />}</Stack.Screen>
                 <Stack.Screen name="Chat">{(props) => <ChatScreen {...props} user={user} />}</Stack.Screen>
-                <Stack.Screen name="Voice">{(props) => <VoiceScreen {...props} user={user} />}</Stack.Screen>
+                <Stack.Screen name="Voice" options={{ animation: "slide_from_bottom" }}>{(props) => <VoiceScreen {...props} user={user} />}</Stack.Screen>
                 <Stack.Screen name="DmChat">{(props) => <DmChatScreen {...props} user={user} />}</Stack.Screen>
-                <Stack.Screen name="Profile">{(props) => <ProfileScreen {...props} user={user} />}</Stack.Screen>
-                <Stack.Screen name="EditProfile">
+                <Stack.Screen name="Profile" options={{ animation: "fade_from_bottom" }}>{(props) => <ProfileScreen {...props} user={user} />}</Stack.Screen>
+                <Stack.Screen name="EditProfile" options={{ animation: "fade_from_bottom" }}>
                   {(props) => <EditProfileScreen {...props} user={user} onUserUpdate={handleUserUpdate} />}
                 </Stack.Screen>
               </>

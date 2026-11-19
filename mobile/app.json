@@ -3,7 +3,7 @@
     "name": "Concorde",
     "slug": "concorde-mobile",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "android": {
@@ -41,13 +41,6 @@
         }
       ],
       [
-        "expo-audio",
-        {
-          "microphonePermission": "O Concorde usa o microfone pra você falar nas calls de voz.",
-          "enableBackgroundPlayback": true
-        }
-      ],
-      [
         "expo-image-picker",
         {
           "photosPermission": "O Concorde acessa suas fotos pra você mandar imagens no chat.",
@@ -59,7 +52,7 @@
     ],
     "ios": {
       "bundleIdentifier": "com.codagis.concorde",
-      "supportsTablet": false,
+      "supportsTablet": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "O Concorde usa o microfone pra você falar nas calls de voz.",
         "NSCameraUsageDescription": "O Concorde usa a câmera nas calls com vídeo.",

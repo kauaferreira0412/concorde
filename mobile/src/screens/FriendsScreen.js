@@ -7,6 +7,7 @@ import { useTokens } from "../theme/ThemeContext";
 import { Avatar, Btn, Field, IconBtn, Screen, SectionTitle, Sticker, Txt } from "../ui/kit";
 import Icon from "../ui/icons";
 import TopBar from "../ui/TopBar";
+import { Enter, stagger } from "../ui/anim";
 import { AvatarWithStatus } from "./DmsScreen";
 
 const STATUS = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", OFFLINE: "Offline" };
@@ -159,7 +160,7 @@ export default function FriendsScreen({ navigation, onFriendsChanged }) {
   return (
     <Screen>
       <TopBar title="AMIGOS" subtitle={friends ? `${friends.length} amigo${friends.length === 1 ? "" : "s"}` : " "} />
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 14, paddingTop: 12 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 14, paddingTop: 12, width: "100%", maxWidth: 720, alignSelf: "center" }}>
         {tabs.map(([id, label]) => (
           <Pressable
             key={id}
@@ -183,7 +184,7 @@ export default function FriendsScreen({ navigation, onFriendsChanged }) {
       {friends === null ? (
         <ActivityIndicator color={t.text} style={{ marginTop: 40 }} />
       ) : tab === "add" ? (
-        <View style={{ padding: 14 }}>
+        <View style={{ padding: 14, width: "100%", maxWidth: 720, alignSelf: "center" }}>
           <Sticker radius={20} shadow={4}>
             <View style={{ padding: 16, gap: 10 }}>
               <Txt weight="display" size={16}>
@@ -206,20 +207,24 @@ export default function FriendsScreen({ navigation, onFriendsChanged }) {
         <FlatList
           data={[...requests.incoming.map((r) => ({ ...r, incoming: true })), ...requests.outgoing.map((r) => ({ ...r, incoming: false }))]}
           keyExtractor={(r) => `${r.incoming ? "in" : "out"}-${r.userId}`}
-          contentContainerStyle={{ padding: 14, gap: 10, paddingBottom: 110 }}
+          contentContainerStyle={{ width: "100%", maxWidth: 720, alignSelf: "center", padding: 14, gap: 10, paddingBottom: 110 }}
           ListHeaderComponent={requests.incoming.length ? <SectionTitle>Recebidos e enviados</SectionTitle> : null}
           ListEmptyComponent={
             <Txt weight={800} color={t.textMuted} style={{ textAlign: "center", marginTop: 20 }}>
               Nenhum pedido pendente.
             </Txt>
           }
-          renderItem={({ item }) => <RequestRow r={item} incoming={item.incoming} />}
+          renderItem={({ item, index }) => (
+            <Enter kind="rise" delay={stagger(index)}>
+              <RequestRow r={item} incoming={item.incoming} />
+            </Enter>
+          )}
         />
       ) : (
         <FlatList
           data={list}
           keyExtractor={(f) => String(f.userId)}
-          contentContainerStyle={{ padding: 14, gap: 10, paddingBottom: 110 }}
+          contentContainerStyle={{ width: "100%", maxWidth: 720, alignSelf: "center", padding: 14, gap: 10, paddingBottom: 110 }}
           ListEmptyComponent={
             <Sticker>
               <View style={{ padding: 18, alignItems: "center", gap: 8 }}>
@@ -230,7 +235,11 @@ export default function FriendsScreen({ navigation, onFriendsChanged }) {
               </View>
             </Sticker>
           }
-          renderItem={({ item }) => <FriendRow f={item} />}
+          renderItem={({ item, index }) => (
+            <Enter kind="rise" delay={stagger(index)}>
+              <FriendRow f={item} />
+            </Enter>
+          )}
         />
       )}
     </Screen>
