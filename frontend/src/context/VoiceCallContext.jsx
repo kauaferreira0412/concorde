@@ -264,6 +264,21 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const stompConnectedRef = useRef(stompConnected);
   const userRef = useRef(user);
 
+  // Navegadores bloqueiam play() de áudio iniciado fora de um gesto do usuário (ex: trackSubscribed
+  // assíncrono ao assistir uma transmissão de tela). Quando isso acontece o LiveKit marca
+  // room.canPlaybackAudio=false e so' volta a tocar chamando room.startAudio() - fazemos isso no
+  // próximo clique em qualquer lugar da página, sem precisar de um banner dedicado.
+  useEffect(() => {
+    function unlockAudioOnNextClick() {
+      const room = roomRef.current;
+      if (room && !room.canPlaybackAudio) {
+        room.startAudio().catch(() => {});
+      }
+    }
+    document.addEventListener("click", unlockAudioOnNextClick, true);
+    return () => document.removeEventListener("click", unlockAudioOnNextClick, true);
+  }, []);
+
   useEffect(() => {
     stompClientRef.current = stompClient;
     stompConnectedRef.current = stompConnected;
@@ -612,6 +627,8 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   const toggleWatchScreenShare = useCallback(async (sid) => {
     const entry = videoTracksRef.current.get(sid);
     if (!entry || entry.isLocal || !entry.pub) return;
+    // Dispara dentro do próprio clique (gesto do usuário) - navegador não bloqueia autoplay depois disso.
+    roomRef.current?.startAudio().catch(() => {});
     const nextWatching = !entry.track;
     if (nextWatching) watchedShareIdentitiesRef.current.add(entry.participantIdentity);
     else watchedShareIdentitiesRef.current.delete(entry.participantIdentity);
@@ -997,6 +1014,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
 
       try {
         await newRoom.connect(data.wsUrl, data.token);
+        await newRoom.startAudio().catch(() => {});
       } catch (err) {
         clearActiveChannel();
         showAlert("Não foi possível conectar na call: " + err.message);

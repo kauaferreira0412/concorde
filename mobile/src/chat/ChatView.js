@@ -17,6 +17,7 @@ import { EmojiSheet, GifSheet, QUICK_REACTIONS } from "./Pickers";
 
 const GROUP_MS = 5 * 60 * 1000;
 const URL_RE = /(https?:\/\/[^\s<]+)/g;
+const IS_URL = /^https?:\/\/[^\s<]+$/;
 const CUSTOM_EMOJI_RE = /^:([a-z0-9_]{2,30}):$/;
 
 function formatTime(iso) {
@@ -61,8 +62,7 @@ function RichText({ text, myUsername }) {
   return (
     <Txt weight={600} size={15} style={{ lineHeight: 22 }}>
       {parts.map((part, i) => {
-        if (URL_RE.test(part)) {
-          URL_RE.lastIndex = 0;
+        if (IS_URL.test(part)) {
           return (
             <Txt key={i} weight={700} size={15} color={t.accentText} style={{ textDecorationLine: "underline" }} onPress={() => Linking.openURL(part).catch(() => {})}>
               {part}

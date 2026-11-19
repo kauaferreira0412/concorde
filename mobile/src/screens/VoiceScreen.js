@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StatusBar, View } from "react-native";
+import { ActivityIndicator, FlatList, Modal, Platform, Pressable, ScrollView, StatusBar, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VideoTrack } from "@livekit/react-native";
 import { startIOSPIP } from "@livekit/react-native-webrtc";
@@ -11,6 +11,7 @@ import { Avatar, Btn, IconBtn, Screen, SectionTitle, Sticker, Tag, Txt } from ".
 import Sheet, { SheetItem } from "../ui/Sheet";
 import Slider from "../ui/Slider";
 import TopBar from "../ui/TopBar";
+import Icon from "../ui/icons";
 
 const PIP = { enabled: true, startAutomatically: true, stopAutomatically: true, preferredSize: { width: 16, height: 9 } };
 
@@ -89,6 +90,65 @@ function StreamPlayer({ stream, onStop, onFullscreen, height = 210, fullscreen }
         </View>
       </View>
     </View>
+  );
+}
+
+/** Soundboard: toca o som pra todo mundo da call (mesma API do site). */
+function Soundboard({ channelId }) {
+  const t = useTokens();
+  const [clips, setClips] = useState(null);
+  const [playingId, setPlayingId] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get("/api/soundboard")
+      .then(({ data }) => active && setClips(data || []))
+      .catch(() => active && setClips([]));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function play(clip) {
+    setPlayingId(clip.id);
+    try {
+      await api.post(`/api/channels/${channelId}/soundboard/play/${clip.id}`);
+    } catch {
+      // som não tocou: só some o destaque
+    } finally {
+      setTimeout(() => setPlayingId(null), 500);
+    }
+  }
+
+  if (!clips?.length) return null;
+  return (
+    <Sticker radius={20} shadow={4}>
+      <View style={{ padding: 12, gap: 10 }}>
+        <SectionTitle>SOUNDBOARD · {clips.length}</SectionTitle>
+        <FlatList
+          data={clips}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(c) => String(c.id)}
+          contentContainerStyle={{ gap: 10, paddingRight: 6, paddingBottom: 4 }}
+          renderItem={({ item }) => (
+            <Pressable onPress={() => play(item)} accessibilityLabel={`Tocar ${item.name}`}>
+              {({ pressed }) => (
+                <Sticker radius={14} shadow={3} pressed={pressed} bg={playingId === item.id ? t.mint : t.surface2}>
+                  <View style={{ width: 92, paddingVertical: 10, paddingHorizontal: 8, alignItems: "center", gap: 4 }}>
+                    <Icon name="volume" size={20} color={playingId === item.id ? t.onPop : t.text} />
+                    <Txt weight={900} size={12} numberOfLines={1} color={playingId === item.id ? t.onPop : t.text}>
+                      {item.name}
+                    </Txt>
+                  </View>
+                </Sticker>
+              )}
+            </Pressable>
+          )}
+        />
+      </View>
+    </Sticker>
   );
 }
 
@@ -315,6 +375,8 @@ export default function VoiceScreen({ route, navigation, user }) {
             </View>
           </Sticker>
         ) : null}
+
+        <Soundboard channelId={voice.channel.id} />
 
         <SectionTitle>NA CALL</SectionTitle>
         {rows.map((row, i) => (

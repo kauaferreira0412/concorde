@@ -91,7 +91,7 @@ export default function DmsScreen({ navigation, user }) {
               <View style={{ padding: 18, alignItems: "center", gap: 8 }}>
                 <Icon name="message" size={28} color={t.textMuted} />
                 <Txt weight={800} color={t.textMuted} style={{ textAlign: "center" }}>
-                  Nenhuma conversa ainda. Abra o perfil de um amigo e toque em "Enviar mensagem".
+                  Nenhuma conversa ainda. Abra o perfil de um amigo e toque em “Enviar mensagem”.
                 </Txt>
               </View>
             </Sticker>

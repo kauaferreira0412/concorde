@@ -15,14 +15,14 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "permissions": [
-        "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.BLUETOOTH",
         "android.permission.CAMERA",
         "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",
-        "android.permission.WAKE_LOCK",
-        "android.permission.BLUETOOTH"
+        "android.permission.WAKE_LOCK"
       ]
     },
     "plugins": [
@@ -54,7 +54,8 @@
           "cameraPermission": "O Concorde usa a câmera nas calls e pra tirar fotos pro chat."
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "./plugins/withWindowsCxxStagingDir.js"
     ],
     "ios": {
       "bundleIdentifier": "com.codagis.concorde",
