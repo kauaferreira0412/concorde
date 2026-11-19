@@ -39,6 +39,15 @@ public class VoicePresenceService {
     }
 
     public void leaveBySession(String sessionId) {
+        leaveBySession(sessionId, true);
+    }
+
+    /**
+     * kickFromLiveKit=false quando o próprio aparelho pediu pra sair (ele já se desconectou do LiveKit).
+     * Derrubar a identidade nesse caso podia tirar da call uma conexão NOVA da mesma pessoa
+     * (entrou de novo rápido, ou trocou de aparelho), deixando os dois "brigando".
+     */
+    public void leaveBySession(String sessionId, boolean kickFromLiveKit) {
         Long channelId = sessionChannel.remove(sessionId);
         Long userId = sessionUser.remove(sessionId);
         if (channelId == null || userId == null) {
@@ -60,7 +69,9 @@ public class VoicePresenceService {
             }
         }
         broadcast(channelId);
-        liveKitService.disconnectParticipant("channel-" + channelId, "user-" + userId);
+        if (kickFromLiveKit) {
+            liveKitService.disconnectParticipant("channel-" + channelId, "user-" + userId);
+        }
     }
 
     public void setMicEnabled(String sessionId, boolean micEnabled) {

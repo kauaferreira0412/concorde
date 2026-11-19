@@ -1,4 +1,8 @@
 import { registerRootComponent } from 'expo';
+import { registerGlobals } from '@livekit/react-native';
+
+// WebRTC nativo pro livekit-client (precisa vir antes de qualquer uso do LiveKit)
+registerGlobals();
 
 import App from './App';
 

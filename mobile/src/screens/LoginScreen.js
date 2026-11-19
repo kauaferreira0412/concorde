@@ -1,9 +1,13 @@
 import { useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import api from "../api";
-import { colors } from "../theme";
+import { useTokens } from "../theme/ThemeContext";
+import { Btn, Field, Screen, Sticker, Txt } from "../ui/kit";
+
+const MASCOT = require("../../assets/splash-icon.png");
 
 export default function LoginScreen({ onLogin }) {
+  const t = useTokens();
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -28,46 +32,52 @@ export default function LoginScreen({ onLogin }) {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Concorde</Text>
-        <Text style={styles.subtitle}>Entre com sua conta para continuar</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Usuário ou email"
-          placeholderTextColor={colors.muted}
-          autoCapitalize="none"
-          autoCorrect={false}
-          value={usernameOrEmail}
-          onChangeText={setUsernameOrEmail}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Senha"
-          placeholderTextColor={colors.muted}
-          secureTextEntry
-          autoCapitalize="none"
-          value={password}
-          onChangeText={setPassword}
-          onSubmitEditing={handleSubmit}
-        />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Pressable style={[styles.button, submitting && styles.buttonDisabled]} onPress={handleSubmit} disabled={submitting}>
-          {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Entrar</Text>}
-        </Pressable>
-      </View>
-    </KeyboardAvoidingView>
+    <Screen>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 20 }} keyboardShouldPersistTaps="handled">
+          <Sticker shadow={t.shadow} radius={24}>
+            <View style={{ padding: 24, gap: 14, alignItems: "stretch" }}>
+              <View style={{ alignItems: "center", gap: 6 }}>
+                <Sticker bg={t.mint} radius={22} shadow={3} innerStyle={{ padding: 6 }}>
+                  <Image source={MASCOT} style={{ width: 84, height: 84 }} />
+                </Sticker>
+                <Txt weight="display" size={28} style={{ marginTop: 6 }}>
+                  CONCORDE
+                </Txt>
+                <Txt weight={700} color={t.textMuted}>
+                  Entre com sua conta para continuar
+                </Txt>
+              </View>
+              <Field
+                placeholder="Usuário ou email"
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={usernameOrEmail}
+                onChangeText={setUsernameOrEmail}
+                returnKeyType="next"
+              />
+              <Field
+                placeholder="Senha"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+                onSubmitEditing={handleSubmit}
+                returnKeyType="go"
+              />
+              {error ? (
+                <Txt weight={800} color={t.danger}>
+                  {error}
+                </Txt>
+              ) : null}
+              {submitting ? (
+                <ActivityIndicator color={t.accent} style={{ marginVertical: 12 }} />
+              ) : (
+                <Btn label="ENTRAR" onPress={handleSubmit} disabled={!usernameOrEmail.trim() || !password} block />
+              )}
+            </View>
+          </Sticker>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg, justifyContent: "center", padding: 20 },
-  card: { backgroundColor: colors.card, borderRadius: 12, padding: 20, gap: 12 },
-  title: { color: colors.text, fontSize: 28, fontWeight: "700", textAlign: "center" },
-  subtitle: { color: colors.muted, textAlign: "center", marginBottom: 8 },
-  input: { backgroundColor: colors.input, color: colors.text, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 },
-  error: { color: colors.danger },
-  button: { backgroundColor: colors.accent, borderRadius: 8, paddingVertical: 14, alignItems: "center", marginTop: 4 },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
-});
