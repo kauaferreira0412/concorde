@@ -12,16 +12,18 @@ import FriendsScreen from "./FriendsScreen";
 import MeScreen from "./MeScreen";
 import { Enter } from "../ui/anim";
 import { useLayout } from "../ui/layout";
+import { useDmNotifications } from "../chat/DmNotifications";
 
 export const TABBAR_HEIGHT = 66;
 export const RAIL_WIDTH = 92;
 
 function TabBar({ tab, setTab, user, friendsBadge, vertical }) {
   const t = useTokens();
+  const { unread } = useDmNotifications();
   const insets = useSafeAreaInsets();
   const tabs = [
     { key: "servers", label: "Servidores", icon: "servers" },
-    { key: "dms", label: "Mensagens", icon: "message" },
+    { key: "dms", label: "Mensagens", icon: "message", badge: unread.size },
     { key: "friends", label: "Amigos", icon: "users", badge: friendsBadge },
     { key: "me", label: "Você" },
   ];

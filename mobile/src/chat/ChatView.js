@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, View } from "react-native";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, View } from "react-native";
+import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
@@ -15,6 +16,7 @@ import Icon from "../ui/icons";
 import Sheet, { SheetItem } from "../ui/Sheet";
 import { EmojiSheet, GifSheet, QUICK_REACTIONS } from "./Pickers";
 import { Enter } from "../ui/anim";
+import { LinkPreviewCard, MarkdownText, MentionSuggestions, PinnedSheet, PollSheet, SearchSheet, TypingLine, firstLink, useTyping } from "./extras";
 
 const GROUP_MS = 5 * 60 * 1000;
 const URL_RE = /(https?:\/\/[^\s<]+)/g;
@@ -145,7 +147,7 @@ function PollCard({ poll, me, onVote }) {
   );
 }
 
-function Message({ m, prev, me, customEmojis, onLongPress, onReact, onOpenImage, onOpenProfile, onJump, onVote }) {
+const Message = memo(function Message({ m, prev, me, customEmojis, onLongPress, onReact, onOpenImage, onOpenProfile, onJump, onVote }) {
   const t = useTokens();
   const grouped = isGrouped(prev, m);
   const newDay = !prev || dayKey(prev.createdAt) !== dayKey(m.createdAt);
@@ -216,6 +218,7 @@ function Message({ m, prev, me, customEmojis, onLongPress, onReact, onOpenImage,
                   (editado)
                 </Txt>
               ) : null}
+              {m.pinned ? <Icon name="pin" size={12} color={t.orange} /> : null}
             </View>
           )}
           {m.rollNotation ? (
@@ -223,12 +226,13 @@ function Message({ m, prev, me, customEmojis, onLongPress, onReact, onOpenImage,
           ) : m.poll ? (
             <PollCard poll={m.poll} me={me} onVote={onVote} />
           ) : m.content ? (
-            <RichText text={m.content} myUsername={me?.username} />
+            <MarkdownText text={m.content} myUsername={me?.username} />
           ) : null}
+          {m.content && !m.imageUrl && !m.poll && firstLink(m.content) ? <LinkPreviewCard url={firstLink(m.content)} /> : null}
           {m.imageUrl ? (
             <Pressable onPress={() => onOpenImage(m.imageUrl)} onLongPress={() => onLongPress(m)} style={{ marginTop: 6, alignSelf: "flex-start" }}>
               <Sticker radius={14} shadow={2}>
-                <Image source={{ uri: m.imageUrl }} style={{ width: 240, height: 180 }} resizeMode="cover" />
+                <Image cachePolicy="memory-disk" transition={120} recyclingKey={m.imageUrl} source={{ uri: m.imageUrl }} style={{ width: 240, height: 180 }} contentFit="cover" />
               </Sticker>
             </Pressable>
           ) : null}
@@ -266,7 +270,7 @@ function Message({ m, prev, me, customEmojis, onLongPress, onReact, onOpenImage,
                       backgroundColor: mine ? t.hoverStrong : t.surface2,
                     }}
                   >
-                    {url ? <Image source={{ uri: url }} style={{ width: 18, height: 18 }} /> : <Txt size={14}>{custom ? "⭐" : r.emoji}</Txt>}
+                    {url ? <Image cachePolicy="memory-disk" transition={120} recyclingKey={url} source={{ uri: url }} style={{ width: 18, height: 18 }} /> : <Txt size={14}>{custom ? "⭐" : r.emoji}</Txt>}
                     <Txt weight={900} size={12}>
                       {r.userIds.length}
                     </Txt>
@@ -279,7 +283,15 @@ function Message({ m, prev, me, customEmojis, onLongPress, onReact, onOpenImage,
       </Pressable>
     </View>
   );
-}
+},
+// só re-renderiza quando a própria mensagem (ou a anterior, que decide o agrupamento) muda
+(a, b) =>
+  a.m === b.m &&
+  a.prev?.id === b.prev?.id &&
+  a.prev?.authorId === b.prev?.authorId &&
+  a.me?.id === b.me?.id &&
+  a.me?.accentColor === b.me?.accentColor &&
+  a.customEmojis === b.customEmojis);
 
 /**
  * Chat completo (canal de servidor ou DM).
@@ -301,6 +313,13 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
   const [uploading, setUploading] = useState(false);
   const [viewer, setViewer] = useState(null);
   const [customEmojiList, setCustomEmojiList] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [perms, setPerms] = useState([]);
+  const [pollOpen, setPollOpen] = useState(false);
+  const [pinnedOpen, setPinnedOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [typers, onTyping] = useTyping();
+  const typingSentRef = useRef(0);
   const clientRef = useRef(null);
   const listRef = useRef(null);
   // mensagens que já estavam no histórico não animam; só as que chegam depois
@@ -314,6 +333,14 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
 
   useEffect(() => {
     if (!serverId) return;
+    api
+      .get(`/api/servers/${serverId}/members`)
+      .then(({ data }) => setMembers(data || []))
+      .catch(() => {});
+    api
+      .get(`/api/servers/${serverId}/me/permissions`)
+      .then(({ data }) => setPerms(Array.isArray(data) ? data : []))
+      .catch(() => {});
     api
       .get(`/api/servers/${serverId}/emojis`)
       .then(({ data }) => setCustomEmojiList(data || []))
@@ -348,9 +375,19 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
             next[index] = event.message;
             return next;
           }
-          if (isDm && event.message.authorId !== user?.id) playSound("message");
           return [...list, event.message];
         });
+      });
+    };
+    const prevConnect = client.onConnect;
+    client.onConnect = (frame) => {
+      prevConnect(frame);
+      client.subscribe(`${topic}.typing`, (f) => {
+        try {
+          onTyping(JSON.parse(f.body), user?.id);
+        } catch {
+          // ignora
+        }
       });
     };
     client.onWebSocketClose = () => setConnected(false);
@@ -386,7 +423,23 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
     return ok;
   }
 
+  function changeText(v) {
+    setText(v);
+    const now = Date.now();
+    if (v.trim() && now - typingSentRef.current > 3000 && clientRef.current?.connected) {
+      typingSentRef.current = now;
+      clientRef.current.publish({ destination: dest("typing"), body: JSON.stringify({ typing: true }) });
+    }
+  }
+
+  function stopTyping() {
+    if (!typingSentRef.current || !clientRef.current?.connected) return;
+    typingSentRef.current = 0;
+    clientRef.current.publish({ destination: dest("typing"), body: JSON.stringify({ typing: false }) });
+  }
+
   function handleSend() {
+    stopTyping();
     const content = text.trim();
     if (!content) return;
     if (editing) {
@@ -461,8 +514,10 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
   const data = useMemo(() => [...(messages || [])].reverse(), [messages]);
   const canManage = (m) => user?.role === "ADMIN" || m.authorId === user?.id;
 
+  const dataRef = useRef(data);
+  dataRef.current = data;
   function jumpTo(id) {
-    const index = data.findIndex((m) => m.id === id);
+    const index = dataRef.current.findIndex((m) => m.id === id);
     if (index >= 0) listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
   }
 
@@ -471,6 +526,20 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
       {/* com call ativa, a barrinha "EM CALL" fica embaixo: abre espaço pra ela */}
       <View style={{ flex: 1, padding: 12, paddingBottom: voice?.channel ? 72 + insets.bottom : 0 }}>
         <Sticker shadow={t.shadow} radius={22} style={{ flex: 1 }} innerStyle={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 6, borderBottomWidth: 2.5, borderBottomColor: t.lineSoft }}>
+            <Pressable onPress={() => setPinnedOpen(true)} style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 2, borderColor: t.ink, backgroundColor: t.surface2 }}>
+              <Icon name="pin" size={14} color={t.text} />
+              <Txt weight={900} size={12}>
+                Fixadas
+              </Txt>
+            </Pressable>
+            <Pressable onPress={() => setSearchOpen(true)} style={{ flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, borderWidth: 2, borderColor: t.ink, backgroundColor: t.surface2 }}>
+              <Icon name="search" size={14} color={t.text} />
+              <Txt weight={900} size={12}>
+                Buscar
+              </Txt>
+            </Pressable>
+          </View>
           {messages === null ? (
             <ActivityIndicator color={t.text} style={{ marginTop: 30 }} />
           ) : (
@@ -481,6 +550,10 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
               keyExtractor={(item) => String(item.id)}
               contentContainerStyle={{ padding: 14 }}
               onScrollToIndexFailed={() => {}}
+              initialNumToRender={12}
+              maxToRenderPerBatch={8}
+              windowSize={9}
+              removeClippedSubviews={Platform.OS === "android"}
               renderItem={({ item, index }) => {
                 const msg = (
                 <Message
@@ -512,6 +585,8 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
             </Txt>
           ) : (
             <View style={{ borderTopWidth: 2.5, borderTopColor: t.lineSoft }}>
+              <TypingLine names={typers} />
+              <MentionSuggestions text={text} members={members} onPick={setText} />
               {replyTo || editing ? (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingTop: 8 }}>
                   <Icon name={editing ? "pencil" : "reply"} size={15} color={t.accentText} />
@@ -553,7 +628,7 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
                   inputStyle={{ maxHeight: 120 }}
                   placeholder={connected ? placeholder : "Conectando..."}
                   value={text}
-                  onChangeText={setText}
+                  onChangeText={changeText}
                   multiline
                 />
                 <IconBtn icon="smile" tone="surface2" size={46} onPress={() => setEmojiMode("text")} label="Emoji" />
@@ -612,6 +687,16 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
                 }}
               />
             ) : null}
+            {isDm || user?.role === "ADMIN" || perms.includes("MANAGE_CHANNELS") ? (
+              <SheetItem
+                icon="pin"
+                label={actionFor.pinned ? "Desafixar" : "Fixar"}
+                onPress={() => {
+                  publish("pin", { messageId: actionFor.id, pinned: !actionFor.pinned });
+                  setActionFor(null);
+                }}
+              />
+            ) : null}
             {actionFor.authorId === user?.id && actionFor.content && !actionFor.poll && !actionFor.rollNotation ? (
               <SheetItem
                 icon="pencil"
@@ -656,7 +741,43 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
           }}
         />
         <SheetItem icon="file" label="Arquivo" onPress={pickFile} />
+        {!isDm ? (
+          <SheetItem
+            icon="poll"
+            label="Enquete"
+            onPress={() => {
+              setAttachOpen(false);
+              setTimeout(() => setPollOpen(true), 350);
+            }}
+          />
+        ) : null}
       </Sheet>
+
+      <PollSheet
+        visible={pollOpen}
+        onClose={() => setPollOpen(false)}
+        onCreate={(poll) => {
+          if (publish("poll.create", poll)) setPollOpen(false);
+        }}
+      />
+      <PinnedSheet
+        visible={pinnedOpen}
+        onClose={() => setPinnedOpen(false)}
+        base={base}
+        onJump={(id) => {
+          setPinnedOpen(false);
+          jumpTo(id);
+        }}
+      />
+      <SearchSheet
+        visible={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        base={base}
+        onJump={(id) => {
+          setSearchOpen(false);
+          jumpTo(id);
+        }}
+      />
 
       <EmojiSheet
         visible={!!emojiMode}
@@ -679,7 +800,7 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
 
       <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
         <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)", justifyContent: "center" }} onPress={() => setViewer(null)}>
-          {viewer ? <Image source={{ uri: viewer }} style={{ width: "100%", height: "80%" }} resizeMode="contain" /> : null}
+          {viewer ? <Image cachePolicy="memory-disk" transition={120} recyclingKey={viewer} source={{ uri: viewer }} style={{ width: "100%", height: "80%" }} contentFit="contain" /> : null}
           <View style={{ position: "absolute", top: insets.top + 10, right: 14 }}>
             <IconBtn icon="x" size={42} onPress={() => setViewer(null)} label="Fechar" />
           </View>

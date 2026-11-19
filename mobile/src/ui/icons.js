@@ -36,6 +36,8 @@ const SHAPES = {
   message: [["path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" }]],
   search: [["circle", { cx: 11, cy: 11, r: 7 }], ["line", { x1: 21, y1: 21, x2: 16.65, y2: 16.65 }]],
   block: [["circle", { cx: 12, cy: 12, r: 9 }], ["line", { x1: 5.5, y1: 18.5, x2: 18.5, y2: 5.5 }]],
+  pin: [["line", { x1: 12, y1: 17, x2: 12, y2: 22 }], ["path", { d: "M5 17h14l-1.5-2.5a3 3 0 0 1-.5-1.7V9a5 5 0 0 0-10 0v3.8a3 3 0 0 1-.5 1.7L5 17z" }]],
+  poll: [["line", { x1: 6, y1: 20, x2: 6, y2: 12 }], ["line", { x1: 12, y1: 20, x2: 12, y2: 4 }], ["line", { x1: 18, y1: 20, x2: 18, y2: 9 }]],
   servers: [["rect", { x: 3, y: 3, width: 7.5, height: 7.5, rx: 2.2 }], ["rect", { x: 13.5, y: 3, width: 7.5, height: 7.5, rx: 2.2 }], ["rect", { x: 3, y: 13.5, width: 7.5, height: 7.5, rx: 2.2 }], ["rect", { x: 13.5, y: 13.5, width: 7.5, height: 7.5, rx: 2.2 }]],
   gif: [["rect", { x: 2, y: 5, width: 20, height: 14, rx: 3 }], ["path", { d: "M9 10H7.5a1.5 1.5 0 0 0-1.5 1.5v1A1.5 1.5 0 0 0 7.5 14H9v-2H8" }], ["line", { x1: 12, y1: 10, x2: 12, y2: 14 }], ["path", { d: "M18 10h-3v4M15 12h2" }]],
 };

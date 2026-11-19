@@ -33,14 +33,17 @@ function openPip(viewRef) {
   }
 }
 
-function ParticipantCard({ p, onPress, mirrorLocal }) {
+const CARD_HEIGHT = 168;
+
+function ParticipantCard({ p, onPress, mirrorLocal, onEnlarge }) {
   const t = useTokens();
   const cam = p.camera;
+  // tamanho fixo: falar só muda cor/anel, nunca o tamanho (o layout não pula)
   return (
     <Pressable style={{ flex: 1 }} onPress={onPress} accessibilityLabel={`Opções de ${p.name}`}>
-      <Sticker radius={20} shadow={4} bg={p.speaking ? t.voiceBg : t.surface} border={p.speaking ? 3 : 2.5}>
+      <Sticker radius={20} shadow={4} bg={p.speaking ? t.voiceBg : t.surface} shadowColor={p.speaking ? t.success : undefined} innerStyle={{ height: CARD_HEIGHT }}>
         {cam ? (
-          <View style={{ height: 150, backgroundColor: "#000" }}>
+          <View style={{ flex: 1, backgroundColor: "#000" }}>
             <VideoTrack
               trackRef={{ participant: cam.participant, publication: cam.publication, source: Track.Source.Camera }}
               objectFit="cover"
@@ -55,10 +58,14 @@ function ParticipantCard({ p, onPress, mirrorLocal }) {
               </View>
               {p.muted ? <Tag label="MUTADO" /> : null}
             </View>
+            {p.speaking ? <View pointerEvents="none" style={{ position: "absolute", inset: 0, borderWidth: 3, borderColor: t.success, borderRadius: 17 }} /> : null}
+            <View style={{ position: "absolute", top: 6, right: 6 }}>
+              <IconBtn icon="maximize" size={34} label="Ampliar câmera" onPress={onEnlarge} />
+            </View>
           </View>
         ) : (
-          <View style={{ alignItems: "center", paddingVertical: 16, paddingHorizontal: 8, gap: 6 }}>
-            <Avatar name={p.name} url={p.avatarUrl} size={64} ring={p.speaking ? t.success : undefined} />
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, gap: 6 }}>
+            <Avatar name={p.name} url={p.avatarUrl} size={64} ring={p.speaking ? t.success : "transparent"} />
             <Txt weight={900} size={15} numberOfLines={1} style={{ maxWidth: "100%" }}>
               {p.isLocal ? "Você" : p.name}
             </Txt>
@@ -121,6 +128,8 @@ function StreamPlayer({ stream, onStop, onFullscreen, height = 210, fullscreen }
 /** Soundboard: toca o som pra todo mundo da call (mesma API do site). */
 function Soundboard({ channelId }) {
   const t = useTokens();
+  const voice = useVoice();
+  const [vol, setVol] = useState(voice.soundboardVolume);
   const [clips, setClips] = useState(null);
   const [playingId, setPlayingId] = useState(null);
 
@@ -151,6 +160,15 @@ function Soundboard({ channelId }) {
     <Sticker radius={20} shadow={4}>
       <View style={{ padding: 12, gap: 10 }}>
         <SectionTitle>SOUNDBOARD · {clips.length}</SectionTitle>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Icon name="volume" size={16} color={t.textMuted} />
+          <View style={{ flex: 1 }}>
+            <Slider value={vol} onChange={setVol} onDone={(v) => voice.setSoundboardVolume(v)} />
+          </View>
+          <Txt weight={900} size={13} style={{ width: 44, textAlign: "right" }}>
+            {vol}%
+          </Txt>
+        </View>
         <FlatList
           data={clips}
           horizontal
@@ -172,6 +190,60 @@ function Soundboard({ channelId }) {
             </Pressable>
           )}
         />
+      </View>
+    </Sticker>
+  );
+}
+
+/** Transmissões só de áudio (música, jogo...): ouvir/parar e volume, igual ao site. */
+function AudioShares() {
+  const t = useTokens();
+  const voice = useVoice();
+  const [vols, setVols] = useState({});
+  if (!voice.audioShares.length) return null;
+  return (
+    <Sticker radius={20} shadow={4}>
+      <View style={{ padding: 12, gap: 12 }}>
+        <SectionTitle>ÁUDIO AO VIVO</SectionTitle>
+        {voice.audioShares.map((a) => {
+          const v = vols[a.identity] ?? voice.getVolume(a.identity, "stream");
+          return (
+            <View key={a.identity} style={{ gap: 6 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <Avatar name={a.name} url={a.avatarUrl} size={38} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Txt weight={900} numberOfLines={1}>
+                    {a.name}
+                  </Txt>
+                  <Txt weight={700} size={12} color={a.listening ? t.mintText : t.textMuted}>
+                    {a.listening ? "você está ouvindo" : "transmitindo áudio - você não está ouvindo"}
+                  </Txt>
+                </View>
+                <Btn
+                  small
+                  variant={a.listening ? "surface" : "accent"}
+                  icon={a.listening ? "headphonesOff" : "headphones"}
+                  label={a.listening ? "Parar" : "Ouvir"}
+                  onPress={() => voice.toggleListenAudio(a.identity)}
+                />
+              </View>
+              {a.listening ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 48 }}>
+                  <View style={{ flex: 1 }}>
+                    <Slider
+                      value={v}
+                      onChange={(nv) => setVols((prev) => ({ ...prev, [a.identity]: nv }))}
+                      onDone={(nv) => voice.setVolume(a.identity, nv, "stream")}
+                    />
+                  </View>
+                  <Txt weight={900} size={13} style={{ width: 44, textAlign: "right" }}>
+                    {v}%
+                  </Txt>
+                </View>
+              ) : null}
+            </View>
+          );
+        })}
       </View>
     </Sticker>
   );
@@ -330,6 +402,7 @@ export default function VoiceScreen({ route, navigation, user }) {
   const inThisCall = voice.channel && target && voice.channel.id === target.id;
   const [fullscreen, setFullscreen] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [bigCam, setBigCam] = useState(null);
   const layout = useLayout();
 
   useEffect(() => {
@@ -403,6 +476,8 @@ export default function VoiceScreen({ route, navigation, user }) {
           </Sticker>
         ) : null}
 
+        <AudioShares />
+
         <Soundboard channelId={voice.channel.id} />
 
         <SectionTitle>NA CALL</SectionTitle>
@@ -410,7 +485,12 @@ export default function VoiceScreen({ route, navigation, user }) {
           <View key={i} style={{ flexDirection: "row", gap: 12 }}>
             {row.map((p) => (
               <Enter key={p.identity} kind="pop" style={{ flex: 1 }}>
-                <ParticipantCard p={p} mirrorLocal={voice.facing === "user"} onPress={() => setSelected(p.identity)} />
+                <ParticipantCard
+                  p={p}
+                  mirrorLocal={voice.facing === "user"}
+                  onPress={() => setSelected(p.identity)}
+                  onEnlarge={() => setBigCam(p.identity)}
+                />
               </Enter>
             ))}
             {Array.from({ length: cols - row.length }, (_, k) => (
@@ -485,6 +565,34 @@ export default function VoiceScreen({ route, navigation, user }) {
       ) : null}
 
       <ParticipantSheet p={selectedP} onClose={() => setSelected(null)} navigation={navigation} user={user} />
+
+      {/* câmera ampliada */}
+      {(() => {
+        const big = bigCam ? people.find((x) => x.identity === bigCam && x.camera) : null;
+        if (!big) return null;
+        return (
+          <Modal visible animationType="fade" onRequestClose={() => setBigCam(null)} supportedOrientations={["portrait", "landscape"]}>
+            <StatusBar hidden />
+            <View style={{ flex: 1, backgroundColor: "#000" }}>
+              <VideoTrack
+                trackRef={{ participant: big.camera.participant, publication: big.camera.publication, source: Track.Source.Camera }}
+                objectFit="contain"
+                mirror={big.isLocal && voice.facing === "user"}
+                style={{ flex: 1 }}
+              />
+              <View style={{ position: "absolute", top: insets.top + 10, right: 14, flexDirection: "row", gap: 8 }}>
+                {big.isLocal ? <IconBtn icon="switchCamera" size={42} label="Trocar câmera" onPress={voice.switchCamera} /> : null}
+                <IconBtn icon="x" size={42} label="Fechar" onPress={() => setBigCam(null)} />
+              </View>
+              <View style={{ position: "absolute", left: 14, bottom: insets.bottom + 14, backgroundColor: t.backdrop, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}>
+                <Txt weight={900} color="#fff">
+                  {big.isLocal ? "Você" : big.name}
+                </Txt>
+              </View>
+            </View>
+          </Modal>
+        );
+      })()}
     </Screen>
   );
 }

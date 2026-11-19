@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Share, Switch, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Share, Switch, View } from "react-native";
+import { Image } from "expo-image";
 import api from "../api";
 import { useTheme } from "../theme/ThemeContext";
 import { BASE_THEMES, resolveColors } from "../theme/themes";
@@ -98,7 +99,7 @@ function Gallery() {
             <Sticker key={item.id} radius={16} shadow={3} style={{ width: 200 }}>
               <View style={{ height: 112, borderBottomWidth: 2, borderBottomColor: t.ink, backgroundColor: t.surface2 }}>
                 {item.coverUrl ? (
-                  <Image source={{ uri: item.coverUrl }} style={{ width: "100%", height: "100%" }} />
+                  <Image cachePolicy="memory-disk" transition={120} recyclingKey={item.coverUrl} source={{ uri: item.coverUrl }} style={{ width: "100%", height: "100%" }} />
                 ) : (
                   <View style={{ padding: 8 }}>
                     <ThemeThumb base={item.base} colors={item.colors} height={94} />

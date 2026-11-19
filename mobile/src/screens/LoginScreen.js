@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { Image } from "expo-image";
 import api from "../api";
 import { useTokens } from "../theme/ThemeContext";
 import { Btn, Field, Screen, Sticker, Txt } from "../ui/kit";

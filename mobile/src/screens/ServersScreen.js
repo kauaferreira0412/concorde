@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, View } from "react-native";
+import { Image } from "expo-image";
 import api from "../api";
 import { useTokens } from "../theme/ThemeContext";
 import { Screen, Sticker, Txt } from "../ui/kit";
@@ -22,7 +23,7 @@ function ServerTile({ server, onPress }) {
       <Sticker radius={20} shadow={4} pressed={pressed}>
         <View style={{ padding: 14, alignItems: "center", gap: 10 }}>
           {server.iconUrl ? (
-            <Image source={{ uri: server.iconUrl }} style={{ width: 64, height: 64, borderRadius: 20, borderWidth: 2.5, borderColor: t.ink }} />
+            <Image cachePolicy="memory-disk" transition={120} recyclingKey={server.iconUrl} source={{ uri: server.iconUrl }} style={{ width: 64, height: 64, borderRadius: 20, borderWidth: 2.5, borderColor: t.ink }} />
           ) : (
             <View
               style={{

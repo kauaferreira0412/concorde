@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import api from "../api";
@@ -9,6 +9,7 @@ import TopBar from "../ui/TopBar";
 import { Enter, stagger } from "../ui/anim";
 import { useLayout } from "../ui/layout";
 import ChatView from "../chat/ChatView";
+import { useDmNotifications } from "../chat/DmNotifications";
 
 const DOT = { ONLINE: "success", AWAY: "orange", DND: "danger" };
 
@@ -53,6 +54,13 @@ export default function DmsScreen({ navigation, user }) {
   const [refreshing, setRefreshing] = useState(false);
   const layout = useLayout();
   const [openDm, setOpenDm] = useState(null);
+  const notif = useDmNotifications();
+  const setActiveDm = notif.setActive;
+  useEffect(() => {
+    if (!layout.wide || !openDm) return;
+    setActiveDm(openDm.channelId);
+    return () => setActiveDm(null);
+  }, [layout.wide, openDm, setActiveDm]);
 
   const load = useCallback(async () => {
     try {
@@ -129,11 +137,19 @@ export default function DmsScreen({ navigation, user }) {
                           {item.otherNickname || item.otherUsername}
                         </Txt>
                         <Txt weight={700} size={12} color={t.textFaint}>
-                          {timeAgo(item.lastMessage?.createdAt)}
+                          {timeAgo((notif.lastMessages[item.channelId] || item.lastMessage)?.createdAt)}
                         </Txt>
+                        {notif.unread.has(item.channelId) ? (
+                          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: t.danger, borderWidth: 2, borderColor: t.ink }} />
+                        ) : null}
                       </View>
-                      <Txt weight={600} size={13} color={t.textMuted} numberOfLines={1}>
-                        {lastLine(item.lastMessage, user?.id)}
+                      <Txt
+                        weight={notif.unread.has(item.channelId) ? 900 : 600}
+                        size={13}
+                        color={notif.unread.has(item.channelId) ? t.text : t.textMuted}
+                        numberOfLines={1}
+                      >
+                        {lastLine(notif.lastMessages[item.channelId] || item.lastMessage, user?.id)}
                       </Txt>
                     </View>
                   </View>

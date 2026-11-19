@@ -48,7 +48,8 @@
         }
       ],
       "expo-asset",
-      "./plugins/withWindowsCxxStagingDir.js"
+      "./plugins/withWindowsCxxStagingDir.js",
+      "expo-image"
     ],
     "ios": {
       "bundleIdentifier": "com.codagis.concorde",

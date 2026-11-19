@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Image, Pressable, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, View } from "react-native";
+import { Image } from "expo-image";
 import api from "../api";
 import { useTokens } from "../theme/ThemeContext";
 import { Field, Txt } from "../ui/kit";
@@ -28,7 +29,7 @@ export function EmojiSheet({ visible, onClose, onPick, customEmojis = [] }) {
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
             {customEmojis.map((e) => (
               <Pressable key={e.id} onPress={() => onPick(`:${e.name}:`)} style={{ padding: 4 }} accessibilityLabel={e.name}>
-                <Image source={{ uri: e.imageUrl }} style={{ width: 34, height: 34 }} />
+                <Image cachePolicy="memory-disk" transition={120} recyclingKey={e.imageUrl} source={{ uri: e.imageUrl }} style={{ width: 34, height: 34 }} />
               </Pressable>
             ))}
           </View>

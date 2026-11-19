@@ -20,6 +20,7 @@ import ProfileScreen from "./src/screens/ProfileScreen";
 import EditProfileScreen from "./src/screens/EditProfileScreen";
 import { VoiceProvider } from "./src/voice/VoiceContext";
 import VoiceBar from "./src/voice/VoiceBar";
+import { DmNotificationsProvider } from "./src/chat/DmNotifications";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -80,6 +81,7 @@ function Root() {
 
   return (
     <VoiceProvider user={user}>
+      <DmNotificationsProvider user={user}>
       <StatusBar style={t.dark ? "light" : "dark"} />
       <View style={{ flex: 1, backgroundColor: t.bg }}>
         <NavigationContainer
@@ -110,6 +112,7 @@ function Root() {
         </NavigationContainer>
         {user ? <VoiceBar navigationRef={navigationRef} currentRoute={currentRoute} /> : null}
       </View>
+      </DmNotificationsProvider>
     </VoiceProvider>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image } from "expo-image";
 import Svg, { Defs, Path, Pattern, Rect } from "react-native-svg";
 import { useTokens } from "../theme/ThemeContext";
 import { toneFor } from "../theme/themes";
@@ -113,7 +114,7 @@ export function Avatar({ name, url, size = 44, radius, ring }) {
   return (
     <View style={[{ borderRadius: r + 4, padding: ring ? 3 : 0, borderWidth: ring ? 3 : 0, borderColor: ring || "transparent" }]}>
       {url ? (
-        <Image source={{ uri: url }} style={{ width: size, height: size, borderRadius: r, borderWidth: 2, borderColor: t.ink, backgroundColor: tone.bg }} />
+        <Image cachePolicy="memory-disk" transition={120} recyclingKey={url} source={{ uri: url }} style={{ width: size, height: size, borderRadius: r, borderWidth: 2, borderColor: t.ink, backgroundColor: tone.bg }} />
       ) : (
         <View style={{ width: size, height: size, borderRadius: r, borderWidth: 2, borderColor: t.ink, backgroundColor: tone.bg, alignItems: "center", justifyContent: "center" }}>
           <Txt weight={900} size={Math.round(size * 0.32)} color={tone.fg}>

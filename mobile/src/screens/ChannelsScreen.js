@@ -4,11 +4,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import api from "../api";
 import { useTokens } from "../theme/ThemeContext";
 import { useVoice } from "../voice/VoiceContext";
-import { Avatar, Screen, SectionTitle, Sticker, Tag, Txt } from "../ui/kit";
+import { Avatar, IconBtn, Screen, SectionTitle, Sticker, Tag, Txt } from "../ui/kit";
 import Icon from "../ui/icons";
 import TopBar from "../ui/TopBar";
 import ChatView from "../chat/ChatView";
 import { useLayout } from "../ui/layout";
+import MembersSheet from "./MembersSheet";
 
 const PRESENCE_REFRESH_MS = 8000;
 
@@ -81,6 +82,7 @@ export default function ChannelsScreen({ route, navigation, user }) {
   const [error, setError] = useState("");
   const layout = useLayout();
   const [openText, setOpenText] = useState(null);
+  const [membersOpen, setMembersOpen] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -137,7 +139,22 @@ export default function ChannelsScreen({ route, navigation, user }) {
 
   return (
     <Screen>
-      <TopBar title={server.name.toUpperCase()} subtitle={server.description || "Canais do servidor"} onBack={() => navigation.goBack()} />
+      <TopBar
+        title={server.name.toUpperCase()}
+        subtitle={server.description || "Canais do servidor"}
+        onBack={() => navigation.goBack()}
+        right={<IconBtn icon="users" size={40} label="Membros" onPress={() => setMembersOpen(true)} />}
+      />
+      <MembersSheet
+        serverId={server.id}
+        isAdmin={user?.role === "ADMIN"}
+        visible={membersOpen}
+        onClose={() => setMembersOpen(false)}
+        onOpenProfile={(userId) => {
+          setMembersOpen(false);
+          navigation.navigate("Profile", { userId });
+        }}
+      />
       {!sections ? (
         <ActivityIndicator color={t.text} style={{ marginTop: 40 }} />
       ) : (

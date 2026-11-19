@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, View } from "react-native";
+import { Image } from "expo-image";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import api from "../api";
 import { useTokens } from "../theme/ThemeContext";
@@ -24,7 +25,7 @@ export function ProfileBanner({ bannerUrl, accent, accent2, height = 120 }) {
   return (
     <View style={{ height, borderBottomWidth: 2.5, borderBottomColor: t.ink, overflow: "hidden" }}>
       {bannerUrl ? (
-        <Image source={{ uri: bannerUrl }} style={{ width: "100%", height: "100%" }} />
+        <Image cachePolicy="memory-disk" transition={120} recyclingKey={bannerUrl} source={{ uri: bannerUrl }} style={{ width: "100%", height: "100%" }} />
       ) : (
         <Svg width="100%" height="100%">
           <Defs>

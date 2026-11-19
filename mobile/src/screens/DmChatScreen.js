@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Pressable } from "react-native";
+import { useDmNotifications } from "../chat/DmNotifications";
 import ChatView from "../chat/ChatView";
 import { Screen } from "../ui/kit";
 import TopBar from "../ui/TopBar";
@@ -9,6 +11,11 @@ const STATUS = { ONLINE: "online", AWAY: "ausente", DND: "não perturbe", OFFLIN
 export default function DmChatScreen({ route, navigation, user }) {
   const p = route.params;
   const name = p.otherNickname || p.otherUsername;
+  const { setActive } = useDmNotifications();
+  useEffect(() => {
+    setActive(p.channelId);
+    return () => setActive(null);
+  }, [p.channelId, setActive]);
   return (
     <Screen>
       <TopBar
