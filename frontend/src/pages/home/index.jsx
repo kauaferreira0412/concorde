@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ServerSidebar from "../../components/ServerSidebar.jsx";
 import FriendsPanel from "../../components/FriendsPanel.jsx";
 import DmChatWindow from "../../components/DmChatWindow.jsx";
@@ -13,6 +13,8 @@ import { attachmentSummary } from "../../utils/attachmentSummary";
 import { LogOutIcon, MessageSquareIcon, SearchIcon, SettingsIcon, UsersIcon } from "../../components/icons.jsx";
 import { useHomeContainer } from "./Container.jsx";
 import { LayoutProvider, usePageLayout } from "../../context/LayoutContext.jsx";
+import MobileTabBar from "../../components/MobileTabBar.jsx";
+import { useLocation } from "react-router-dom";
 import "./style.css";
 
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
@@ -49,6 +51,17 @@ export default function HomePage() {
     openDmChannel,
     openFriendsView,
   } = useHomeContainer();
+
+  // aba "Amigos" do celular vinda de outra página
+  const location = useLocation();
+  useEffect(() => {
+    if (!location.state?.friends) return;
+    openFriendsView();
+    layout.showMain();
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const mobileTab = layout.value.pane === "main" && view === "friends" ? "friends" : "dms";
 
   const visibleDms = useMemo(() => {
     const q = dmFilter.trim().toLowerCase();
@@ -201,6 +214,20 @@ export default function HomePage() {
         </div>
       )}
 
+      {layout.isMobile && (
+        <MobileTabBar
+          active={mobileTab}
+          persistent={mobileTab === "friends"}
+          friendsBadge={requests.incoming.length}
+          onDms={() => layout.showNav()}
+          onFriends={() => {
+            openFriendsView();
+            layout.showMain();
+          }}
+          onOpenSettings={() => setShowSettings(true)}
+          onLogout={logout}
+        />
+      )}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showLogoutConfirm && (
         <ConfirmModal

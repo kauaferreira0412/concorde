@@ -13,6 +13,7 @@ import {
   MaximizeIcon,
   MicIcon,
   MicOffIcon,
+  MusicNoteIcon,
   PictureInPictureIcon,
   ScreenShareIcon,
   UsersIcon,
@@ -22,7 +23,7 @@ import {
   ZoomOutIcon,
 } from "./icons.jsx";
 import VolumeSlider from "./VolumeSlider.jsx";
-import Avatar from "./Avatar.jsx";
+import Avatar, { FreezableAvatar } from "./Avatar.jsx";
 import { useTrackFps } from "../utils/useTrackFps";
 import { useAppFocused } from "../utils/useAppFocused";
 import CameraPipWindow from "./CameraPipWindow.jsx";
@@ -30,6 +31,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import SoundboardPanel from "./SoundboardPanel.jsx";
 import { enterPip, exitPip, pipSupported, registerPipCandidate } from "../utils/screenSharePip";
 import { MembersToggleButton, MobileBackButton } from "../context/LayoutContext.jsx";
+import { useProfile } from "../context/ProfileContext.jsx";
 
 const isElectronDesktop = typeof window !== "undefined" && !!window.concordeDesktop;
 
@@ -107,7 +109,14 @@ function VoiceHeader({ channel, serverName, live, count }) {
 
 const SPEAK_BARS = [8, 18, 12, 22, 10];
 
-function ParticipantCard({ participant, speaking, streaming }) {
+function userIdOfIdentity(identity, channelId) {
+  const m = /^user-(\d+)$/.exec(identity || "");
+  if (m) return Number(m[1]);
+  if (/^musicbot-\d+$/.test(identity || "")) return -channelId;
+  return null;
+}
+
+function ParticipantCard({ participant, speaking, streaming, audioLive, channelId, onOpenProfile }) {
   const name = participant.isLocal ? participant.name.replace(/ \(você\)$/, "") : participant.name;
   const muted = !participant.micEnabled || participant.deafened;
   const status = participant.deafened
@@ -116,13 +125,48 @@ function ParticipantCard({ participant, speaking, streaming }) {
     ? "mutado"
     : speaking
     ? "falando"
-    : participant.isLocal
-    ? "microfone ativo"
     : "em silêncio";
   return (
-    <div className={"voice-person" + (speaking ? " speaking" : "") + (streaming ? " streaming" : "") + (participant.isLocal ? " me" : "")}>
-      {streaming && <span className="voice-person-live live-tag">AO VIVO</span>}
-      <Avatar name={name} url={participant.avatarUrl} className="voice-person-avatar" />
+    <div
+      className={"voice-person clickable" + (speaking ? " speaking" : "") + (streaming ? " streaming" : "") + (participant.isLocal ? " me" : "")}
+      role="button"
+      tabIndex={0}
+      title="Clique pra ver o perfil · botão direito pra mais opções"
+      onClick={() => {
+        const uid = userIdOfIdentity(participant.identity, channelId);
+        if (uid > 0) onOpenProfile(uid);
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter") return;
+        const uid = userIdOfIdentity(participant.identity, channelId);
+        if (uid > 0) onOpenProfile(uid);
+      }}
+      onContextMenu={(e) => {
+        const uid = userIdOfIdentity(participant.identity, channelId);
+        if (uid == null) return;
+        e.preventDefault();
+        window.dispatchEvent(
+          new CustomEvent("concorde:participant-menu", {
+            detail: { channelId, userId: uid, identity: participant.identity, username: name, x: e.clientX, y: e.clientY },
+          })
+        );
+      }}
+    >
+      {streaming ? (
+        <span className="voice-person-live live-tag">AO VIVO</span>
+      ) : (
+        audioLive && (
+          <span className="voice-person-live live-tag audio-live-tag">
+            <MusicNoteIcon size={10} /> ÁUDIO
+          </span>
+        )
+      )}
+      <FreezableAvatar
+        name={name}
+        url={participant.avatarUrl}
+        className="voice-person-avatar"
+        animate={!participant.gifOnSpeak || speaking}
+      />
       <div className="voice-person-text">
         <div className="voice-person-name">
           {name} {participant.isLocal && <span className="voice-person-you">(você)</span>}
@@ -147,10 +191,12 @@ function CallToolbar() {
     deafened,
     cameraEnabled,
     screenSharing,
+    audioSharing,
     toggleMic,
     toggleDeafen,
     toggleCamera,
     toggleScreenShare,
+    toggleAudioShare,
     leaveChannel,
   } = useVoiceCall();
   return (
@@ -191,9 +237,22 @@ function CallToolbar() {
       >
         <ScreenShareIcon size={22} />
       </button>
-      <button type="button" className="call-toolbar-leave" onClick={leaveChannel} title="Sair da call">
+      <button
+        type="button"
+        className={"call-toolbar-btn audio-share-btn" + (audioSharing ? " on" : "")}
+        onClick={toggleAudioShare}
+        aria-pressed={audioSharing}
+        title={
+          audioSharing
+            ? "Parar de transmitir o áudio"
+            : "Transmitir só o áudio (música, jogo...) - todo mundo da call ouve, sem vídeo"
+        }
+      >
+        <MusicNoteIcon size={22} />
+      </button>
+      <button type="button" className="call-toolbar-leave" onClick={leaveChannel} title="Sair da call" aria-label="Sair da call">
         <HangUpIcon size={22} />
-        SAIR
+        <span className="call-toolbar-leave-label">SAIR</span>
       </button>
     </div>
   );
@@ -476,6 +535,7 @@ function ScreenShareTile({
 }
 
 export default function VoiceChannel({ channel, serverName, stompClient, stompConnected }) {
+  const { openProfile } = useProfile();
   const { showAlert } = useAlert();
   const {
     activeChannel,
@@ -490,6 +550,9 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
     toggleScreenShare,
     toggleWatchScreenShare,
     screenShareWatchers,
+    audioShares,
+    toggleAudioShare,
+    toggleListenAudioShare,
     streamVolumes,
     setStreamVolume,
     joinChannel,
@@ -625,7 +688,15 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
 
         <section className={"voice-people" + (screenShares.length > 0 ? " compact" : "")} aria-label="Participantes">
           {orderedParticipants.map(({ p, streaming }) => (
-            <ParticipantCard key={p.identity} participant={p} speaking={speakingIds.has(p.identity)} streaming={streaming} />
+            <ParticipantCard
+              key={p.identity}
+              participant={p}
+              speaking={speakingIds.has(p.identity)}
+              streaming={streaming}
+              audioLive={audioShares.some((a) => a.identity === p.identity)}
+              channelId={channel.id}
+              onOpenProfile={openProfile}
+            />
           ))}
           {!screenSharing && screenShares.length === 0 && (
             <button type="button" className="voice-person voice-person-share" onClick={toggleScreenShare}>
@@ -637,6 +708,59 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
             </button>
           )}
         </section>
+
+        {audioShares.length > 0 && (
+          <section className="voice-section audio-shares" aria-label="Áudio ao vivo">
+            <div className="voice-section-header">
+              <p className="voice-section-title">ÁUDIO AO VIVO</p>
+              <span className="audio-shares-hint">o volume aqui muda só pra você</span>
+            </div>
+            <div className="audio-shares-list">
+              {audioShares.map((a) => (
+                <div key={a.identity} className={"audio-share-row" + (a.isLocal ? " me" : "") + (!a.isLocal && !a.listening ? " idle" : "")}>
+                  <Avatar name={a.name} url={a.avatarUrl} className="voice-avatar" />
+                  <div className="audio-share-info">
+                    <strong>{a.isLocal ? "Você" : a.name}</strong>
+                    <span className="audio-share-eq" aria-hidden="true">
+                      <i />
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                    <span className="audio-share-sub">
+                      {a.isLocal ? "transmitindo áudio" : a.listening ? "você está ouvindo" : "transmitindo áudio - você não está ouvindo"}
+                    </span>
+                  </div>
+                  {a.isLocal ? (
+                    <button type="button" className="btn-accent-sm active" onClick={toggleAudioShare}>
+                      Parar
+                    </button>
+                  ) : !a.listening ? (
+                    <button type="button" className="btn-accent-sm" onClick={() => toggleListenAudioShare(a.identity)}>
+                      <HeadphonesIcon size={15} /> Ouvir
+                    </button>
+                  ) : (
+                    <div className="audio-share-volume">
+                      <VolumeSlider
+                        value={streamVolumes[a.identity] ?? 100}
+                        onChange={(v) => setStreamVolume(a.identity, v)}
+                        label={`Volume do áudio de ${a.name} (só pra você)`}
+                      />
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => toggleListenAudioShare(a.identity)}
+                        title="Parar de ouvir essa transmissão (economiza dados)"
+                      >
+                        <HeadphonesOffIcon size={15} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="voice-section voice-mic-row" aria-label="Seu microfone">
           <h2 className="voice-section-title">SEU MIC</h2>

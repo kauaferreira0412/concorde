@@ -17,7 +17,8 @@ public class AuthDtos {
 
     public record UserResponse(Long id, String username, String email, String avatarUrl, Role role, UserStatus status,
                                 String nickname, String bio, String bannerUrl, String customStatus,
-                                String accentColor) {}
+                                String accentColor, java.util.List<Long> serverOrder,
+                                boolean avatarAnimateOnSpeak) {}
 
     public record AuthResponse(String token, UserResponse user) {}
 
@@ -28,6 +29,10 @@ public class AuthDtos {
     ) {}
 
     public record StatusRequest(@NotNull UserStatus status) {}
+
+    public record AvatarAnimationRequest(boolean onlyWhenSpeaking) {}
+
+    public record ServerOrderRequest(@NotNull @Size(max = 200) java.util.List<Long> ids) {}
 
     public record AccentColorRequest(
             @jakarta.validation.constraints.Pattern(regexp = "^(#[0-9a-fA-F]{6})?$", message = "Cor inválida") String color) {}

@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useAuth } from "../context/AuthContext.jsx";
 import { useDmNotifications } from "../context/DmNotificationsContext.jsx";
 import api from "../api/client";
 import Avatar from "./Avatar.jsx";
@@ -13,6 +14,35 @@ export default function ServerSidebar({ servers, selectedServerId, homeActive, o
   const [tooltipPos, setTooltipPos] = useState(null);
   const [voicePresence, setVoicePresence] = useState(null);
   const hoverTimeoutRef = useRef(null);
+  const { user, updateUser } = useAuth();
+  const [dragId, setDragId] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null); // { id, after }
+
+  // Ordem pessoal (salva no perfil, vale em qualquer aparelho); servidores novos vão pro fim.
+  const orderedServers = useMemo(() => {
+    const order = user?.serverOrder || [];
+    const pos = new Map(order.map((id, i) => [String(id), i]));
+    return [...servers].sort((a, b) => {
+      const pa = pos.has(String(a.id)) ? pos.get(String(a.id)) : Infinity;
+      const pb = pos.has(String(b.id)) ? pos.get(String(b.id)) : Infinity;
+      return pa === pb ? 0 : pa - pb;
+    });
+  }, [servers, user?.serverOrder]);
+
+  function dropOn(targetId, after) {
+    const from = dragId;
+    setDragId(null);
+    setDropTarget(null);
+    if (from == null || from === targetId) return;
+    const ids = orderedServers.map((s) => s.id).filter((id) => id !== from);
+    let idx = ids.indexOf(targetId);
+    if (idx < 0) return;
+    if (after) idx += 1;
+    ids.splice(idx, 0, from);
+    const prev = user?.serverOrder || [];
+    updateUser({ serverOrder: ids });
+    api.put("/api/users/me/server-order", { ids }).catch(() => updateUser({ serverOrder: prev }));
+  }
 
   function handleHoverStart(serverId, iconEl) {
     clearTimeout(hoverTimeoutRef.current);
@@ -50,19 +80,48 @@ export default function ServerSidebar({ servers, selectedServerId, homeActive, o
         {hasUnreadDm && <span className="server-icon-unread-dot" title="Você tem mensagens privadas não lidas" />}
       </div>
       <div className="server-sidebar-divider" />
-      {servers.map((s) => {
+      {orderedServers.map((s) => {
         const isActive = s.id === selectedServerId;
+        const drop = dropTarget?.id === s.id ? (dropTarget.after ? " drop-after" : " drop-before") : "";
         return (
           <div
             key={s.id}
-            className="server-icon-wrap"
-            onMouseEnter={(e) => handleHoverStart(s.id, e.currentTarget)}
-            onMouseLeave={handleHoverEnd}
+            className={"server-icon-wrap" + (dragId === s.id ? " dragging" : "") + drop}
+            // tooltip só com mouse: no toque ele ficava preso na tela até clicar fora
+            onPointerEnter={(e) => e.pointerType === "mouse" && !dragId && handleHoverStart(s.id, e.currentTarget)}
+            onPointerLeave={handleHoverEnd}
+            draggable
+            onDragStart={(e) => {
+              handleHoverEnd();
+              setDragId(s.id);
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", String(s.id));
+            }}
+            onDragEnd={() => {
+              setDragId(null);
+              setDropTarget(null);
+            }}
+            onDragOver={(e) => {
+              if (dragId == null) return;
+              e.preventDefault();
+              const r = e.currentTarget.getBoundingClientRect();
+              const after = e.clientY > r.top + r.height / 2;
+              if (dropTarget?.id !== s.id || dropTarget.after !== after) setDropTarget({ id: s.id, after });
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const r = e.currentTarget.getBoundingClientRect();
+              dropOn(s.id, e.clientY > r.top + r.height / 2);
+            }}
+            title="Arraste pra reordenar"
           >
             <span className={"server-icon-pill" + (isActive ? " active" : "")} />
             <button
               className={"server-icon" + (isActive ? " active" : "") + (s.iconUrl ? " has-icon" : "")}
-              onClick={() => onSelect(s.id)}
+              onClick={() => {
+                handleHoverEnd();
+                onSelect(s.id);
+              }}
               aria-label={s.name}
             >
               {s.iconUrl ? <img src={s.iconUrl} alt="" className="server-icon-img" /> : s.name.slice(0, 2).toUpperCase()}

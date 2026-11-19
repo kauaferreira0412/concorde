@@ -2,6 +2,8 @@ package com.codagis.concorde.controller;
 
 import com.codagis.concorde.domain.User;
 import com.codagis.concorde.dto.AuthDtos.AccentColorRequest;
+import com.codagis.concorde.dto.AuthDtos.ServerOrderRequest;
+import com.codagis.concorde.dto.AuthDtos.AvatarAnimationRequest;
 import com.codagis.concorde.dto.AuthDtos.CustomStatusRequest;
 import com.codagis.concorde.dto.AuthDtos.ProfileRequest;
 import com.codagis.concorde.dto.AuthDtos.StatusRequest;
@@ -90,6 +92,26 @@ public class AvatarController {
         return toResponse(user);
     }
 
+    @PutMapping("/avatar-animation")
+    @Transactional
+    public UserResponse setAvatarAnimation(@RequestBody AvatarAnimationRequest req) {
+        Long userId = currentUser.id();
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalStateException("Usuario nao encontrado"));
+        user.setAvatarAnimateOnSpeak(req.onlyWhenSpeaking());
+        userRepository.save(user);
+        return toResponse(user);
+    }
+
+    @PutMapping("/server-order")
+    @Transactional
+    public UserResponse setServerOrder(@Valid @RequestBody ServerOrderRequest req) {
+        Long userId = currentUser.id();
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalStateException("Usuario nao encontrado"));
+        user.setServerOrder(com.codagis.concorde.util.ServerOrder.format(req.ids()));
+        userRepository.save(user);
+        return toResponse(user);
+    }
+
     @PutMapping("/accent-color")
     @Transactional
     public UserResponse setAccentColor(@Valid @RequestBody AccentColorRequest req) {
@@ -118,6 +140,7 @@ public class AvatarController {
 
     private UserResponse toResponse(User user) {
         return new UserResponse(user.getId(), user.getUsername(), user.getEmail(), user.getAvatarUrl(), user.getRole(),
-                user.getStatus(), user.getNickname(), user.getBio(), user.getBannerUrl(), user.getCustomStatus(), user.getAccentColor());
+                user.getStatus(), user.getNickname(), user.getBio(), user.getBannerUrl(), user.getCustomStatus(), user.getAccentColor(),
+                com.codagis.concorde.util.ServerOrder.parse(user.getServerOrder()), user.isAvatarAnimateOnSpeakEnabled());
     }
 }

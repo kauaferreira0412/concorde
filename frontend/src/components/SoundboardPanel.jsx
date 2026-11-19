@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { useAlert } from "../context/AlertContext.jsx";
+import { useVoiceCall } from "../context/VoiceCallContext.jsx";
+import VolumeSlider from "./VolumeSlider.jsx";
 import { subscribeToSoundboard } from "../ws/chatSocket";
-import { MusicNoteIcon, PlusIcon, TrashIcon, XIcon } from "./icons.jsx";
+import { MusicNoteIcon, PlusIcon, TrashIcon } from "./icons.jsx";
 
 const ACCEPTED_TYPES = "audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/webm,audio/mp4,audio/aac";
 
 export default function SoundboardPanel({ channelId, stompClient, stompConnected }) {
   const { showAlert } = useAlert();
+  const { soundboardVolume, setSoundboardVolume } = useVoiceCall();
   const [clips, setClips] = useState(null);
   const [playingId, setPlayingId] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [showUpload, setShowUpload] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const dragCounter = useRef(0);
   const fileInputRef = useRef(null);
@@ -60,7 +62,6 @@ export default function SoundboardPanel({ channelId, stompClient, stompConnected
         const list = prev || [];
         return list.some((c) => c.id === data.id) ? list : [data, ...list];
       });
-      setShowUpload(false);
     } catch (err) {
       showAlert(err.response?.data?.error || "Não foi possível enviar esse áudio");
     } finally {
@@ -109,73 +110,84 @@ export default function SoundboardPanel({ channelId, stompClient, stompConnected
     }
   }
 
+  const list = clips || [];
+
   return (
-    <section className="voice-section">
-      <div className="voice-section-header">
-        <p className="voice-section-title">SOUNDBOARD</p>
-        <div className="voice-section-header-actions">
-          <button
-            type="button"
-            className={"icon-btn" + (showUpload ? " icon-btn-active" : "")}
-            onClick={() => setShowUpload((prev) => !prev)}
-            title="Adicionar som ao seu banco"
-          >
-            <PlusIcon size={15} />
-          </button>
+    <section
+      className={"voice-section soundboard" + (dragActive ? " drag-active" : "")}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <input type="file" accept={ACCEPTED_TYPES} ref={fileInputRef} onChange={handleFileChosen} hidden />
+      <div className="voice-section-header soundboard-header">
+        <div className="soundboard-title">
+          <p className="voice-section-title">SOUNDBOARD</p>
+          {list.length > 0 && <span className="soundboard-count">{list.length}</span>}
+        </div>
+        <div className="soundboard-volume" title="Volume dos sons do soundboard só pra você (não muda pros outros)">
+          <span className="soundboard-volume-label">Volume dos sons</span>
+          <VolumeSlider
+            value={soundboardVolume}
+            onChange={setSoundboardVolume}
+            max={200}
+            label="Volume dos sons do soundboard (só pra você)"
+          />
         </div>
       </div>
-      <p className="voice-hint soundboard-hint">
-        Seu banco de sons é particular - só você vê o que tem aqui. Clicar num som toca ele pra todo mundo na call.
-      </p>
-
-      {showUpload && (
-        <div
-          className={"soundboard-dropzone" + (dragActive ? " drag-active" : "") + (uploading ? " uploading" : "")}
-          onClick={() => !uploading && fileInputRef.current?.click()}
-          onDragEnter={handleDragEnter}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          title="Arraste um áudio ou clique aqui (até 3MB)"
-        >
-          <input type="file" accept={ACCEPTED_TYPES} ref={fileInputRef} onChange={handleFileChosen} hidden />
-          <PlusIcon size={15} />
-          <span>{uploading ? "Enviando..." : "Arraste ou clique"}</span>
-          <button
-            type="button"
-            className="icon-btn soundboard-dropzone-close"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowUpload(false);
-            }}
-            title="Cancelar"
-          >
-            <XIcon size={11} />
-          </button>
-        </div>
-      )}
+      <p className="soundboard-sub">Clique num som pra tocar pra todo mundo na call · só você vê seus sons</p>
 
       {clips === null ? (
-        <p className="voice-hint">Carregando seus sons...</p>
-      ) : clips.length === 0 ? (
-        <p className="voice-hint">Você ainda não tem nenhum som. Clique em + pra adicionar o primeiro.</p>
+        <div className="soundboard-grid">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="soundboard-tile skeleton" aria-hidden="true" />
+          ))}
+        </div>
       ) : (
         <div className="soundboard-grid">
-          {clips.map((clip) => (
-            <div key={clip.id} className={"soundboard-clip" + (playingId === clip.id ? " playing" : "")}>
-              <button type="button" className="soundboard-clip-play" onClick={() => play(clip)} title={`Tocar "${clip.name}" na call`}>
-                <span className="soundboard-clip-icon">
-                  <MusicNoteIcon size={12} />
+          {list.map((clip) => (
+            <div key={clip.id} className={"soundboard-tile" + (playingId === clip.id ? " playing" : "")}>
+              <button
+                type="button"
+                className="soundboard-tile-play"
+                onClick={() => play(clip)}
+                title={`Tocar "${clip.name}" na call`}
+              >
+                <span className="soundboard-tile-icon" aria-hidden="true">
+                  <MusicNoteIcon size={16} />
                 </span>
-                <span className="soundboard-clip-name">{clip.name}</span>
+                <span className="soundboard-tile-name">{clip.name}</span>
               </button>
-              <button type="button" className="soundboard-clip-remove" onClick={() => remove(clip)} title="Apagar som">
+              <button
+                type="button"
+                className="soundboard-tile-remove"
+                onClick={() => remove(clip)}
+                title={`Apagar "${clip.name}"`}
+                aria-label={`Apagar ${clip.name}`}
+              >
                 <TrashIcon size={12} />
               </button>
             </div>
           ))}
+          <button
+            type="button"
+            className={"soundboard-tile soundboard-add" + (uploading ? " uploading" : "")}
+            onClick={() => !uploading && fileInputRef.current?.click()}
+            disabled={uploading}
+            title="Adicionar um som (MP3, WAV, OGG... até 3MB). Também dá pra arrastar o arquivo aqui."
+          >
+            <span className="soundboard-tile-icon" aria-hidden="true">
+              <PlusIcon size={16} />
+            </span>
+            <span className="soundboard-tile-name">
+              {uploading ? "Enviando..." : list.length ? "Adicionar" : "Adicionar o primeiro som"}
+            </span>
+          </button>
         </div>
       )}
+
+      {dragActive && <div className="soundboard-drop-hint">Solte o áudio pra adicionar</div>}
     </section>
   );
 }

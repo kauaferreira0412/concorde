@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { MaximizeIcon, ScreenShareIcon } from "./icons.jsx";
 
-export default function ScreenSharePicker({ onSelect, onClose }) {
+export default function ScreenSharePicker({ onSelect, onClose, mode = "screen" }) {
+  const audioOnly = mode === "audio";
   const [sources, setSources] = useState(null);
   const [tab, setTab] = useState("screen");
   const [error, setError] = useState("");
@@ -26,7 +27,7 @@ export default function ScreenSharePicker({ onSelect, onClose }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
-        <h2>Escolha o que compartilhar</h2>
+        <h2>{audioOnly ? "De onde vem o áudio?" : "Escolha o que compartilhar"}</h2>
 
         <div className="screen-picker-tabs">
           <button
@@ -34,7 +35,7 @@ export default function ScreenSharePicker({ onSelect, onClose }) {
             className={"screen-picker-tab" + (tab === "screen" ? " active" : "")}
             onClick={() => setTab("screen")}
           >
-            <MaximizeIcon size={15} /> Tela Inteira
+            <MaximizeIcon size={15} /> {audioOnly ? "Som do PC" : "Tela Inteira"}
           </button>
           <button
             type="button"
@@ -46,7 +47,11 @@ export default function ScreenSharePicker({ onSelect, onClose }) {
         </div>
 
         <p className="admin-hint" style={{ margin: 0 }}>
-          {tab === "screen"
+          {audioOnly
+            ? tab === "screen"
+              ? "Transmite todo o som do PC (menos a própria call). Só áudio, sem imagem."
+              : "Transmite só o som dessa janela (Spotify, jogo, navegador...). Só áudio, sem imagem."
+            : tab === "screen"
             ? "Compartilha a tela toda, com o áudio do sistema junto."
             : "Compartilha só essa janela, com o áudio só dela — você continua ouvindo a call normalmente."}
         </p>

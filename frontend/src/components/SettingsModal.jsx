@@ -35,6 +35,7 @@ import { BellIcon, KeyboardIcon, MicIcon, MusicNoteIcon, PaletteIcon, ShieldIcon
 import AppearanceSettings from "./AppearanceSettings.jsx";
 import ImageCropModal from "./ImageCropModal.jsx";
 import { getAutoPipEnabled, pipSupported, setAutoPipEnabled } from "../utils/screenSharePip";
+import { getAutoListenAudioShare, setAutoListenAudioShare } from "../utils/audioShareListen";
 import AccentColorPicker, { accentStyle } from "./AccentColorPicker.jsx";
 
 const TABS = [
@@ -88,6 +89,7 @@ export default function SettingsModal({ onClose }) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("perfil");
   const [autoPip, setAutoPip] = useState(getAutoPipEnabled);
+  const [autoListenAudio, setAutoListenAudio] = useState(getAutoListenAudioShare);
   const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
 
   function handleTabClick(tabId) {
@@ -105,6 +107,22 @@ export default function SettingsModal({ onClose }) {
   const [cropTarget, setCropTarget] = useState(null);
   const [customStatus, setCustomStatus] = useState(() => user?.customStatus || "");
   const [customStatusSaving, setCustomStatusSaving] = useState(false);
+  const [gifPrefSaving, setGifPrefSaving] = useState(false);
+
+  async function saveGifOnSpeak(value) {
+    const prev = !!user?.avatarAnimateOnSpeak;
+    updateUser({ avatarAnimateOnSpeak: value });
+    setGifPrefSaving(true);
+    try {
+      const { data } = await api.put("/api/users/me/avatar-animation", { onlyWhenSpeaking: value });
+      updateUser({ avatarAnimateOnSpeak: !!data.avatarAnimateOnSpeak });
+    } catch (err) {
+      updateUser({ avatarAnimateOnSpeak: prev });
+      setAvatarError(err.response?.data?.error || "Não deu pra salvar essa opção agora");
+    } finally {
+      setGifPrefSaving(false);
+    }
+  }
 
   async function saveCustomStatus(text) {
     setVisibilityError("");
@@ -544,6 +562,15 @@ export default function SettingsModal({ onClose }) {
                 </p>
                 {avatarError && <p className="auth-error">{avatarError}</p>}
                 <AccentColorPicker />
+                <label className="settings-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={!!user?.avatarAnimateOnSpeak}
+                    disabled={gifPrefSaving}
+                    onChange={(e) => saveGifOnSpeak(e.target.checked)}
+                  />
+                  Na call, minha foto (GIF) só se mexe enquanto eu estiver falando
+                </label>
                 {cropTarget && (
                   <ImageCropModal
                     file={cropTarget.file}
@@ -807,6 +834,24 @@ export default function SettingsModal({ onClose }) {
                     {NOISE_SUPPRESSION_MODES.find((m) => m.value === noiseSuppressionMode)?.description}
                   </p>
                 </div>
+
+                <div className="settings-divider" />
+                <p className="settings-section-title">Transmissões de áudio</p>
+                <label className="settings-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={autoListenAudio}
+                    onChange={(e) => {
+                      setAutoListenAudio(e.target.checked);
+                      setAutoListenAudioShare(e.target.checked);
+                    }}
+                  />
+                  Entrar automaticamente quando alguém transmitir áudio na call
+                </label>
+                <p className="admin-hint" style={{ margin: 0 }}>
+                  Ligado: o som (música, jogo...) começa a tocar pra você assim que alguém transmite. Desligado: aparece
+                  um botão "Ouvir" na call e você entra só se quiser.
+                </p>
 
                 {pipSupported && (
                   <>

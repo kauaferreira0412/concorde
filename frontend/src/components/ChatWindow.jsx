@@ -40,6 +40,7 @@ import DiceRollCard from "./DiceRollCard.jsx";
 import EmojiPicker from "./EmojiPicker.jsx";
 import MusicQueueCard from "./MusicQueueCard.jsx";
 import PollCard from "./PollCard.jsx";
+import { useStickToBottom } from "../utils/useStickToBottom";
 import {
   CheckIcon,
   HashIcon,
@@ -317,9 +318,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
     };
   }, [channel, stompClient, stompConnected]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  const { containerRef: messagesRef, onScroll: onMessagesScroll, release: releaseStick } = useStickToBottom(channel?.id, messages);
 
   useEffect(() => {
     const el = draftInputRef.current;
@@ -735,6 +734,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
   }
 
   function jumpToMessage(id) {
+    releaseStick();
     const el = messageRefs.current.get(id);
     if (!el) return;
     el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -853,7 +853,7 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
         <div className="chat-status">Conectando ao chat em tempo real...</div>
       ) : null}
       {uploadError && <div className="chat-status error">⚠️ {uploadError}</div>}
-      <div className="chat-messages" key={channel.id}>
+      <div className="chat-messages" key={channel.id} ref={messagesRef} onScroll={onMessagesScroll}>
         {historyLoaded && messages.length === 0 && (
           <EmptyState
             icon={channel.adminOnly ? <MegaphoneIcon size={30} /> : <HashIcon size={30} />}

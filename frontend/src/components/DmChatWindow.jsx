@@ -35,6 +35,7 @@ import DiceRollCard from "./DiceRollCard.jsx";
 import EmojiPicker from "./EmojiPicker.jsx";
 import { CheckIcon, MessageSquareIcon, MicIcon, PencilIcon, PinIcon, PlusIcon, ReplyIcon, SearchIcon, SendIcon, SmileIcon, TrashIcon, XIcon } from "./icons.jsx";
 import { accentStyle } from "./AccentColorPicker.jsx";
+import { useStickToBottom } from "../utils/useStickToBottom";
 
 const ROLL_COMMAND_RE = /^\/(?:roll|r)\s+(.+)$/i;
 const ROLL_NOTATION_RE = /^(\d{0,2})d(\d{1,3})\s*([+-]\s*\d{1,3})?$/i;
@@ -186,9 +187,7 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
     };
   }, [channelId, stompClient, stompConnected]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  const { containerRef: messagesRef, onScroll: onMessagesScroll, release: releaseStick } = useStickToBottom(channelId, messages);
 
   useEffect(() => {
     const el = draftInputRef.current;
@@ -422,6 +421,7 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
   }
 
   function jumpToMessage(id) {
+    releaseStick();
     const el = messageRefs.current.get(id);
     if (!el) return;
     el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -540,7 +540,7 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
         <div className="chat-status">Conectando ao chat em tempo real...</div>
       ) : null}
       {uploadError && <div className="chat-status error">⚠️ {uploadError}</div>}
-      <div className="chat-messages" key={channelId}>
+      <div className="chat-messages" key={channelId} ref={messagesRef} onScroll={onMessagesScroll}>
         {historyLoaded && messages.length === 0 && (
           <EmptyState
             icon={<Avatar name={channel.otherUsername} url={channel.otherAvatarUrl} className="empty-state-avatar" />}
