@@ -1,65 +1,126 @@
-import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useState } from "react";
+import { Pressable, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAppTheme } from "../theme/ThemeContext";
-import ServersPane from "./home/ServersPane";
-import MessagesPane from "./home/MessagesPane";
-import FriendsPane from "./home/FriendsPane";
-import YouPane from "./home/YouPane";
+import api from "../api";
+import { useTokens } from "../theme/ThemeContext";
+import { Avatar, Txt } from "../ui/kit";
+import Icon from "../ui/icons";
+import ServersScreen from "./ServersScreen";
+import DmsScreen from "./DmsScreen";
+import FriendsScreen from "./FriendsScreen";
+import MeScreen from "./MeScreen";
 
-const TABS = [
-  { key: "servers", label: "Servidores", icon: "🧩" },
-  { key: "messages", label: "Mensagens", icon: "💬" },
-  { key: "friends", label: "Amigos", icon: "👥" },
-  { key: "you", label: "Você", icon: "🙂" },
-];
+export const TABBAR_HEIGHT = 66;
 
-export default function HomeScreen({ navigation, user, onLogout }) {
-  const colors = useAppTheme();
+function TabBar({ tab, setTab, user, friendsBadge }) {
+  const t = useTokens();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => createStyles(colors, insets), [colors, insets]);
-  const [tab, setTab] = useState("servers");
-
+  const tabs = [
+    { key: "servers", label: "Servidores", icon: "servers" },
+    { key: "dms", label: "Mensagens", icon: "message" },
+    { key: "friends", label: "Amigos", icon: "users", badge: friendsBadge },
+    { key: "me", label: "Você" },
+  ];
   return (
-    <View style={styles.screen}>
-      <View style={styles.body}>
-        {tab === "servers" && <ServersPane navigation={navigation} />}
-        {tab === "messages" && <MessagesPane navigation={navigation} />}
-        {tab === "friends" && <FriendsPane navigation={navigation} />}
-        {tab === "you" && <YouPane user={user} onLogout={onLogout} />}
-      </View>
-
-      <View style={styles.tabBar}>
-        {TABS.map((t) => {
-          const active = tab === t.key;
-          return (
-            <Pressable key={t.key} style={styles.tabItem} onPress={() => setTab(t.key)}>
-              <Text style={[styles.tabIcon, active && styles.tabIconActive]}>{t.icon}</Text>
-              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+    <View
+      style={{
+        flexDirection: "row",
+        backgroundColor: t.surface,
+        borderTopWidth: 2.5,
+        borderTopColor: t.ink,
+        paddingBottom: insets.bottom,
+        height: TABBAR_HEIGHT + insets.bottom,
+      }}
+    >
+      {tabs.map((item) => {
+        const active = tab === item.key;
+        return (
+          <Pressable
+            key={item.key}
+            onPress={() => setTab(item.key)}
+            style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 3 }}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={item.label}
+          >
+            <View
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 4,
+                borderRadius: 999,
+                borderWidth: 2,
+                borderColor: active ? t.ink : "transparent",
+                backgroundColor: active ? t.accent : "transparent",
+              }}
+            >
+              {item.key === "me" ? (
+                <Avatar name={user?.username} url={user?.avatarUrl} size={24} radius={8} />
+              ) : (
+                <Icon name={item.icon} size={22} color={active ? t.onAccent : t.textMuted} />
+              )}
+              {item.badge > 0 ? (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: -6,
+                    right: -2,
+                    minWidth: 18,
+                    height: 18,
+                    borderRadius: 9,
+                    paddingHorizontal: 4,
+                    backgroundColor: t.danger,
+                    borderWidth: 2,
+                    borderColor: t.ink,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Txt weight={900} size={10} color="#fff">
+                    {item.badge > 9 ? "9+" : item.badge}
+                  </Txt>
+                </View>
+              ) : null}
+            </View>
+            <Txt weight={900} size={11} color={active ? t.text : t.textMuted}>
+              {item.label}
+            </Txt>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
 
-function createStyles(colors, insets) {
-  return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: colors.bg },
-    body: { flex: 1 },
-    tabBar: {
-      flexDirection: "row",
-      backgroundColor: colors.surface,
-      borderTopWidth: 1,
-      borderTopColor: colors.line,
-      paddingTop: 8,
-      paddingBottom: Math.max(insets.bottom, 8),
-    },
-    tabItem: { flex: 1, alignItems: "center", gap: 2 },
-    tabIcon: { fontSize: 20, opacity: 0.6 },
-    tabIconActive: { opacity: 1 },
-    tabLabel: { color: colors.textMuted, fontSize: 11, fontWeight: "600" },
-    tabLabelActive: { color: colors.accent },
-  });
+/** Tela principal com as abas de baixo (igual ao site no celular). */
+export default function HomeScreen({ navigation, route, user, onLogout, onUserUpdate }) {
+  const t = useTokens();
+  const [tab, setTab] = useState(route.params?.tab || "servers");
+  const [friendsBadge, setFriendsBadge] = useState(0);
+
+  const loadBadge = useCallback(() => {
+    api
+      .get("/api/friends/requests")
+      .then(({ data }) => setFriendsBadge(data.incoming?.length || 0))
+      .catch(() => {});
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadBadge();
+    }, [loadBadge])
+  );
+
+  const props = { navigation, user, onLogout, onUserUpdate, embedded: true, onFriendsChanged: loadBadge };
+  return (
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <View style={{ flex: 1 }}>
+        {tab === "servers" ? <ServersScreen {...props} /> : null}
+        {tab === "dms" ? <DmsScreen {...props} /> : null}
+        {tab === "friends" ? <FriendsScreen {...props} /> : null}
+        {tab === "me" ? <MeScreen {...props} /> : null}
+      </View>
+      <TabBar tab={tab} setTab={setTab} user={user} friendsBadge={friendsBadge} />
+    </View>
+  );
 }

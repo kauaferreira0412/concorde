@@ -69,7 +69,7 @@ public class VoicePresenceController {
 
     @MessageMapping("/channel.{channelId}.voice.leave")
     public void leave(@DestinationVariable Long channelId, @Header("simpSessionId") String sessionId) {
-        presenceService.leaveBySession(sessionId);
+        presenceService.leaveBySession(sessionId, false);
     }
 
     @MessageMapping("/channel.{channelId}.voice.mic")

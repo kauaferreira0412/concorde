@@ -52,6 +52,14 @@ import { startSystemAudioExcludingSelfTrack } from "../utils/systemAudioTrack";
 const VoiceCallContext = createContext(null);
 
 const isElectronDesktop = typeof window !== "undefined" && !!window.concordeDesktop;
+// Navegador de celular: o navegador congela o Web Audio quando a aba vai pro fundo (minimizar,
+// trocar de app, PiP). Aí usamos <audio> comum pra tocar a call e o filtro de ruído nativo do
+// aparelho no microfone - os dois continuam rodando em segundo plano.
+const isMobileBrowser =
+  typeof window !== "undefined" &&
+  !isElectronDesktop &&
+  (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "") ||
+    (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent || "")));
 
 const ACTIVE_CHANNEL_KEY = "activeVoiceChannel";
 
@@ -279,6 +287,52 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     userRef.current = user;
   }, [user]);
 
+  // Celular: a call aparece nos controles de mídia do sistema (ajuda o navegador a não congelar a aba
+  // em segundo plano) e, ao voltar pra aba, religa o áudio e o microfone se o sistema tiver derrubado.
+  useEffect(() => {
+    if (!isMobileBrowser || !connected || !activeChannel) return;
+    const ms = typeof navigator !== "undefined" ? navigator.mediaSession : null;
+    try {
+      if (ms && typeof MediaMetadata !== "undefined") {
+        ms.metadata = new MediaMetadata({ title: activeChannel.name || "Call", artist: "Concorde - em call" });
+        ms.playbackState = "playing";
+      }
+    } catch {
+      // sem Media Session: tudo bem
+    }
+
+    async function onVisible() {
+      if (document.visibilityState !== "visible") return;
+      const room = roomRef.current;
+      if (!room) return;
+      room.startAudio().catch(() => {});
+      const micPub = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+      const mst = micPub?.track?.mediaStreamTrack;
+      if (micEnabledRef.current && micPub?.track && mst && (mst.readyState === "ended" || mst.muted)) {
+        try {
+          await micPub.track.restartTrack();
+          if (micPub.track.mediaStreamTrack) startMicMeter(micPub.track.mediaStreamTrack);
+        } catch (err) {
+          console.warn("Não deu pra religar o microfone ao voltar pra aba:", err);
+        }
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onVisible);
+      try {
+        if (ms) {
+          ms.metadata = null;
+          ms.playbackState = "none";
+        }
+      } catch {
+        // ignora
+      }
+    };
+  }, [connected, activeChannel]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function setActiveChannel(channel) {
     activeChannelRef.current = channel;
     setActiveChannelState(channel);
@@ -303,6 +357,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   }
 
   async function applyNoiseSuppression(track) {
+    if (isMobileBrowser) {
+      // o filtro por IA roda em Web Audio, que para em segundo plano; o nativo do aparelho não para
+      if (track.getProcessor?.()) await track.stopProcessor().catch(() => {});
+      return;
+    }
     const mode = getNoiseSuppressionMode();
     const gainPercent = getMicGain();
     try {
@@ -627,7 +686,9 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   }
 
   function effectiveVolume(rawPercent) {
-    return (rawPercent / 100) * (masterVolumeRef.current / 100);
+    const v = (rawPercent / 100) * (masterVolumeRef.current / 100);
+    // sem Web Audio (celular) o volume vai direto no <audio>, que só vai até 1
+    return isMobileBrowser ? Math.min(1, v) : v;
   }
 
   function setParticipantVolume(identity, percent) {
@@ -669,10 +730,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     if (localMicTrackRef.current) applyNoiseSuppression(localMicTrackRef.current);
   }
 
-  async function disconnectInternal() {
+  async function disconnectInternal({ skipPresenceLeave = false } = {}) {
     intentionalDisconnectRef.current = true;
     const channelLeaving = activeChannelRef.current;
-    if (channelLeaving && stompClientRef.current && stompConnectedRef.current) {
+    // substituído por outro aparelho/aba: a presença agora é dele, não avisa "saí"
+    if (!skipPresenceLeave && channelLeaving && stompClientRef.current && stompConnectedRef.current) {
       publishVoiceLeave(stompClientRef.current, channelLeaving.id);
     }
     presenceSubRef.current?.unsubscribe();
@@ -742,10 +804,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       const newRoom = new Room({
         adaptiveStream: true,
         dynacast: true,
-        webAudioMix: true,
+        webAudioMix: !isMobileBrowser,
         audioCaptureDefaults: {
           ...(savedInput ? { deviceId: savedInput } : {}),
-          noiseSuppression: false,
+          noiseSuppression: isMobileBrowser,
+          ...(isMobileBrowser ? { echoCancellation: true, autoGainControl: true } : {}),
         },
         publishDefaults: {
           screenShareEncoding: { maxBitrate: 6_000_000, maxFramerate: 30, priority: "high" },
@@ -907,7 +970,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         } else if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
           message = "Você entrou nessa call em outro lugar (outra aba/dispositivo) - essa conexão foi encerrada.";
         }
-        disconnectInternal();
+        disconnectInternal({ skipPresenceLeave: reason === DisconnectReason.DUPLICATE_IDENTITY });
         playLeaveSound();
         showAlert(message);
       });

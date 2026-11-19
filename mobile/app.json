@@ -5,36 +5,77 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.codagis.concorde",
       "adaptiveIcon": {
-        "backgroundColor": "#1e1f22",
+        "backgroundColor": "#8EE6D6",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "permissions": [
         "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.BLUETOOTH",
         "android.permission.CAMERA",
         "android.permission.INTERNET",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",
-        "android.permission.WAKE_LOCK",
-        "android.permission.BLUETOOTH"
+        "android.permission.WAKE_LOCK"
       ]
     },
     "plugins": [
       "expo-secure-store",
       "@livekit/react-native-expo-plugin",
       "@config-plugins/react-native-webrtc",
+      "expo-status-bar",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#2B1A63"
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "O Concorde usa o microfone pra você falar nas calls de voz.",
+          "enableBackgroundPlayback": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O Concorde acessa suas fotos pra você mandar imagens no chat.",
+          "cameraPermission": "O Concorde usa a câmera nas calls e pra tirar fotos pro chat."
+        }
+      ],
+      "expo-asset",
       "./plugins/withWindowsCxxStagingDir.js"
     ],
+    "ios": {
+      "bundleIdentifier": "com.codagis.concorde",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "O Concorde usa o microfone pra você falar nas calls de voz.",
+        "NSCameraUsageDescription": "O Concorde usa a câmera nas calls com vídeo.",
+        "UIBackgroundModes": [
+          "audio",
+          "voip"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bitcode": false
+    },
     "extra": {
       "eas": {
-        "projectId": "36e736a9-f0e8-4d60-86f5-af78e0322ed5"
+        "projectId": "467c5e68-1e8d-457b-8bd9-e5aa93874bd6"
       }
-    }
+    },
+    "owner": "lkaio16"
   }
 }
