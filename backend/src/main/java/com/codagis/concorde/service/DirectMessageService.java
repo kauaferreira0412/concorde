@@ -256,7 +256,8 @@ public class DirectMessageService {
                 m.getRollNotation(), m.getRollSides(), m.getRollResultsCsv(), m.getRollTotal(),
                 groupReactions(reactions), m.isPinned(),
                 m.getFileUrl(), m.getFileName(), m.getFileType(), m.getFileSize(),
-                author != null ? author.getAccentColor() : null);
+                author != null ? author.getAccentColor() : null,
+                author != null ? author.getAccentColor2() : null);
     }
 
     private List<ReactionSummary> groupReactions(List<DirectMessageReaction> reactions) {

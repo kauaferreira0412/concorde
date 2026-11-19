@@ -48,6 +48,8 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
 
   // Cor de destaque do autor; nas minhas mensagens usa a atual (muda na hora quando troco nas configurações).
   const authorAccent = (m) => (m.authorId === user?.id ? user?.accentColor : m.authorAccentColor) || null;
+  const authorAccent2 = (m) =>
+    (authorAccent(m) && (m.authorId === user?.id ? user?.accentColor2 : m.authorAccentColor2)) || null;
   const { openProfile } = useProfile();
   const { showAlert } = useAlert();
 
@@ -559,7 +561,7 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
               if (el) messageRefs.current.set(m.id, el);
               else messageRefs.current.delete(m.id);
             }}
-            className={"chat-message" + (grouped ? " grouped" : "")}
+            className={"chat-message" + (grouped ? " grouped" : "") + (m.authorId === user?.id ? " mine" : "")}
           >
             {grouped ? (
               <span className="chat-gutter-time" aria-hidden="true">{new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
@@ -575,9 +577,9 @@ export default function DmChatWindow({ channel, stompClient, stompConnected, sto
                 <div>
                   <button
                     type="button"
-                    className={"chat-author" + (authorAccent(m) ? " has-accent" : "")}
+                    className={"chat-author" + (authorAccent(m) ? " has-accent" : "") + (authorAccent2(m) ? " has-accent-2" : "")}
                     data-tone={toneFor(m.authorUsername)}
-                    style={accentStyle(authorAccent(m))}
+                    style={accentStyle(authorAccent(m), undefined, authorAccent2(m))}
                     onClick={() => openProfile(m.authorId)}
                   >
                     {m.authorUsername}

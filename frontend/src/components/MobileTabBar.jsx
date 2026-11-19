@@ -127,6 +127,7 @@ function YouSheet({ onClose, onOpenSettings, onLogout }) {
           style={{
             ...(user?.bannerUrl ? { backgroundImage: `url("${user.bannerUrl}")` } : null),
             ...(user?.accentColor ? { "--profile-accent": user.accentColor } : null),
+            ...(user?.accentColor && user?.accentColor2 ? { "--profile-accent-2": user.accentColor2 } : null),
           }}
         />
         <div className="you-sheet-head">
