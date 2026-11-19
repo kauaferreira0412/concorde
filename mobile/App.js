@@ -4,12 +4,17 @@ import { StatusBar } from "expo-status-bar";
 import { NavigationContainer, DarkTheme } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { registerGlobals } from "@livekit/react-native";
 import { loadSession, saveSession, setExpiredHandler } from "./src/api";
 import { colors } from "./src/theme";
 import LoginScreen from "./src/screens/LoginScreen";
 import ServersScreen from "./src/screens/ServersScreen";
 import ChannelsScreen from "./src/screens/ChannelsScreen";
 import ChatScreen from "./src/screens/ChatScreen";
+import VoiceCallScreen from "./src/screens/VoiceCallScreen";
+
+// Precisa rodar uma vez, antes de qualquer uso do LiveKit, pra registrar o WebRTC nativo.
+registerGlobals();
 
 const Stack = createNativeStackNavigator();
 
@@ -71,6 +76,7 @@ export default function App() {
               />
               <Stack.Screen name="Channels" component={ChannelsScreen} />
               <Stack.Screen name="Chat" component={ChatScreen} />
+              <Stack.Screen name="VoiceCall" component={VoiceCallScreen} options={{ headerBackVisible: false }} />
             </>
           ) : (
             <Stack.Screen name="Login" options={{ headerShown: false }}>

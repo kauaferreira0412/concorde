@@ -51,13 +51,13 @@ export default function ChannelsScreen({ route, navigation }) {
         const isText = item.type === "TEXT";
         return (
           <Pressable
-            style={[styles.row, !isText && styles.rowDisabled]}
-            disabled={!isText}
-            onPress={() => navigation.navigate("Chat", { channel: item, server })}
+            style={styles.row}
+            onPress={() =>
+              navigation.navigate(isText ? "Chat" : "VoiceCall", { channel: item, server })
+            }
           >
             <Text style={styles.icon}>{isText ? "#" : "🔊"}</Text>
             <Text style={styles.name}>{item.name}</Text>
-            {!isText ? <Text style={styles.badge}>em breve</Text> : null}
           </Pressable>
         );
       }}
@@ -71,8 +71,6 @@ const styles = StyleSheet.create({
   empty: { color: colors.muted, textAlign: "center", marginTop: 40 },
   header: { color: colors.muted, fontSize: 12, fontWeight: "700", paddingHorizontal: 14, paddingTop: 18, paddingBottom: 6 },
   row: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
-  rowDisabled: { opacity: 0.5 },
   icon: { color: colors.muted, fontSize: 18, width: 24, textAlign: "center" },
   name: { color: colors.text, fontSize: 16, flex: 1 },
-  badge: { color: colors.muted, fontSize: 12 },
 });

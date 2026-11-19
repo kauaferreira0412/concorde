@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
+    "@config-plugins/react-native-webrtc": "^15.0.2",
     "@livekit/react-native": "^3.1.0",
+    "@livekit/react-native-expo-plugin": "^1.2.0",
     "@livekit/react-native-webrtc": "^150.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/native": "^7.5.1",
@@ -24,7 +26,12 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "lint": "expo lint"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~58.0.4"
+  }
 }
