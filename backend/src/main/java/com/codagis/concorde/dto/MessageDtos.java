@@ -29,7 +29,7 @@ public class MessageDtos {
                                String rollNotation, Integer rollSides, String rollResultsCsv, Integer rollTotal,
                                List<ReactionSummary> reactions, boolean pinned, PollDto poll,
                                String fileUrl, String fileName, String fileType, Long fileSize,
-                               String authorAccentColor) {}
+                               String authorAccentColor, String authorAccentColor2) {}
 
     public record RollDiceRequest(String notation) {}
 

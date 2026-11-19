@@ -123,6 +123,27 @@ public class AvatarController {
         return toResponse(user);
     }
 
+    @PutMapping("/accent-color-2")
+    @Transactional
+    public UserResponse setAccentColor2(@Valid @RequestBody com.codagis.concorde.dto.AuthDtos.AccentColor2Request req) {
+        Long userId = currentUser.id();
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalStateException("Usuario nao encontrado"));
+        String color = blankToNull(req.color());
+        user.setAccentColor2(color == null ? null : color.toUpperCase(java.util.Locale.ROOT));
+        userRepository.save(user);
+        return toResponse(user);
+    }
+
+    @PutMapping("/about-blocks")
+    @Transactional
+    public UserResponse setAboutBlocks(@RequestBody com.codagis.concorde.dto.UserProfileDtos.AboutBlocksRequest req) {
+        Long userId = currentUser.id();
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalStateException("Usuario nao encontrado"));
+        user.setAboutBlocks(com.codagis.concorde.util.AboutBlocks.format(req.blocks()));
+        userRepository.save(user);
+        return toResponse(user);
+    }
+
     @PutMapping("/profile")
     @Transactional
     public UserResponse setProfile(@Valid @RequestBody ProfileRequest req) {
@@ -141,6 +162,7 @@ public class AvatarController {
     private UserResponse toResponse(User user) {
         return new UserResponse(user.getId(), user.getUsername(), user.getEmail(), user.getAvatarUrl(), user.getRole(),
                 user.getStatus(), user.getNickname(), user.getBio(), user.getBannerUrl(), user.getCustomStatus(), user.getAccentColor(),
-                com.codagis.concorde.util.ServerOrder.parse(user.getServerOrder()), user.isAvatarAnimateOnSpeakEnabled());
+                com.codagis.concorde.util.ServerOrder.parse(user.getServerOrder()), user.isAvatarAnimateOnSpeakEnabled(),
+                user.getAccentColor2(), com.codagis.concorde.util.AboutBlocks.parse(user.getAboutBlocks()));
     }
 }
