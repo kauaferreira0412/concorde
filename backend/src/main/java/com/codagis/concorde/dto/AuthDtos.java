@@ -18,7 +18,8 @@ public class AuthDtos {
     public record UserResponse(Long id, String username, String email, String avatarUrl, Role role, UserStatus status,
                                 String nickname, String bio, String bannerUrl, String customStatus,
                                 String accentColor, java.util.List<Long> serverOrder,
-                                boolean avatarAnimateOnSpeak) {}
+                                boolean avatarAnimateOnSpeak, String accentColor2,
+                                java.util.List<com.codagis.concorde.dto.UserProfileDtos.AboutBlock> aboutBlocks) {}
 
     public record AuthResponse(String token, UserResponse user) {}
 
@@ -35,6 +36,10 @@ public class AuthDtos {
     public record ServerOrderRequest(@NotNull @Size(max = 200) java.util.List<Long> ids) {}
 
     public record AccentColorRequest(
+            @jakarta.validation.constraints.Pattern(regexp = "^(#[0-9a-fA-F]{6})?$", message = "Cor inválida") String color) {}
+
+    /** Segunda cor do gradiente do perfil ("" ou null = sem gradiente). */
+    public record AccentColor2Request(
             @jakarta.validation.constraints.Pattern(regexp = "^(#[0-9a-fA-F]{6})?$", message = "Cor inválida") String color) {}
 
     public record CustomStatusRequest(@jakarta.validation.constraints.Size(max = 80) String text) {}

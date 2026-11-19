@@ -15,7 +15,7 @@ public class DirectMessageDtos {
                              String rollNotation, Integer rollSides, String rollResultsCsv, Integer rollTotal,
                              List<ReactionSummary> reactions, boolean pinned,
                              String fileUrl, String fileName, String fileType, Long fileSize,
-                             String authorAccentColor) {}
+                             String authorAccentColor, String authorAccentColor2) {}
 
     public record DmEvent(String type, DmMessage message, Long messageId) {
         public static DmEvent created(DmMessage message) {

@@ -54,6 +54,14 @@ public class User {
     @Column(length = 7)
     private String accentColor;
 
+    /** Segunda cor do perfil (#RRGGBB): com ela, o card e o nome viram um gradiente. */
+    @Column(length = 7)
+    private String accentColor2;
+
+    /** Blocos do "Sobre mim" (links, jogos, música do momento) em JSON. */
+    @Column(length = 6000)
+    private String aboutBlocks;
+
     /** Ordem pessoal dos servidores na barra lateral (ids separados por vírgula). */
     @Column(length = 2000)
     private String serverOrder;

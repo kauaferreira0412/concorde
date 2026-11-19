@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { BASE_THEMES, THEME_TOKENS, TOKEN_GROUPS, normalizeHex, resolveColors } from "../theme/themes";
 import { CheckIcon, CopyIcon, PlusIcon, TrashIcon, XIcon } from "./icons.jsx";
+import ChatLookSettings from "./ChatLookSettings.jsx";
+import ThemeGallery from "./ThemeGallery.jsx";
 
 const SWATCH_KEYS = ["bg", "surface", "accent", "mint", "orange"];
 
@@ -150,6 +152,10 @@ export default function AppearanceSettings() {
 
       <div className="settings-divider" />
 
+      <ChatLookSettings />
+
+      <div className="settings-divider" />
+
       <p className="settings-section-title">Presets</p>
       <div className="appearance-preset-grid">
         {theme.presets.map((p) => {
@@ -229,6 +235,10 @@ export default function AppearanceSettings() {
         </form>
       )}
       {message && <p className={"appearance-message " + message.kind}>{message.text}</p>}
+
+      <div className="settings-divider" />
+
+      <ThemeGallery />
 
       <div className="settings-divider" />
 

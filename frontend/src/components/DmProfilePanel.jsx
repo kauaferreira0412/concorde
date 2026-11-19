@@ -3,6 +3,7 @@ import api from "../api/client";
 import { useProfile } from "../context/ProfileContext.jsx";
 import Avatar from "./Avatar.jsx";
 import { accentStyle } from "./AccentColorPicker.jsx";
+import { AboutBlocksView } from "./AboutBlocks.jsx";
 
 const STATUS_LABEL = { ONLINE: "online", AWAY: "ausente", DND: "não perturbe", OFFLINE: "offline" };
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
@@ -35,7 +36,7 @@ export default function DmProfilePanel({ channel }) {
   return (
     <aside
       className={"dm-profile-panel" + (profile?.accentColor ? " has-accent" : "")}
-      style={accentStyle(profile?.accentColor)}
+      style={accentStyle(profile?.accentColor, undefined, profile?.accentColor2)}
       aria-label={`Perfil de ${name}`}
     >
       <div
@@ -61,6 +62,7 @@ export default function DmProfilePanel({ channel }) {
             {profile === null ? "Carregando..." : bio || "Ainda não escreveu nada sobre si."}
           </div>
         </div>
+        <AboutBlocksView blocks={profile?.aboutBlocks} compact />
         {profile?.createdAt && (
           <div className="dm-profile-card">
             <div className="dm-profile-card-title">NO CONCORDE DESDE</div>

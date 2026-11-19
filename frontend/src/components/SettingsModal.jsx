@@ -37,6 +37,7 @@ import ImageCropModal from "./ImageCropModal.jsx";
 import { getAutoPipEnabled, pipSupported, setAutoPipEnabled } from "../utils/screenSharePip";
 import { getAutoListenAudioShare, setAutoListenAudioShare } from "../utils/audioShareListen";
 import AccentColorPicker, { accentStyle } from "./AccentColorPicker.jsx";
+import { AboutBlocksEditor } from "./AboutBlocks.jsx";
 
 const TABS = [
   { id: "perfil", label: "Perfil", Icon: UserIcon },
@@ -513,7 +514,7 @@ export default function SettingsModal({ onClose }) {
                   onChange={handleBannerChange}
                   hidden
                 />
-                <div className="profile-editor" style={accentStyle(user?.accentColor)}>
+                <div className="profile-editor" style={accentStyle(user?.accentColor, undefined, user?.accentColor2)}>
                   <button
                     type="button"
                     className={"profile-editor-banner" + (user?.bannerUrl ? " has-image" : "")}
@@ -644,6 +645,7 @@ export default function SettingsModal({ onClose }) {
                     placeholder="Conte um pouco sobre você..."
                   />
                 </div>
+                <AboutBlocksEditor />
                 {profileError && <p className="auth-error">{profileError}</p>}
 
                 <div className="settings-divider" />
