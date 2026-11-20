@@ -26,6 +26,16 @@ import { DmNotificationsProvider } from "./src/chat/DmNotifications";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+// cor clara? (decide o texto da barra de status pela cor real do topo, não pelo tema base)
+function isLightColor(hex) {
+  const n = parseInt(String(hex || "#000000").replace("#", "").slice(0, 6), 16);
+  if (Number.isNaN(n)) return false;
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6;
+}
+
 const navigationRef = createNavigationContainerRef();
 const Stack = createNativeStackNavigator();
 
@@ -105,7 +115,8 @@ function Root() {
   return (
     <VoiceProvider user={user}>
       <DmNotificationsProvider user={user}>
-      <StatusBar style={t.dark ? "light" : "dark"} />
+      {/* o topo das telas é a barra na cor de destaque: texto claro em destaque escuro e vice-versa */}
+      <StatusBar style={isLightColor(t.accent) ? "dark" : "light"} />
       <View style={{ flex: 1, backgroundColor: t.bg }}>
         <NavigationContainer
           theme={navTheme}
@@ -116,7 +127,16 @@ function Root() {
           }}
           onStateChange={() => setCurrentRoute(navigationRef.getCurrentRoute()?.name)}
         >
-          <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg }, animation: "slide_from_right", gestureEnabled: true }}>
+          <Stack.Navigator
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: t.bg },
+              animation: "slide_from_right",
+              gestureEnabled: true,
+              // no iOS cada tela controla a barra de status (o <StatusBar> sozinho não vale): texto claro em topo escuro
+              statusBarStyle: isLightColor(t.accent) ? "dark" : "light",
+            }}
+          >
             {user ? (
               <>
                 <Stack.Screen name="Home">

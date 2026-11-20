@@ -13,7 +13,7 @@ import { useVoice } from "../voice/VoiceContext";
 import { playSound } from "../voice/sounds";
 import { Avatar, Field, IconBtn, Sticker, Txt } from "../ui/kit";
 import Icon from "../ui/icons";
-import Sheet, { SheetItem } from "../ui/Sheet";
+import Sheet, { ALL_ORIENTATIONS, SheetItem } from "../ui/Sheet";
 import { EmojiSheet, GifSheet, QUICK_REACTIONS } from "./Pickers";
 import { Enter } from "../ui/anim";
 import { LinkPreviewCard, MarkdownText, MentionSuggestions, PinnedSheet, PollSheet, SearchSheet, TypingLine, firstLink, useTyping } from "./extras";
@@ -797,7 +797,7 @@ export default function ChatView({ kind = "channel", channelId, serverId, readOn
         }}
       />
 
-      <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
+      <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)} supportedOrientations={ALL_ORIENTATIONS}>
         <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)", justifyContent: "center" }} onPress={() => setViewer(null)}>
           {viewer ? <Image cachePolicy="memory-disk" transition={120} recyclingKey={viewer} source={{ uri: viewer }} style={{ width: "100%", height: "80%" }} contentFit="contain" /> : null}
           <View style={{ position: "absolute", top: insets.top + 10, right: 14 }}>

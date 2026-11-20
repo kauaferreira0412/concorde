@@ -273,9 +273,10 @@ export default function MeScreen({ navigation, user, onLogout, embedded }) {
       <ScrollView contentContainerStyle={{ width: "100%", maxWidth: 720, alignSelf: "center", padding: 14, gap: 16, paddingBottom: 130 }}>
         <Sticker radius={22} shadow={t.shadow}>
           <ProfileBanner bannerUrl={user?.bannerUrl} accent={user?.accentColor} accent2={user?.accentColor2} height={90} />
-          <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: -32, alignItems: "flex-end" }}>
+          <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: -32, alignItems: "flex-start" }}>
             <Avatar name={user?.username} url={user?.avatarUrl} size={76} radius={24} />
-            <View style={{ flex: 1, paddingBottom: 4 }}>
+            {/* só a foto sobe por cima da faixa; o nome fica abaixo dela, sem ficar em cima do banner */}
+            <View style={{ flex: 1, paddingTop: 38 }}>
               <Txt weight="display" size={18} numberOfLines={1}>
                 {(user?.nickname || user?.username || "").toUpperCase()}
               </Txt>

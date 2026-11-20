@@ -57,7 +57,7 @@ export default function ServersScreen({ navigation, user }) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const layout = useLayout();
-  const cols = layout.wide ? layout.columns(190, 6) : 2;
+  const cols = layout.wide ? layout.columns(190, 6, layout.contentWidth) : 2;
 
   const load = useCallback(async () => {
     try {

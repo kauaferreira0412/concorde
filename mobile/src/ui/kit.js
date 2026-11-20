@@ -164,16 +164,26 @@ const WAVE = "M0 30 Q60 0 120 30 T240 30 M0 90 Q60 60 120 90 T240 90";
 /** Fundo do app: cor do tema + ondas (quando o tema tem). */
 export function Screen({ children, style, padded }) {
   const t = useTokens();
+  // o SVG não se redesenha sozinho ao girar a tela: mede o espaço e recria no tamanho novo
+  const [size, setSize] = useState(null);
   return (
-    <View style={[{ flex: 1, backgroundColor: t.bg }, padded && { padding: 12 }, style]}>
-      {t.waves ? (
-        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+    <View
+      style={[{ flex: 1, backgroundColor: t.bg }, padded && { padding: 12 }, style]}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        const w = Math.ceil(width);
+        const h = Math.ceil(height);
+        setSize((prev) => (prev && prev.w === w && prev.h === h ? prev : { w, h }));
+      }}
+    >
+      {t.waves && size ? (
+        <Svg key={`${size.w}x${size.h}`} width={size.w} height={size.h} style={StyleSheet.absoluteFill} pointerEvents="none">
           <Defs>
             <Pattern id="waves" patternUnits="userSpaceOnUse" width="240" height="120">
               <Path d={WAVE} fill="none" stroke={t.wave} strokeWidth={16} strokeLinecap="round" />
             </Pattern>
           </Defs>
-          <Rect width="100%" height="100%" fill="url(#waves)" />
+          <Rect width={size.w} height={size.h} fill="url(#waves)" />
         </Svg>
       ) : null}
       {children}

@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Linking, Modal, Platform, Pressable, ScrollView, StatusBar, UIManager, View, findNodeHandle } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Linking, Modal, Platform, Pressable, ScrollView, StatusBar, StyleSheet, UIManager, View, findNodeHandle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VideoTrack } from "@livekit/react-native";
 import { startIOSPIP } from "@livekit/react-native-webrtc";
 import { Track } from "livekit-client";
 import { Image } from "expo-image";
+import { isPictureInPictureActive, startPictureInPicture, stopPictureInPicture } from "../../modules/concorde-sfx";
 import api from "../api";
 import { useTokens } from "../theme/ThemeContext";
 import { useVoice } from "../voice/VoiceContext";
 import { Avatar, Btn, Field, IconBtn, Screen, SectionTitle, Sticker, Tag, Txt } from "../ui/kit";
-import Sheet, { SheetItem } from "../ui/Sheet";
+import Sheet, { ALL_ORIENTATIONS, SheetItem } from "../ui/Sheet";
 import Slider from "../ui/Slider";
 import TopBar from "../ui/TopBar";
 import Icon from "../ui/icons";
@@ -18,8 +19,12 @@ import { useLayout } from "../ui/layout";
 
 const PIP = { enabled: true, startAutomatically: true, stopAutomatically: true, preferredSize: { width: 16, height: 9 } };
 
-/** Abre o PiP do vídeo. Tenta o comando da biblioteca e, na arquitetura nova, o nome direto. */
-function openPip(viewRef) {
+/**
+ * Abre o PiP do vídeo. O comando da biblioteca não funciona na arquitetura nova do RN,
+ * então primeiro tenta pelo nosso módulo nativo (acha a view de vídeo e abre o PiP).
+ */
+async function openPip(viewRef) {
+  if (await startPictureInPicture()) return true;
   if (!viewRef.current) return false;
   try {
     startIOSPIP(viewRef);
@@ -83,13 +88,48 @@ function ParticipantCard({ p, onPress, mirrorLocal, onEnlarge }) {
   );
 }
 
-/** Vídeo da live, com Picture in Picture no iPhone (manual pelo botão ou sozinho ao minimizar). */
-function StreamPlayer({ stream, onStop, onFullscreen, height = 210, fullscreen }) {
+/** O PiP está aberto? Confere de tempos em tempos enquanto a live está na tela (o sistema não avisa). */
+function usePipActive(enabled) {
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    if (!enabled || Platform.OS !== "ios") return undefined;
+    let alive = true;
+    const check = () => isPictureInPictureActive().then((v) => alive && setActive(v));
+    check();
+    const timer = setInterval(check, 800);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [enabled]);
+  return enabled && active;
+}
+
+/**
+ * Vídeo da live, com Picture in Picture no iPhone/iPad (manual pelo botão ou sozinho ao minimizar).
+ * Fora da tela cheia o quadro é 16:9 e cresce até onde dá (sem as faixas pretas enormes).
+ */
+function StreamPlayer({ stream, onStop, onFullscreen, fullscreen }) {
   const t = useTokens();
+  const layout = useLayout();
   const viewRef = useRef(null);
+  const [boxWidth, setBoxWidth] = useState(0);
+  const inPip = usePipActive(stream.hasVideo);
   const trackRef = { participant: stream.participant, publication: stream.publication, source: Track.Source.ScreenShare };
-  return (
-    <View style={{ height, backgroundColor: "#000", borderRadius: fullscreen ? 0 : 14, overflow: "hidden" }}>
+
+  // 16:9 na largura disponível, sem passar de ~62% da altura da tela (no iPad deitado fica centralizado)
+  const maxH = Math.round(layout.height * (layout.wide ? 0.62 : 0.4));
+  const frameW = boxWidth ? Math.min(boxWidth, Math.round((maxH * 16) / 9)) : 0;
+  const frameH = Math.round((frameW * 9) / 16);
+
+  const player = (
+    <View
+      style={
+        fullscreen
+          ? { flex: 1, backgroundColor: "#000" }
+          : { width: frameW, height: frameH, backgroundColor: "#000", borderRadius: 16, overflow: "hidden", borderWidth: 2.5, borderColor: t.ink }
+      }
+    >
       {stream.hasVideo ? (
         <VideoTrack ref={viewRef} trackRef={trackRef} objectFit="contain" style={{ flex: 1 }} iosPIP={Platform.OS === "ios" ? PIP : undefined} />
       ) : (
@@ -100,28 +140,55 @@ function StreamPlayer({ stream, onStop, onFullscreen, height = 210, fullscreen }
           </Txt>
         </View>
       )}
-      <View style={{ position: "absolute", top: 8, right: 8, flexDirection: "row", gap: 8 }}>
-        {Platform.OS === "ios" && stream.hasVideo ? (
-          <IconBtn
-            icon="pip"
-            size={38}
-            label="Picture in Picture"
-            onPress={() => {
-              if (!openPip(viewRef)) Alert.alert("Picture in Picture", "Não deu pra abrir agora. Minimize o app com a live aberta que ele abre sozinho.");
-            }}
-          />
-        ) : null}
-        {onFullscreen ? <IconBtn icon="maximize" size={38} label="Tela cheia" onPress={onFullscreen} /> : null}
-        <IconBtn icon="x" size={38} label={fullscreen ? "Fechar" : "Parar de assistir"} onPress={onStop} />
-      </View>
-      <View style={{ position: "absolute", left: 8, bottom: 8, flexDirection: "row", gap: 6, alignItems: "center" }}>
-        <Tag label="AO VIVO" />
-        <View style={{ backgroundColor: t.backdrop, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 }}>
-          <Txt weight={800} size={12} color="#fff">
-            {stream.name}
+      {inPip ? (
+        // a live continua montada por baixo (o PiP depende dela); só cobre pra não aparecer duas vezes
+        <Pressable
+          onPress={() => stopPictureInPicture()}
+          style={{ ...StyleSheet.absoluteFillObject, backgroundColor: t.surface, alignItems: "center", justifyContent: "center", gap: 8, padding: 16 }}
+          accessibilityLabel="Voltar a live pro app"
+        >
+          <Icon name="pip" size={34} color={t.text} />
+          <Txt weight={900} size={15} style={{ textAlign: "center" }}>
+            Assistindo em Picture in Picture
           </Txt>
+          <Txt weight={700} size={12} color={t.textMuted} style={{ textAlign: "center" }}>
+            Toque aqui pra trazer a live de volta
+          </Txt>
+        </Pressable>
+      ) : null}
+      {!inPip ? (
+        <View style={{ position: "absolute", top: 8, right: 8, flexDirection: "row", gap: 8 }}>
+          {Platform.OS === "ios" && stream.hasVideo ? (
+            <IconBtn
+              icon="pip"
+              size={38}
+              label="Picture in Picture"
+              onPress={() => {
+                openPip(viewRef).then((ok) => !ok && Alert.alert("Picture in Picture", "Não deu pra abrir agora. Minimize o app com a live aberta que ele abre sozinho."));
+              }}
+            />
+          ) : null}
+          {onFullscreen ? <IconBtn icon="maximize" size={38} label="Tela cheia" onPress={onFullscreen} /> : null}
+          <IconBtn icon="x" size={38} label={fullscreen ? "Fechar" : "Parar de assistir"} onPress={onStop} />
         </View>
-      </View>
+      ) : null}
+      {!inPip ? (
+        <View style={{ position: "absolute", left: 8, bottom: 8, flexDirection: "row", gap: 6, alignItems: "center" }}>
+          <Tag label="AO VIVO" />
+          <View style={{ backgroundColor: t.backdrop, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 }}>
+            <Txt weight={800} size={12} color="#fff">
+              {stream.name}
+            </Txt>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+
+  if (fullscreen) return player;
+  return (
+    <View style={{ width: "100%", alignItems: "center" }} onLayout={(e) => setBoxWidth(Math.floor(e.nativeEvent.layout.width))}>
+      {boxWidth ? player : <View style={{ height: 200 }} />}
     </View>
   );
 }
@@ -676,10 +743,10 @@ export default function VoiceScreen({ route, navigation, user }) {
       </View>
 
       {fullscreen && watched ? (
-        <Modal visible animationType="fade" onRequestClose={() => setFullscreen(false)} supportedOrientations={["portrait", "landscape"]}>
+        <Modal visible animationType="fade" onRequestClose={() => setFullscreen(false)} supportedOrientations={ALL_ORIENTATIONS}>
           <StatusBar hidden />
           <View style={{ flex: 1, backgroundColor: "#000", justifyContent: "center", paddingTop: insets.top }}>
-            <StreamPlayer stream={watched} fullscreen height="100%" onStop={() => setFullscreen(false)} />
+            <StreamPlayer stream={watched} fullscreen onStop={() => setFullscreen(false)} />
           </View>
         </Modal>
       ) : null}
@@ -691,7 +758,7 @@ export default function VoiceScreen({ route, navigation, user }) {
         const big = bigCam ? people.find((x) => x.identity === bigCam && x.camera) : null;
         if (!big) return null;
         return (
-          <Modal visible animationType="fade" onRequestClose={() => setBigCam(null)} supportedOrientations={["portrait", "landscape"]}>
+          <Modal visible animationType="fade" onRequestClose={() => setBigCam(null)} supportedOrientations={ALL_ORIENTATIONS}>
             <StatusBar hidden />
             <View style={{ flex: 1, backgroundColor: "#000" }}>
               <VideoTrack
