@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useAlert } from "../context/AlertContext.jsx";
 import {
@@ -631,6 +631,16 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
     setVolumeMenu({ participantIdentity: share.participantIdentity, name: share.name, x: e.clientX, y: e.clientY });
   }
 
+  useLayoutEffect(() => {
+    if (!volumeMenu || !volumeMenuRef.current) return;
+    const el = volumeMenuRef.current;
+    const rect = el.getBoundingClientRect();
+    const left = Math.max(8, Math.min(volumeMenu.x, window.innerWidth - rect.width - 8));
+    const top = Math.max(8, Math.min(volumeMenu.y, window.innerHeight - rect.height - 8));
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+  }, [volumeMenu]);
+
   useEffect(() => {
     if (!volumeMenu) return;
     function handlePointerDown(e) {
@@ -928,10 +938,7 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
         <div
           className="volume-popover"
           ref={volumeMenuRef}
-          style={{
-            left: Math.min(volumeMenu.x, window.innerWidth - 232),
-            top: Math.min(volumeMenu.y, window.innerHeight - 70),
-          }}
+          style={{ left: volumeMenu.x, top: volumeMenu.y }}
         >
           <p className="volume-popover-title">{volumeMenu.name}</p>
           <VolumeSlider
