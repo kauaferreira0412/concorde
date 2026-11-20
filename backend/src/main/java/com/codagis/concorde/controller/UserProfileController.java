@@ -40,6 +40,7 @@ public class UserProfileController {
                 user.getBio(), presenceService.effectiveStatus(user.getId()), user.getCreatedAt(), user.getRole(),
                 user.getBannerUrl(), presenceService.visibleCustomStatus(user.getId()),
                 user.getAccentColor(), user.getAccentColor2(),
-                com.codagis.concorde.util.AboutBlocks.parse(user.getAboutBlocks()));
+                com.codagis.concorde.util.AboutBlocks.parse(user.getAboutBlocks()),
+                com.codagis.concorde.util.CardColors.parse(user.getCardColors()));
     }
 }

@@ -7,4 +7,6 @@ public class SoundboardDtos {
     public record ClipResponse(Long id, String name, String fileUrl, Instant createdAt) {}
 
     public record UploadClipRequest(String name) {}
+
+    public record RenameClipRequest(String name) {}
 }

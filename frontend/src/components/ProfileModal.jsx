@@ -9,6 +9,7 @@ import CustomStatusEditor from "./CustomStatusEditor.jsx";
 import { CheckIcon, MessageSquareIcon, MusicNoteIcon, PlusIcon, ShieldIcon } from "./icons.jsx";
 import { accentStyle } from "./AccentColorPicker.jsx";
 import { AboutBlocksView } from "./AboutBlocks.jsx";
+import { cardColorClass, cardColorStyle } from "../utils/cardColors";
 
 const STATUS_LABEL = { ONLINE: "Online", AWAY: "Ausente", DND: "Não perturbe", OFFLINE: "Offline" };
 const STATUS_DOT_CLASS = { ONLINE: "online", AWAY: "away", DND: "dnd", OFFLINE: "offline" };
@@ -91,8 +92,8 @@ export default function ProfileModal({ userId, onClose }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className={"modal profile-modal" + (profile?.accentColor ? " has-accent" : "")}
-        style={accentStyle(profile?.accentColor, undefined, profile?.accentColor2)}
+        className={"modal profile-modal" + (profile?.accentColor ? " has-accent" : "") + cardColorClass(profile?.cardColors)}
+        style={cardColorStyle(profile?.cardColors, accentStyle(profile?.accentColor, undefined, profile?.accentColor2))}
         onClick={(e) => e.stopPropagation()}
       >
         {loadError && <p className="auth-error" style={{ margin: 20 }}>{loadError}</p>}

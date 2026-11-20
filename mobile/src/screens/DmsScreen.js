@@ -22,7 +22,7 @@ export function StatusDot({ status, size = 14 }) {
 export function AvatarWithStatus({ name, url, status, size = 46 }) {
   return (
     <View>
-      <Avatar name={name} url={url} size={size} />
+      <Avatar name={name} url={url} size={size} still={status === "OFFLINE" || status === "INVISIBLE"} />
       <View style={{ position: "absolute", right: -3, bottom: -3 }}>
         <StatusDot status={status} />
       </View>

@@ -3,7 +3,8 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, Share, Switch, View } 
 import { Image } from "expo-image";
 import api from "../api";
 import { useTheme } from "../theme/ThemeContext";
-import { BASE_THEMES, resolveColors } from "../theme/themes";
+import { BASE_THEMES, THEME_TOKENS, TOKEN_GROUPS, resolveColors } from "../theme/themes";
+import ColorPicker, { Swatch } from "../ui/ColorPicker";
 import { useVoice } from "../voice/VoiceContext";
 import { Avatar, Btn, Field, Screen, SectionTitle, Sticker, Tag, Txt } from "../ui/kit";
 import Icon from "../ui/icons";
@@ -130,6 +131,97 @@ function Gallery() {
   );
 }
 
+/** Editar cada cor do tema (igual ao "Personalizar" do site) e salvar como preset. */
+function ThemeColorsEditor() {
+  const theme = useTheme();
+  const { t } = theme;
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [presetName, setPresetName] = useState("");
+  const [saved, setSaved] = useState(false);
+  const current = resolveColors(theme.base, theme.colors);
+  const changed = Object.keys(theme.colors || {}).length;
+
+  return (
+    <View style={{ gap: 10 }}>
+      <Pressable onPress={() => setOpen((v) => !v)} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <View style={{ flex: 1 }}>
+          <SectionTitle>Personalizar cores{changed ? ` · ${changed} mudada${changed > 1 ? "s" : ""}` : ""}</SectionTitle>
+        </View>
+        <View style={open ? { transform: [{ rotate: "180deg" }] } : undefined}>
+          <Icon name="chevronDown" size={18} color={t.textMuted} />
+        </View>
+      </Pressable>
+      {open ? (
+        <>
+          {TOKEN_GROUPS.map((group) => (
+            <View key={group} style={{ gap: 8 }}>
+              <Txt weight={900} size={12} color={t.textMuted}>
+                {group.toUpperCase()}
+              </Txt>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                {THEME_TOKENS.filter((tok) => tok.group === group).map((tok) => (
+                  <Pressable
+                    key={tok.key}
+                    onPress={() => setEditing(tok)}
+                    style={{ width: "47%", flexDirection: "row", alignItems: "center", gap: 8 }}
+                  >
+                    <Swatch color={current[tok.key]} onPress={() => setEditing(tok)} label={tok.label} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Txt weight={800} size={13} numberOfLines={1}>
+                        {tok.label}
+                      </Txt>
+                      <Txt weight={700} size={11} color={theme.colors?.[tok.key] ? t.accentText : t.textFaint}>
+                        {current[tok.key]}
+                        {theme.colors?.[tok.key] ? " · sua" : ""}
+                      </Txt>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ))}
+          <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            {changed ? <Btn small variant="surface" label="Voltar ao tema base" onPress={() => theme.setBase(theme.base)} /> : null}
+          </View>
+          <SectionTitle>Salvar como preset</SectionTitle>
+          <Field value={presetName} onChangeText={(v) => { setPresetName(v); setSaved(false); }} placeholder="Nome do seu tema" maxLength={40} />
+          <Btn
+            small
+            icon="check"
+            label={saved ? "Salvo nos seus presets" : "Salvar tema"}
+            disabled={saved}
+            onPress={() => {
+              theme.savePreset(presetName || "Meu tema");
+              setSaved(true);
+              setPresetName("");
+            }}
+          />
+        </>
+      ) : null}
+      <ColorPicker
+        visible={!!editing}
+        title={editing ? editing.label.toUpperCase() : ""}
+        value={editing ? current[editing.key] : null}
+        onClose={() => setEditing(null)}
+        onPick={(hex) => {
+          theme.setColor(editing.key, hex);
+          setEditing(null);
+        }}
+        onClear={
+          editing && theme.colors?.[editing.key]
+            ? () => {
+                theme.setColor(editing.key, BASE_THEMES[theme.base].colors[editing.key]);
+                setEditing(null);
+              }
+            : undefined
+        }
+        clearLabel="Voltar a do tema base"
+      />
+    </View>
+  );
+}
+
 export default function MeScreen({ navigation, user, onLogout, embedded }) {
   const theme = useTheme();
   const { t } = theme;
@@ -237,6 +329,8 @@ export default function MeScreen({ navigation, user, onLogout, embedded }) {
               <Txt weight={800}>Ondas no fundo</Txt>
               <Switch value={theme.waves} onValueChange={theme.setWaves} trackColor={{ true: t.accent }} />
             </View>
+
+            <ThemeColorsEditor />
 
             <SectionTitle>Presets</SectionTitle>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>

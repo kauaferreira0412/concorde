@@ -150,3 +150,26 @@ export function useTheme() {
 export function useTokens() {
   return useContext(ThemeContext).t;
 }
+
+const CARD_MAP = { bg: "surface", surface: "surface2", border: "ink", text: "text", muted: "textMuted", accent: "accent" };
+
+/**
+ * Cores próprias do card de perfil (iguais às do site): redefine os tokens só pra quem está dentro.
+ * Cor vazia segue o tema de quem está vendo.
+ */
+export function CardThemeProvider({ colors, children }) {
+  const theme = useContext(ThemeContext);
+  const value = useMemo(() => {
+    const c = colors || {};
+    const over = {};
+    for (const [k, token] of Object.entries(CARD_MAP)) {
+      if (/^#[0-9a-fA-F]{6}$/.test(c[k] || "")) over[token] = c[k];
+    }
+    if (over.ink) over.line = over.ink;
+    const banner = /^#[0-9a-fA-F]{6}$/.test(c.banner || "") ? c.banner : null;
+    if (!Object.keys(over).length && !banner) return theme;
+    const t = buildTokens(theme.t.base, { ...theme.t, ...over }, theme.t.waves);
+    return { ...theme, t: { ...t, cardBanner: banner } };
+  }, [theme, colors]);
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}

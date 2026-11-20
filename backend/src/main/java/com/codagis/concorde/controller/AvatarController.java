@@ -144,6 +144,16 @@ public class AvatarController {
         return toResponse(user);
     }
 
+    @PutMapping("/card-colors")
+    @Transactional
+    public UserResponse setCardColors(@RequestBody com.codagis.concorde.dto.UserProfileDtos.CardColorsRequest req) {
+        Long userId = currentUser.id();
+        User user = userRepository.findById(userId).orElseThrow(() -> new IllegalStateException("Usuario nao encontrado"));
+        user.setCardColors(com.codagis.concorde.util.CardColors.format(req.colors()));
+        userRepository.save(user);
+        return toResponse(user);
+    }
+
     @PutMapping("/profile")
     @Transactional
     public UserResponse setProfile(@Valid @RequestBody ProfileRequest req) {
@@ -163,6 +173,7 @@ public class AvatarController {
         return new UserResponse(user.getId(), user.getUsername(), user.getEmail(), user.getAvatarUrl(), user.getRole(),
                 user.getStatus(), user.getNickname(), user.getBio(), user.getBannerUrl(), user.getCustomStatus(), user.getAccentColor(),
                 com.codagis.concorde.util.ServerOrder.parse(user.getServerOrder()), user.isAvatarAnimateOnSpeakEnabled(),
-                user.getAccentColor2(), com.codagis.concorde.util.AboutBlocks.parse(user.getAboutBlocks()));
+                user.getAccentColor2(), com.codagis.concorde.util.AboutBlocks.parse(user.getAboutBlocks()),
+                com.codagis.concorde.util.CardColors.parse(user.getCardColors()));
     }
 }

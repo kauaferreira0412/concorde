@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Linking, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
@@ -18,7 +18,9 @@ import VoiceScreen from "./src/screens/VoiceScreen";
 import DmChatScreen from "./src/screens/DmChatScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import EditProfileScreen from "./src/screens/EditProfileScreen";
-import { VoiceProvider } from "./src/voice/VoiceContext";
+import { VoiceProvider, useVoice } from "./src/voice/VoiceContext";
+import { parseCallLink } from "./src/widgets/activeCalls";
+import { useWidgetSync } from "./src/widgets/useWidgetSync";
 import VoiceBar from "./src/voice/VoiceBar";
 import { DmNotificationsProvider } from "./src/chat/DmNotifications";
 
@@ -27,12 +29,33 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 const navigationRef = createNavigationContainerRef();
 const Stack = createNativeStackNavigator();
 
+/**
+ * Links concorde://call/<id> (do widget "Em call agora"): abre a tela da call, que já entra nela.
+ * Se o app ainda está carregando, guarda o link e abre assim que der.
+ */
+function CallLinks({ user, navReady }) {
+  const voice = useVoice();
+  useWidgetSync(user, voice?.channel?.id);
+  useEffect(() => {
+    if (!user || !navReady) return undefined;
+    function open(url) {
+      const channel = parseCallLink(url);
+      if (channel && navigationRef.isReady()) navigationRef.navigate("Voice", { channel });
+    }
+    Linking.getInitialURL().then((url) => url && open(url)).catch(() => {});
+    const sub = Linking.addEventListener("url", ({ url }) => open(url));
+    return () => sub.remove();
+  }, [user, navReady]);
+  return null;
+}
+
 function Root() {
   const { t, loaded: themeLoaded } = useTheme();
   const [fontsLoaded] = useFonts({ Bungee_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold, Nunito_900Black });
   const [sessionReady, setSessionReady] = useState(false);
   const [user, setUser] = useState(null);
   const [currentRoute, setCurrentRoute] = useState(null);
+  const [navReady, setNavReady] = useState(false);
 
   useEffect(() => {
     setExpiredHandler(() => {
@@ -87,7 +110,10 @@ function Root() {
         <NavigationContainer
           theme={navTheme}
           ref={navigationRef}
-          onReady={() => setCurrentRoute(navigationRef.getCurrentRoute()?.name)}
+          onReady={() => {
+            setCurrentRoute(navigationRef.getCurrentRoute()?.name);
+            setNavReady(true);
+          }}
           onStateChange={() => setCurrentRoute(navigationRef.getCurrentRoute()?.name)}
         >
           <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg }, animation: "slide_from_right", gestureEnabled: true }}>
@@ -111,6 +137,7 @@ function Root() {
           </Stack.Navigator>
         </NavigationContainer>
         {user ? <VoiceBar navigationRef={navigationRef} currentRoute={currentRoute} /> : null}
+        <CallLinks user={user} navReady={navReady} />
       </View>
       </DmNotificationsProvider>
     </VoiceProvider>

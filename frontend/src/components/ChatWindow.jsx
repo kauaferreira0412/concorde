@@ -30,7 +30,6 @@ import { useFileDrop } from "../utils/useFileDrop";
 import { MembersToggleButton, MobileBackButton } from "../context/LayoutContext.jsx";
 import RecordingBar from "./RecordingBar.jsx";
 import AudioPlayer from "./AudioPlayer.jsx";
-import { accentStyle } from "./AccentColorPicker.jsx";
 import DaySeparator, { isGroupedWith, isNewDay } from "./DaySeparator.jsx";
 import MessageText from "./MessageText.jsx";
 import AttachmentMessage from "./AttachmentMessage.jsx";
@@ -119,9 +118,6 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
   const { user, isAdmin } = useAuth();
 
   // Cor de destaque do autor; nas minhas mensagens usa a atual (muda na hora quando troco nas configurações).
-  const authorAccent = (m) => (m.authorId === user?.id ? user?.accentColor : m.authorAccentColor) || null;
-  const authorAccent2 = (m) =>
-    (authorAccent(m) && (m.authorId === user?.id ? user?.accentColor2 : m.authorAccentColor2)) || null;
   const { openProfile } = useProfile();
   const { showAlert } = useAlert();
   const { activeChannel } = useVoiceCall();
@@ -896,9 +892,8 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                 <div>
                   <button
                     type="button"
-                    className={"chat-author" + (authorAccent(m) ? " has-accent" : "") + (authorAccent2(m) ? " has-accent-2" : "")}
+                    className="chat-author"
                     data-tone={toneFor(m.authorUsername)}
-                    style={accentStyle(authorAccent(m), undefined, authorAccent2(m))}
                     onClick={() => openProfile(m.authorId)}
                   >
                     {m.authorUsername}

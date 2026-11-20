@@ -49,10 +49,33 @@
       ],
       "expo-asset",
       "./plugins/withWindowsCxxStagingDir.js",
-      "expo-image"
+      "expo-image",
+      "@bacons/apple-targets",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "CallsWidget",
+              "label": "Em call agora",
+              "description": "Quem está em call nos seus servidores. Toque pra entrar.",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "maxResizeWidth": "420dp",
+              "maxResizeHeight": "420dp",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/widget-preview.png"
+            }
+          ]
+        }
+      ]
     ],
     "ios": {
       "bundleIdentifier": "com.codagis.concorde",
+      "appleTeamId": "4Z544V82DV",
       "supportsTablet": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "O Concorde usa o microfone pra você falar nas calls de voz.",
@@ -63,13 +86,19 @@
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bitcode": false
+      "bitcode": false,
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.codagis.concorde"
+        ]
+      }
     },
     "extra": {
       "eas": {
         "projectId": "467c5e68-1e8d-457b-8bd9-e5aa93874bd6"
       }
     },
-    "owner": "lkaio16"
+    "owner": "lkaio16",
+    "scheme": "concorde"
   }
 }

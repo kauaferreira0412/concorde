@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Modal, Platform, Pressable, ScrollView, StatusBar, UIManager, View, findNodeHandle } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Linking, Modal, Platform, Pressable, ScrollView, StatusBar, UIManager, View, findNodeHandle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VideoTrack } from "@livekit/react-native";
 import { startIOSPIP } from "@livekit/react-native-webrtc";
 import { Track } from "livekit-client";
+import { Image } from "expo-image";
 import api from "../api";
 import { useTokens } from "../theme/ThemeContext";
 import { useVoice } from "../voice/VoiceContext";
-import { Avatar, Btn, IconBtn, Screen, SectionTitle, Sticker, Tag, Txt } from "../ui/kit";
+import { Avatar, Btn, Field, IconBtn, Screen, SectionTitle, Sticker, Tag, Txt } from "../ui/kit";
 import Sheet, { SheetItem } from "../ui/Sheet";
 import Slider from "../ui/Slider";
 import TopBar from "../ui/TopBar";
@@ -125,13 +126,18 @@ function StreamPlayer({ stream, onStop, onFullscreen, height = 210, fullscreen }
   );
 }
 
-/** Soundboard: toca o som pra todo mundo da call (mesma API do site). */
+/** Soundboard: toca o som pra todo mundo da call (mesma API do site). Toque de novo pra parar; segure pra renomear. */
+const MAX_CLIP_MS = 15000; // o bot corta cada som em 15s
+
 function Soundboard({ channelId }) {
   const t = useTokens();
   const voice = useVoice();
   const [vol, setVol] = useState(voice.soundboardVolume);
   const [clips, setClips] = useState(null);
-  const [playingId, setPlayingId] = useState(null);
+  const [playing, setPlaying] = useState({});
+  const timers = useRef({});
+  const [renaming, setRenaming] = useState(null);
+  const [renameValue, setRenameValue] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -139,27 +145,71 @@ function Soundboard({ channelId }) {
       .get("/api/soundboard")
       .then(({ data }) => active && setClips(data || []))
       .catch(() => active && setClips([]));
+    const all = timers.current;
     return () => {
       active = false;
+      Object.values(all).forEach(clearTimeout);
     };
   }, []);
 
+  function clearPlaying(id) {
+    setPlaying((p) => {
+      const next = { ...p };
+      delete next[id];
+      return next;
+    });
+  }
+
   async function play(clip) {
-    setPlayingId(clip.id);
+    if (playing[clip.id]) return stop();
     try {
       await api.post(`/api/channels/${channelId}/soundboard/play/${clip.id}`);
-    } catch {
-      // som não tocou: só some o destaque
-    } finally {
-      setTimeout(() => setPlayingId(null), 500);
+      clearTimeout(timers.current[clip.id]);
+      setPlaying((p) => ({ ...p, [clip.id]: true }));
+      timers.current[clip.id] = setTimeout(() => clearPlaying(clip.id), MAX_CLIP_MS);
+    } catch (err) {
+      Alert.alert("Soundboard", err.response?.data?.error || "Não deu pra tocar esse som.");
+    }
+  }
+
+  /** Para os sons que você tocou (os dos outros continuam). */
+  async function stop() {
+    Object.values(timers.current).forEach(clearTimeout);
+    timers.current = {};
+    setPlaying({});
+    try {
+      await api.post(`/api/channels/${channelId}/soundboard/stop`);
+    } catch (err) {
+      Alert.alert("Soundboard", err.response?.data?.error || "Não deu pra parar o som.");
+    }
+  }
+
+  async function saveRename() {
+    const clip = renaming;
+    const name = renameValue.trim();
+    setRenaming(null);
+    if (!clip || !name || name === clip.name) return;
+    setClips((prev) => prev.map((c) => (c.id === clip.id ? { ...c, name } : c)));
+    try {
+      const { data } = await api.put(`/api/soundboard/${clip.id}`, { name });
+      setClips((prev) => prev.map((c) => (c.id === clip.id ? data : c)));
+    } catch (err) {
+      setClips((prev) => prev.map((c) => (c.id === clip.id ? clip : c)));
+      Alert.alert("Soundboard", err.response?.data?.error || "Não deu pra renomear.");
     }
   }
 
   if (!clips?.length) return null;
+  const anyPlaying = Object.keys(playing).length > 0;
   return (
     <Sticker radius={20} shadow={4}>
       <View style={{ padding: 12, gap: 10 }}>
-        <SectionTitle>SOUNDBOARD · {clips.length}</SectionTitle>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <SectionTitle>SOUNDBOARD · {clips.length}</SectionTitle>
+          </View>
+          {anyPlaying ? <Btn small icon="stop" label="Parar" onPress={stop} /> : null}
+        </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <Icon name="volume" size={16} color={t.textMuted} />
           <View style={{ flex: 1 }}>
@@ -169,37 +219,85 @@ function Soundboard({ channelId }) {
             {vol}%
           </Txt>
         </View>
+        <Txt weight={700} size={12} color={t.textFaint}>
+          Toque pra tocar (de novo pra parar) · segure pra renomear
+        </Txt>
         <FlatList
           data={clips}
           horizontal
           showsHorizontalScrollIndicator={false}
           keyExtractor={(c) => String(c.id)}
           contentContainerStyle={{ gap: 10, paddingRight: 6, paddingBottom: 4 }}
-          renderItem={({ item }) => (
-            <Pressable onPress={() => play(item)} accessibilityLabel={`Tocar ${item.name}`}>
-              {({ pressed }) => (
-                <Sticker radius={14} shadow={3} pressed={pressed} bg={playingId === item.id ? t.mint : t.surface2}>
-                  <View style={{ width: 92, paddingVertical: 10, paddingHorizontal: 8, alignItems: "center", gap: 4 }}>
-                    <Icon name="volume" size={20} color={playingId === item.id ? t.onPop : t.text} />
-                    <Txt weight={900} size={12} numberOfLines={1} color={playingId === item.id ? t.onPop : t.text}>
-                      {item.name}
-                    </Txt>
-                  </View>
-                </Sticker>
-              )}
-            </Pressable>
-          )}
+          renderItem={({ item }) => {
+            const on = !!playing[item.id];
+            return (
+              <Pressable
+                onPress={() => play(item)}
+                onLongPress={() => {
+                  setRenaming(item);
+                  setRenameValue(item.name);
+                }}
+                accessibilityLabel={on ? `Parar ${item.name}` : `Tocar ${item.name}`}
+                accessibilityHint="Segure pra renomear"
+              >
+                {({ pressed }) => (
+                  <Sticker radius={14} shadow={3} pressed={pressed} bg={on ? t.mint : t.surface2}>
+                    <View style={{ width: 92, paddingVertical: 10, paddingHorizontal: 8, alignItems: "center", gap: 4 }}>
+                      <Icon name={on ? "stop" : "volume"} size={20} color={on ? t.onPop : t.text} />
+                      <Txt weight={900} size={12} numberOfLines={1} color={on ? t.onPop : t.text}>
+                        {item.name}
+                      </Txt>
+                    </View>
+                  </Sticker>
+                )}
+              </Pressable>
+            );
+          }}
         />
       </View>
+      <Sheet visible={!!renaming} onClose={() => setRenaming(null)} title="RENOMEAR SOM">
+        <View style={{ gap: 12 }}>
+          <Field value={renameValue} onChangeText={setRenameValue} maxLength={60} autoFocus returnKeyType="done" onSubmitEditing={saveRename} placeholder="Nome do som" />
+          <Btn icon="check" label="Salvar" onPress={saveRename} disabled={!renameValue.trim()} />
+        </View>
+      </Sheet>
     </Sticker>
   );
 }
 
 /** Transmissões só de áudio (música, jogo...): ouvir/parar e volume, igual ao site. */
+/** Música do Spotify de quem está transmitindo áudio (só pra quem conectou o Spotify), atualiza a cada 15s. */
+function useNowPlaying(identities) {
+  const ids = identities
+    .map((id) => /^user-(\d+)$/.exec(id || "")?.[1])
+    .filter(Boolean)
+    .sort()
+    .join(",");
+  const [tracks, setTracks] = useState({});
+  useEffect(() => {
+    if (!ids) return undefined;
+    let active = true;
+    function poll() {
+      api
+        .post("/api/spotify/now-playing/batch", { userIds: ids.split(",").map(Number) })
+        .then(({ data }) => active && setTracks(data || {}))
+        .catch(() => {});
+    }
+    poll();
+    const timer = setInterval(poll, 15000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [ids]);
+  return ids ? tracks : {};
+}
+
 function AudioShares() {
   const t = useTokens();
   const voice = useVoice();
   const [vols, setVols] = useState({});
+  const tracks = useNowPlaying(voice.audioShares.map((a) => a.identity));
   if (!voice.audioShares.length) return null;
   return (
     <Sticker radius={20} shadow={4}>
@@ -207,14 +305,36 @@ function AudioShares() {
         <SectionTitle>ÁUDIO AO VIVO</SectionTitle>
         {voice.audioShares.map((a) => {
           const v = vols[a.identity] ?? voice.getVolume(a.identity, "stream");
+          const np = tracks[/^user-(\d+)$/.exec(a.identity || "")?.[1]];
+          const track = np && np.playing !== false && np.trackName ? np : null;
           return (
             <View key={a.identity} style={{ gap: 6 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <Avatar name={a.name} url={a.avatarUrl} size={38} />
+                {track?.albumArtUrl ? (
+                  <View>
+                    <Image source={{ uri: track.albumArtUrl }} cachePolicy="memory-disk" style={{ width: 48, height: 48, borderRadius: 10, borderWidth: 2, borderColor: t.ink }} />
+                    <View style={{ position: "absolute", right: -6, bottom: -6 }}>
+                      <Avatar name={a.name} url={a.avatarUrl} size={24} radius={8} />
+                    </View>
+                  </View>
+                ) : (
+                  <Avatar name={a.name} url={a.avatarUrl} size={38} />
+                )}
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Txt weight={900} numberOfLines={1}>
                     {a.name}
                   </Txt>
+                  {track ? (
+                    <Pressable onPress={() => track.trackUrl && Linking.openURL(track.trackUrl).catch(() => {})} accessibilityLabel={`Abrir ${track.trackName} no Spotify`}>
+                      <Txt weight={900} size={13} numberOfLines={1}>
+                        ♪ {track.trackName}
+                        <Txt weight={700} size={12} color={t.textMuted}>
+                          {"  "}
+                          {track.artistNames}
+                        </Txt>
+                      </Txt>
+                    </Pressable>
+                  ) : null}
                   <Txt weight={700} size={12} color={a.listening ? t.mintText : t.textMuted}>
                     {a.listening ? "você está ouvindo" : "transmitindo áudio - você não está ouvindo"}
                   </Txt>

@@ -3,7 +3,7 @@ import { Router } from "express";
 import { broadcastQueue } from "./backendClient.js";
 import { advanceNext, enqueue } from "./playback.js";
 import { disconnectSession, getSession, moveSession, sessions, stopPlayback } from "./session.js";
-import { playSoundboardClip } from "./soundboard.js";
+import { playSoundboardClip, stopSoundboardClips } from "./soundboard.js";
 import { disconnectSoundboardSession, moveSoundboardSession, soundboardSessions } from "./soundboardSession.js";
 
 function serializeQueue(session) {
@@ -141,10 +141,10 @@ router.post("/pause", (req, res) => {
 });
 
 router.post("/soundboard/play", async (req, res) => {
-  const { channelId, url } = req.body || {};
+  const { channelId, url, userId } = req.body || {};
   if (!channelId || !url) return res.status(400).json({ error: "channelId e url são obrigatórios" });
   try {
-    playSoundboardClip(String(channelId), String(url)).catch((err) => {
+    playSoundboardClip(String(channelId), String(url), userId ?? null).catch((err) => {
       console.error(`[soundboard ${channelId}] falha ao tocar:`, err.message);
     });
     res.json({ ok: true });
@@ -159,6 +159,13 @@ router.post("/soundboard/stop", async (req, res) => {
   if (!channelId) return res.status(400).json({ error: "channelId é obrigatório" });
   await disconnectSoundboardSession(String(channelId));
   res.json({ ok: true });
+});
+
+router.post("/soundboard/stop-clips", (req, res) => {
+  const { channelId, userId } = req.body || {};
+  if (!channelId) return res.status(400).json({ error: "channelId é obrigatório" });
+  const stopped = stopSoundboardClips(soundboardSessions.get(String(channelId)), userId ?? null);
+  res.json({ ok: true, stopped });
 });
 
 router.post("/soundboard/mute", (req, res) => {

@@ -153,8 +153,8 @@ const Message = memo(function Message({ m, prev, me, customEmojis, onLongPress, 
   const newDay = !prev || dayKey(prev.createdAt) !== dayKey(m.createdAt);
   const compact = grouped && !newDay;
   const tone = t["tone" + toneFor(m.authorUsername).toUpperCase()];
-  const accent = m.authorId === me?.id ? me?.accentColor : m.authorAccentColor;
-  const nameColor = accent ? mix(accent, 78, t.text) : tone.name;
+  // nome sempre na cor do tema (a cor de destaque de cada um deixava alguns temas esquisitos)
+  const nameColor = tone.name;
   const mentioned = me?.username && m.content && new RegExp(`@${me.username}\\b`).test(m.content);
 
   return (
@@ -290,7 +290,6 @@ const Message = memo(function Message({ m, prev, me, customEmojis, onLongPress, 
   a.prev?.id === b.prev?.id &&
   a.prev?.authorId === b.prev?.authorId &&
   a.me?.id === b.me?.id &&
-  a.me?.accentColor === b.me?.accentColor &&
   a.customEmojis === b.customEmojis);
 
 /**

@@ -3,6 +3,7 @@ import api from "../api/client";
 import { useProfile } from "../context/ProfileContext.jsx";
 import Avatar from "./Avatar.jsx";
 import { accentStyle } from "./AccentColorPicker.jsx";
+import { cardColorClass, cardColorStyle } from "../utils/cardColors";
 import { AboutBlocksView } from "./AboutBlocks.jsx";
 
 const STATUS_LABEL = { ONLINE: "online", AWAY: "ausente", DND: "não perturbe", OFFLINE: "offline" };
@@ -35,8 +36,8 @@ export default function DmProfilePanel({ channel }) {
 
   return (
     <aside
-      className={"dm-profile-panel" + (profile?.accentColor ? " has-accent" : "")}
-      style={accentStyle(profile?.accentColor, undefined, profile?.accentColor2)}
+      className={"dm-profile-panel" + (profile?.accentColor ? " has-accent" : "") + cardColorClass(profile?.cardColors)}
+      style={cardColorStyle(profile?.cardColors, accentStyle(profile?.accentColor, undefined, profile?.accentColor2))}
       aria-label={`Perfil de ${name}`}
     >
       <div

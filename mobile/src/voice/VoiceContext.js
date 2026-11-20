@@ -154,8 +154,8 @@ export function VoiceProvider({ user, children }) {
     const shares = [];
     for (const p of room.remoteParticipants.values()) {
       if (isSoundboardBot(p.identity)) continue;
-      const pub = p.getTrackPublication(Track.Source.ScreenShareAudio);
-      if (!isAudioOnlyShare(pub)) continue;
+      const pub = [...p.trackPublications.values()].find(isAudioOnlyShare);
+      if (!pub) continue;
       shares.push({
         identity: p.identity,
         name: p.name || p.identity,
