@@ -633,14 +633,17 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
     // customizado do app (mesma causa que ja desalinhava os botoes da barra de titulo),
     // entao a caixinha abria longe de onde o usuario clicou. Ancorada no card, sempre
     // bate certo em qualquer zoom.
-    const card = e.currentTarget.closest(".stream-card");
-    const rect = card ? card.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
-    setVolumeMenu({
-      participantIdentity: share.participantIdentity,
-      name: share.name,
-      anchorX: rect.right,
-      anchorY: rect.bottom,
-    });
+    let anchorX = window.innerWidth - 24;
+    let anchorY = window.innerHeight - 24;
+    try {
+      const card = e.currentTarget.closest(".stream-card");
+      const rect = card ? card.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
+      anchorX = rect.right;
+      anchorY = rect.bottom;
+    } catch (err) {
+      console.warn("Não foi possível medir a posição do card de transmissão, usando posição padrão:", err);
+    }
+    setVolumeMenu({ participantIdentity: share.participantIdentity, name: share.name, anchorX, anchorY });
   }
 
   useLayoutEffect(() => {
