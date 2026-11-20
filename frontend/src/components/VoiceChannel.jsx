@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useVoiceCall } from "../context/VoiceCallContext.jsx";
 import { useAlert } from "../context/AlertContext.jsx";
 import {
@@ -941,20 +942,22 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
 
       <CallToolbar />
 
-      {volumeMenu && (
-        <div
-          className="volume-popover"
-          ref={volumeMenuRef}
-          style={{ left: volumeMenu.anchorX - 220, top: volumeMenu.anchorY - 70 }}
-        >
-          <p className="volume-popover-title">{volumeMenu.name}</p>
-          <VolumeSlider
-            value={streamVolumes[volumeMenu.participantIdentity] ?? 100}
-            onChange={(v) => setStreamVolume(volumeMenu.participantIdentity, v)}
-            label={`Volume do áudio da transmissão de ${volumeMenu.name} (padrão 100%, pode passar de 100%)`}
-          />
-        </div>
-      )}
+      {volumeMenu &&
+        createPortal(
+          <div
+            className="volume-popover"
+            ref={volumeMenuRef}
+            style={{ left: volumeMenu.anchorX - 220, top: volumeMenu.anchorY - 70 }}
+          >
+            <p className="volume-popover-title">{volumeMenu.name}</p>
+            <VolumeSlider
+              value={streamVolumes[volumeMenu.participantIdentity] ?? 100}
+              onChange={(v) => setStreamVolume(volumeMenu.participantIdentity, v)}
+              label={`Volume do áudio da transmissão de ${volumeMenu.name} (padrão 100%, pode passar de 100%)`}
+            />
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
