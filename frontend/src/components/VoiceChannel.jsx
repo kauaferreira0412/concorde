@@ -628,15 +628,27 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
   const volumeMenuRef = useRef(null);
 
   function openVolumeMenu(e, share) {
-    setVolumeMenu({ participantIdentity: share.participantIdentity, name: share.name, x: e.clientX, y: e.clientY });
+    // Usa so' medidas de layout (getBoundingClientRect), nunca e.clientX/clientY: no app
+    // desktop (Electron) as coordenadas do evento de mouse podem nao bater com o zoom
+    // customizado do app (mesma causa que ja desalinhava os botoes da barra de titulo),
+    // entao a caixinha abria longe de onde o usuario clicou. Ancorada no card, sempre
+    // bate certo em qualquer zoom.
+    const card = e.currentTarget.closest(".stream-card");
+    const rect = card ? card.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
+    setVolumeMenu({
+      participantIdentity: share.participantIdentity,
+      name: share.name,
+      anchorX: rect.right,
+      anchorY: rect.bottom,
+    });
   }
 
   useLayoutEffect(() => {
     if (!volumeMenu || !volumeMenuRef.current) return;
     const el = volumeMenuRef.current;
     const rect = el.getBoundingClientRect();
-    const left = Math.max(8, Math.min(volumeMenu.x, window.innerWidth - rect.width - 8));
-    const top = Math.max(8, Math.min(volumeMenu.y, window.innerHeight - rect.height - 8));
+    const left = Math.max(8, Math.min(volumeMenu.anchorX - rect.width, window.innerWidth - rect.width - 8));
+    const top = Math.max(8, Math.min(volumeMenu.anchorY - rect.height - 8, window.innerHeight - rect.height - 8));
     el.style.left = `${left}px`;
     el.style.top = `${top}px`;
   }, [volumeMenu]);
@@ -938,7 +950,7 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
         <div
           className="volume-popover"
           ref={volumeMenuRef}
-          style={{ left: volumeMenu.x, top: volumeMenu.y }}
+          style={{ left: volumeMenu.anchorX - 220, top: volumeMenu.anchorY - 70 }}
         >
           <p className="volume-popover-title">{volumeMenu.name}</p>
           <VolumeSlider
