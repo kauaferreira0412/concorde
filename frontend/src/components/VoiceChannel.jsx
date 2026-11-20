@@ -461,14 +461,6 @@ function ScreenShareTile({
       <div
         ref={containerRef}
         className={"stream-card-screen" + (isFullscreen ? " is-fullscreen" : "")}
-        onContextMenu={
-          share.isLocal
-            ? undefined
-            : (e) => {
-                e.preventDefault();
-                onVolumeMenu(e, share);
-              }
-        }
       >
         <video
           ref={videoRef}
