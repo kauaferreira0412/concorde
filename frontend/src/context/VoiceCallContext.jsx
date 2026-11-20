@@ -1532,6 +1532,11 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         if (Number.isFinite(hwnd) && hwnd > 0) {
           audioTrack = await startWindowAudioTrack(hwnd);
         }
+        if (!audioTrack) {
+          showAlert(
+            "Não foi possível capturar o áudio dessa janela agora (só o vídeo vai ser compartilhado) - tente parar e compartilhar de novo."
+          );
+        }
       }
 
       electronScreenTracksRef.current = { video: videoTrack, audio: audioTrack };

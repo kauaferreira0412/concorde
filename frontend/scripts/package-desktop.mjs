@@ -36,6 +36,10 @@ run("npx vite build", {
   VITE_DESKTOP_BUILD: "true",
   VITE_APP_BUILD_ID: BUILD_ID,
 });
+// garante que os modulos nativos (ex: captura de audio) estao compilados contra
+// a versao do Electron, nao a do Node do sistema - senao carregam silenciosamente
+// quebrados dentro do app empacotado (sem nenhum aviso visivel pro usuario).
+run("npx electron-builder install-app-deps");
 run(`npx electron-builder ${builderFlag} --publish=never`);
 
 if (!existsSync(releaseDir)) {

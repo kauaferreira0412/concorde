@@ -12,7 +12,7 @@
     "dist": "electron-builder --publish=never",
     "dist:win": "electron-builder --win nsis --publish=never",
     "package:desktop": "node scripts/package-desktop.mjs",
-    "postinstall": "patch-package && npm rebuild process-audio-capture"
+    "postinstall": "patch-package && electron-builder install-app-deps"
   },
   "dependencies": {
     "@sapphi-red/web-noise-suppressor": "^0.4.0",
