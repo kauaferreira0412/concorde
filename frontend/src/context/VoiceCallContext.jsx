@@ -537,6 +537,15 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     return !!pub && pub.source === Track.Source.ScreenShareAudio && pub.trackName === "audio_only";
   }
 
+  // a live com áudio e a transmissão só de áudio da mesma pessoa ficam em chaves separadas
+  function shareAudioKey(identity, pub) {
+    return isAudioOnlyPub(pub) ? `${identity}#audio` : identity;
+  }
+
+  function identityOfShareKey(key) {
+    return key.endsWith("#audio") ? key.slice(0, -6) : key;
+  }
+
   function isSoundboardBot(identity) {
     return /^soundboardbot-\d+$/.test(identity || "");
   }
@@ -579,8 +588,8 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       shares.push({ identity: local.identity, name: userRef.current?.username || local.identity, avatarUrl: userRef.current?.avatarUrl || null, isLocal: true });
     }
     for (const p of activeRoom.remoteParticipants.values()) {
-      const pub = p.getTrackPublication(Track.Source.ScreenShareAudio);
-      if (isAudioOnlyPub(pub)) {
+      const pub = [...p.trackPublications.values()].find(isAudioOnlyPub);
+      if (pub) {
         if (wantsAudioShare(p.identity)) listeningAudioRef.current.add(p.identity);
         shares.push({
           identity: p.identity,
@@ -641,15 +650,29 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       console.warn("Não foi possível mudar a inscrição da transmissão:", err);
     }
     const participant = roomRef.current?.remoteParticipants.get(entry.participantIdentity);
-    const audioPub = participant?.getTrackPublication(Track.Source.ScreenShareAudio);
-    if (audioPub && !isAudioOnlyPub(audioPub)) {
+    for (const audioPub of participant?.trackPublications.values() || []) {
+      if (audioPub.source !== Track.Source.ScreenShareAudio || isAudioOnlyPub(audioPub)) continue;
       try {
         await audioPub.setSubscribed(nextWatching);
       } catch (err) {
         console.warn("Não foi possível mudar a inscrição do áudio da transmissão:", err);
       }
     }
+    // garante que as transmissões só de áudio continuam do jeito que a pessoa deixou
+    enforceAudioShareChoices();
   }, []);
+
+  function enforceAudioShareChoices() {
+    const room = roomRef.current;
+    if (!room) return;
+    room.remoteParticipants.forEach((p) => {
+      p.trackPublications.forEach((pub) => {
+        if (!isAudioOnlyPub(pub)) return;
+        const want = wantsAudioShare(p.identity);
+        if (pub.isDesired !== want) pub.setSubscribed(want);
+      });
+    });
+  }
 
   function userIdFromIdentity(identity) {
     const match = /^user-(\d+)$/.exec(identity || "");
@@ -709,7 +732,9 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     const userId = userIdFromIdentity(identity);
     if (userId) setSavedStreamVolume(userId, clamped);
     if (!deafenedRef.current) {
-      screenAudioTracksRef.current.get(identity)?.setVolume(effectiveVolume(clamped));
+      screenAudioTracksRef.current.forEach((track, key) => {
+        if (identityOfShareKey(key) === identity) track.setVolume(effectiveVolume(clamped));
+      });
     }
   }
 
@@ -720,7 +745,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     persistMasterVolume(clamped);
     if (deafenedRef.current) return;
     micAudioTracksRef.current.forEach((track, identity) => track.setVolume(effectiveVolume(resolveParticipantVolume(identity))));
-    screenAudioTracksRef.current.forEach((track, identity) => track.setVolume(effectiveVolume(resolveStreamVolume(identity))));
+    screenAudioTracksRef.current.forEach((track, key) => track.setVolume(effectiveVolume(resolveStreamVolume(identityOfShareKey(key)))));
   }
 
   function setMicGainPercent(percent) {
@@ -862,7 +887,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
             micAudioTracksRef.current.set(participant.identity, track);
             track.setVolume(silenced ? 0 : effectiveVolume(resolveParticipantVolume(participant.identity)));
           } else if (pub.source === Track.Source.ScreenShareAudio) {
-            screenAudioTracksRef.current.set(participant.identity, track);
+            screenAudioTracksRef.current.set(shareAudioKey(participant.identity, pub), track);
             track.setVolume(silenced ? 0 : effectiveVolume(resolveStreamVolume(participant.identity)));
           }
           if (pub.source === Track.Source.Microphone) refreshParticipants(newRoom);
@@ -880,7 +905,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           micAudioTracksRef.current.delete(participant.identity);
           refreshParticipants(newRoom);
         }
-        if (pub.source === Track.Source.ScreenShareAudio) screenAudioTracksRef.current.delete(participant.identity);
+        if (pub.source === Track.Source.ScreenShareAudio) screenAudioTracksRef.current.delete(shareAudioKey(participant.identity, pub));
         if (pub.source === Track.Source.Camera) {
           cameraTracksRef.current.delete(participant.identity);
           syncCameraTracks();
@@ -1081,8 +1106,8 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     micAudioTracksRef.current.forEach((track, identity) => {
       track.setVolume(effectiveVolume(resolveParticipantVolume(identity)));
     });
-    screenAudioTracksRef.current.forEach((track, identity) => {
-      track.setVolume(effectiveVolume(resolveStreamVolume(identity)));
+    screenAudioTracksRef.current.forEach((track, key) => {
+      track.setVolume(effectiveVolume(resolveStreamVolume(identityOfShareKey(key))));
     });
     room.remoteParticipants.forEach((participant) => {
       participant.audioTrackPublications.forEach((pub) => {
@@ -1135,7 +1160,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
             pub.setSubscribed(false);
             return;
           }
-          screenAudioTracksRef.current.set(participant.identity, pub.track);
+          screenAudioTracksRef.current.set(shareAudioKey(participant.identity, pub), pub.track);
           if (pub.track.attachedElements.length === 0) pub.track.attach();
           pub.track.setVolume(silenced ? 0 : effectiveVolume(resolveStreamVolume(participant.identity)));
           pub.track.attachedElements.forEach((el) => (el.muted = silenced));
@@ -1396,8 +1421,8 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   async function toggleListenAudioShare(identity) {
     const room = roomRef.current;
     const participant = room?.remoteParticipants.get(identity);
-    const pub = participant?.getTrackPublication(Track.Source.ScreenShareAudio);
-    if (!pub || !isAudioOnlyPub(pub)) return;
+    const pub = participant ? [...participant.trackPublications.values()].find(isAudioOnlyPub) : null;
+    if (!pub) return;
     const next = !listeningAudioRef.current.has(identity);
     if (next) {
       listeningAudioRef.current.add(identity);

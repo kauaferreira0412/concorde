@@ -19,7 +19,8 @@ public class AuthDtos {
                                 String nickname, String bio, String bannerUrl, String customStatus,
                                 String accentColor, java.util.List<Long> serverOrder,
                                 boolean avatarAnimateOnSpeak, String accentColor2,
-                                java.util.List<com.codagis.concorde.dto.UserProfileDtos.AboutBlock> aboutBlocks) {}
+                                java.util.List<com.codagis.concorde.dto.UserProfileDtos.AboutBlock> aboutBlocks,
+                                java.util.Map<String, String> cardColors) {}
 
     public record AuthResponse(String token, UserResponse user) {}
 

@@ -3,7 +3,7 @@
     "name": "Concorde",
     "slug": "concorde-mobile",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "android": {
@@ -41,13 +41,6 @@
         }
       ],
       [
-        "expo-audio",
-        {
-          "microphonePermission": "O Concorde usa o microfone pra você falar nas calls de voz.",
-          "enableBackgroundPlayback": true
-        }
-      ],
-      [
         "expo-image-picker",
         {
           "photosPermission": "O Concorde acessa suas fotos pra você mandar imagens no chat.",
@@ -55,11 +48,35 @@
         }
       ],
       "expo-asset",
-      "./plugins/withWindowsCxxStagingDir.js"
+      "./plugins/withWindowsCxxStagingDir.js",
+      "expo-image",
+      "@bacons/apple-targets",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "CallsWidget",
+              "label": "Em call agora",
+              "description": "Quem está em call nos seus servidores. Toque pra entrar.",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "maxResizeWidth": "420dp",
+              "maxResizeHeight": "420dp",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/widget-preview.png"
+            }
+          ]
+        }
+      ]
     ],
     "ios": {
       "bundleIdentifier": "com.codagis.concorde",
-      "supportsTablet": false,
+      "appleTeamId": "4Z544V82DV",
+      "supportsTablet": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "O Concorde usa o microfone pra você falar nas calls de voz.",
         "NSCameraUsageDescription": "O Concorde usa a câmera nas calls com vídeo.",
@@ -69,13 +86,19 @@
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "bitcode": false
+      "bitcode": false,
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.codagis.concorde"
+        ]
+      }
     },
     "extra": {
       "eas": {
         "projectId": "467c5e68-1e8d-457b-8bd9-e5aa93874bd6"
       }
     },
-    "owner": "lkaio16"
+    "owner": "lkaio16",
+    "scheme": "concorde"
   }
 }

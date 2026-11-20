@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image } from "expo-image";
 import Svg, { Defs, Path, Pattern, Rect } from "react-native-svg";
 import { useTokens } from "../theme/ThemeContext";
 import { toneFor } from "../theme/themes";
@@ -106,14 +107,14 @@ export function IconBtn({ icon, onPress, size = 48, tone = "surface", label, ico
 }
 
 /** Avatar com o mesmo tom (roxo/menta/laranja) que o site sorteia pelo nome. */
-export function Avatar({ name, url, size = 44, radius, ring }) {
+export function Avatar({ name, url, size = 44, radius, ring, still }) {
   const t = useTokens();
   const tone = t["tone" + toneFor(name).toUpperCase()];
   const r = radius ?? Math.round(size * 0.32);
   return (
     <View style={[{ borderRadius: r + 4, padding: ring ? 3 : 0, borderWidth: ring ? 3 : 0, borderColor: ring || "transparent" }]}>
       {url ? (
-        <Image source={{ uri: url }} style={{ width: size, height: size, borderRadius: r, borderWidth: 2, borderColor: t.ink, backgroundColor: tone.bg }} />
+        <Image cachePolicy="memory-disk" transition={120} recyclingKey={url} autoplay={!still} source={{ uri: url }} style={{ width: size, height: size, borderRadius: r, borderWidth: 2, borderColor: t.ink, backgroundColor: tone.bg, opacity: still ? 0.75 : 1 }} />
       ) : (
         <View style={{ width: size, height: size, borderRadius: r, borderWidth: 2, borderColor: t.ink, backgroundColor: tone.bg, alignItems: "center", justifyContent: "center" }}>
           <Txt weight={900} size={Math.round(size * 0.32)} color={tone.fg}>
@@ -163,16 +164,26 @@ const WAVE = "M0 30 Q60 0 120 30 T240 30 M0 90 Q60 60 120 90 T240 90";
 /** Fundo do app: cor do tema + ondas (quando o tema tem). */
 export function Screen({ children, style, padded }) {
   const t = useTokens();
+  // o SVG não se redesenha sozinho ao girar a tela: mede o espaço e recria no tamanho novo
+  const [size, setSize] = useState(null);
   return (
-    <View style={[{ flex: 1, backgroundColor: t.bg }, padded && { padding: 12 }, style]}>
-      {t.waves ? (
-        <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+    <View
+      style={[{ flex: 1, backgroundColor: t.bg }, padded && { padding: 12 }, style]}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        const w = Math.ceil(width);
+        const h = Math.ceil(height);
+        setSize((prev) => (prev && prev.w === w && prev.h === h ? prev : { w, h }));
+      }}
+    >
+      {t.waves && size ? (
+        <Svg key={`${size.w}x${size.h}`} width={size.w} height={size.h} style={StyleSheet.absoluteFill} pointerEvents="none">
           <Defs>
             <Pattern id="waves" patternUnits="userSpaceOnUse" width="240" height="120">
               <Path d={WAVE} fill="none" stroke={t.wave} strokeWidth={16} strokeLinecap="round" />
             </Pattern>
           </Defs>
-          <Rect width="100%" height="100%" fill="url(#waves)" />
+          <Rect width={size.w} height={size.h} fill="url(#waves)" />
         </Svg>
       ) : null}
       {children}

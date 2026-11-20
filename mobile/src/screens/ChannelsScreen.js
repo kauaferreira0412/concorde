@@ -4,20 +4,23 @@ import { useFocusEffect } from "@react-navigation/native";
 import api from "../api";
 import { useTokens } from "../theme/ThemeContext";
 import { useVoice } from "../voice/VoiceContext";
-import { Avatar, Screen, SectionTitle, Sticker, Tag, Txt } from "../ui/kit";
+import { Avatar, IconBtn, Screen, SectionTitle, Sticker, Tag, Txt } from "../ui/kit";
 import Icon from "../ui/icons";
 import TopBar from "../ui/TopBar";
+import ChatView from "../chat/ChatView";
+import { useLayout } from "../ui/layout";
+import MembersSheet from "./MembersSheet";
 
 const PRESENCE_REFRESH_MS = 8000;
 
-function ChannelRow({ item, onPress, connected, people }) {
+function ChannelRow({ item, onPress, connected, people, selected }) {
   const t = useTokens();
   const isText = item.type === "TEXT";
   const isVoice = item.type === "VOICE";
   const enabled = isText || isVoice;
   const [pressed, setPressed] = useState(false);
   const icon = isText ? "hash" : isVoice ? "volume" : "map";
-  const active = connected;
+  const active = connected || selected;
   return (
     <View style={{ marginHorizontal: 12, marginBottom: 6 }}>
       <Pressable
@@ -70,13 +73,16 @@ function ChannelRow({ item, onPress, connected, people }) {
   );
 }
 
-export default function ChannelsScreen({ route, navigation }) {
+export default function ChannelsScreen({ route, navigation, user }) {
   const t = useTokens();
   const voice = useVoice();
   const { server } = route.params;
   const [sections, setSections] = useState(null);
   const [presence, setPresence] = useState({});
   const [error, setError] = useState("");
+  const layout = useLayout();
+  const [openText, setOpenText] = useState(null);
+  const [membersOpen, setMembersOpen] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -100,6 +106,13 @@ export default function ChannelsScreen({ route, navigation }) {
         setSections([]);
       });
   }, [server.id]);
+
+  // no iPad abre o primeiro canal de texto do lado, como no desktop
+  useEffect(() => {
+    if (!layout.wide || openText || !sections) return;
+    const first = sections.flatMap((x) => x.data).find((c) => c.type === "TEXT");
+    if (first) setOpenText(first);
+  }, [layout.wide, sections, openText]);
 
   // quem está em cada canal de voz (igual à lista lateral do site)
   const loadPresence = useCallback(async () => {
@@ -126,11 +139,27 @@ export default function ChannelsScreen({ route, navigation }) {
 
   return (
     <Screen>
-      <TopBar title={server.name.toUpperCase()} subtitle={server.description || "Canais do servidor"} onBack={() => navigation.goBack()} />
+      <TopBar
+        title={server.name.toUpperCase()}
+        subtitle={server.description || "Canais do servidor"}
+        onBack={() => navigation.goBack()}
+        right={<IconBtn icon="users" size={40} label="Membros" onPress={() => setMembersOpen(true)} />}
+      />
+      <MembersSheet
+        serverId={server.id}
+        isAdmin={user?.role === "ADMIN"}
+        visible={membersOpen}
+        onClose={() => setMembersOpen(false)}
+        onOpenProfile={(userId) => {
+          setMembersOpen(false);
+          navigation.navigate("Profile", { userId });
+        }}
+      />
       {!sections ? (
         <ActivityIndicator color={t.text} style={{ marginTop: 40 }} />
       ) : (
-        <View style={{ flex: 1, padding: 12, paddingBottom: 0 }}>
+        <View style={{ flex: 1, flexDirection: "row" }}>
+        <View style={layout.wide ? { width: layout.sideWidth, padding: 12, paddingRight: 0 } : { flex: 1, padding: 12, paddingBottom: 0 }}>
           <Sticker shadow={t.shadow} radius={22} style={{ flex: 1 }} innerStyle={{ flex: 1 }}>
             <SectionList
               sections={sections}
@@ -147,16 +176,40 @@ export default function ChannelsScreen({ route, navigation }) {
                 <ChannelRow
                   item={item}
                   connected={item.type === "VOICE" && voice.channel?.id === item.id}
+                  selected={layout.wide && item.type === "TEXT" && openText?.id === item.id}
                   people={presence[item.id]}
                   onPress={() =>
                     item.type === "VOICE"
                       ? navigation.navigate("Voice", { channel: { ...item, serverId: server.id } })
-                      : navigation.navigate("Chat", { channel: item, server })
+                      : layout.wide
+                        ? setOpenText(item)
+                        : navigation.navigate("Chat", { channel: item, server })
                   }
                 />
               )}
             />
           </Sticker>
+        </View>
+        {layout.wide && openText ? (
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 22, paddingTop: 14 }}>
+              <Icon name="hash" size={20} color={t.text} />
+              <Txt weight="display" size={18} numberOfLines={1} style={{ flex: 1 }}>
+                {openText.name}
+              </Txt>
+            </View>
+            <ChatView
+              key={openText.id}
+              kind="channel"
+              channelId={openText.id}
+              serverId={server.id}
+              readOnly={openText.adminOnly && user?.role !== "ADMIN"}
+              placeholder={`Manda no #${openText.name}...`}
+              user={user}
+              navigation={navigation}
+            />
+          </View>
+        ) : null}
         </View>
       )}
     </Screen>

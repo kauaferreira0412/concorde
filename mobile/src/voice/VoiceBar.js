@@ -1,7 +1,8 @@
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useVoice } from "./VoiceContext";
-import { TABBAR_HEIGHT } from "../screens/HomeScreen";
+import { RAIL_WIDTH, TABBAR_HEIGHT } from "../screens/HomeScreen";
+import { useLayout } from "../ui/layout";
 import { useTokens } from "../theme/ThemeContext";
 import { IconBtn, Sticker, Tag, Txt } from "../ui/kit";
 import Icon from "../ui/icons";
@@ -11,11 +12,22 @@ export default function VoiceBar({ navigationRef, currentRoute }) {
   const voice = useVoice();
   const t = useTokens();
   const insets = useSafeAreaInsets();
+  const layout = useLayout();
+  const onHome = currentRoute === "Home";
   if (!voice?.channel || currentRoute === "Voice" || currentRoute === "Login") return null;
   const live = voice.streams.length > 0;
 
   return (
-    <View style={{ position: "absolute", left: 10, right: 10, bottom: currentRoute === "Home" ? TABBAR_HEIGHT + insets.bottom + 8 : Math.max(10, insets.bottom) }}>
+    <View
+      style={{
+        position: "absolute",
+        right: 10,
+        left: onHome && layout.wide ? RAIL_WIDTH + insets.left + 10 : 10,
+        maxWidth: layout.wide ? 520 : undefined,
+        alignSelf: "flex-end",
+        bottom: onHome && !layout.wide ? TABBAR_HEIGHT + insets.bottom + 8 : Math.max(10, insets.bottom),
+      }}
+    >
       <Sticker bg={t.voiceBg} radius={18} shadow={4}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10, padding: 8, paddingLeft: 12 }}>
           <Pressable

@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Share, Switch, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Share, Switch, View } from "react-native";
+import { Image } from "expo-image";
 import api from "../api";
 import { useTheme } from "../theme/ThemeContext";
-import { BASE_THEMES, resolveColors } from "../theme/themes";
+import { BASE_THEMES, THEME_TOKENS, TOKEN_GROUPS, resolveColors } from "../theme/themes";
+import ColorPicker, { Swatch } from "../ui/ColorPicker";
 import { useVoice } from "../voice/VoiceContext";
 import { Avatar, Btn, Field, Screen, SectionTitle, Sticker, Tag, Txt } from "../ui/kit";
 import Icon from "../ui/icons";
@@ -98,7 +100,7 @@ function Gallery() {
             <Sticker key={item.id} radius={16} shadow={3} style={{ width: 200 }}>
               <View style={{ height: 112, borderBottomWidth: 2, borderBottomColor: t.ink, backgroundColor: t.surface2 }}>
                 {item.coverUrl ? (
-                  <Image source={{ uri: item.coverUrl }} style={{ width: "100%", height: "100%" }} />
+                  <Image cachePolicy="memory-disk" transition={120} recyclingKey={item.coverUrl} source={{ uri: item.coverUrl }} style={{ width: "100%", height: "100%" }} />
                 ) : (
                   <View style={{ padding: 8 }}>
                     <ThemeThumb base={item.base} colors={item.colors} height={94} />
@@ -125,6 +127,97 @@ function Gallery() {
       <Txt weight={600} size={12} color={t.textMuted}>
         No app vêm as cores do tema. A imagem de fundo dos temas só aparece no site por enquanto.
       </Txt>
+    </View>
+  );
+}
+
+/** Editar cada cor do tema (igual ao "Personalizar" do site) e salvar como preset. */
+function ThemeColorsEditor() {
+  const theme = useTheme();
+  const { t } = theme;
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [presetName, setPresetName] = useState("");
+  const [saved, setSaved] = useState(false);
+  const current = resolveColors(theme.base, theme.colors);
+  const changed = Object.keys(theme.colors || {}).length;
+
+  return (
+    <View style={{ gap: 10 }}>
+      <Pressable onPress={() => setOpen((v) => !v)} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <View style={{ flex: 1 }}>
+          <SectionTitle>Personalizar cores{changed ? ` · ${changed} mudada${changed > 1 ? "s" : ""}` : ""}</SectionTitle>
+        </View>
+        <View style={open ? { transform: [{ rotate: "180deg" }] } : undefined}>
+          <Icon name="chevronDown" size={18} color={t.textMuted} />
+        </View>
+      </Pressable>
+      {open ? (
+        <>
+          {TOKEN_GROUPS.map((group) => (
+            <View key={group} style={{ gap: 8 }}>
+              <Txt weight={900} size={12} color={t.textMuted}>
+                {group.toUpperCase()}
+              </Txt>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+                {THEME_TOKENS.filter((tok) => tok.group === group).map((tok) => (
+                  <Pressable
+                    key={tok.key}
+                    onPress={() => setEditing(tok)}
+                    style={{ width: "47%", flexDirection: "row", alignItems: "center", gap: 8 }}
+                  >
+                    <Swatch color={current[tok.key]} onPress={() => setEditing(tok)} label={tok.label} />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Txt weight={800} size={13} numberOfLines={1}>
+                        {tok.label}
+                      </Txt>
+                      <Txt weight={700} size={11} color={theme.colors?.[tok.key] ? t.accentText : t.textFaint}>
+                        {current[tok.key]}
+                        {theme.colors?.[tok.key] ? " · sua" : ""}
+                      </Txt>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ))}
+          <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            {changed ? <Btn small variant="surface" label="Voltar ao tema base" onPress={() => theme.setBase(theme.base)} /> : null}
+          </View>
+          <SectionTitle>Salvar como preset</SectionTitle>
+          <Field value={presetName} onChangeText={(v) => { setPresetName(v); setSaved(false); }} placeholder="Nome do seu tema" maxLength={40} />
+          <Btn
+            small
+            icon="check"
+            label={saved ? "Salvo nos seus presets" : "Salvar tema"}
+            disabled={saved}
+            onPress={() => {
+              theme.savePreset(presetName || "Meu tema");
+              setSaved(true);
+              setPresetName("");
+            }}
+          />
+        </>
+      ) : null}
+      <ColorPicker
+        visible={!!editing}
+        title={editing ? editing.label.toUpperCase() : ""}
+        value={editing ? current[editing.key] : null}
+        onClose={() => setEditing(null)}
+        onPick={(hex) => {
+          theme.setColor(editing.key, hex);
+          setEditing(null);
+        }}
+        onClear={
+          editing && theme.colors?.[editing.key]
+            ? () => {
+                theme.setColor(editing.key, BASE_THEMES[theme.base].colors[editing.key]);
+                setEditing(null);
+              }
+            : undefined
+        }
+        clearLabel="Voltar a do tema base"
+      />
     </View>
   );
 }
@@ -177,12 +270,13 @@ export default function MeScreen({ navigation, user, onLogout, embedded }) {
   return (
     <Screen>
       <TopBar title="VOCÊ" subtitle="Perfil e aparência" onBack={embedded ? undefined : () => navigation.goBack()} />
-      <ScrollView contentContainerStyle={{ padding: 14, gap: 16, paddingBottom: 130 }}>
+      <ScrollView contentContainerStyle={{ width: "100%", maxWidth: 720, alignSelf: "center", padding: 14, gap: 16, paddingBottom: 130 }}>
         <Sticker radius={22} shadow={t.shadow}>
           <ProfileBanner bannerUrl={user?.bannerUrl} accent={user?.accentColor} accent2={user?.accentColor2} height={90} />
-          <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: -32, alignItems: "flex-end" }}>
+          <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: -32, alignItems: "flex-start" }}>
             <Avatar name={user?.username} url={user?.avatarUrl} size={76} radius={24} />
-            <View style={{ flex: 1, paddingBottom: 4 }}>
+            {/* só a foto sobe por cima da faixa; o nome fica abaixo dela, sem ficar em cima do banner */}
+            <View style={{ flex: 1, paddingTop: 38 }}>
               <Txt weight="display" size={18} numberOfLines={1}>
                 {(user?.nickname || user?.username || "").toUpperCase()}
               </Txt>
@@ -236,6 +330,8 @@ export default function MeScreen({ navigation, user, onLogout, embedded }) {
               <Txt weight={800}>Ondas no fundo</Txt>
               <Switch value={theme.waves} onValueChange={theme.setWaves} trackColor={{ true: t.accent }} />
             </View>
+
+            <ThemeColorsEditor />
 
             <SectionTitle>Presets</SectionTitle>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>

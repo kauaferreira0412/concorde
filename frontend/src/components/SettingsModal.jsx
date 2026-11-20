@@ -36,8 +36,9 @@ import AppearanceSettings from "./AppearanceSettings.jsx";
 import ImageCropModal from "./ImageCropModal.jsx";
 import { getAutoPipEnabled, pipSupported, setAutoPipEnabled } from "../utils/screenSharePip";
 import { getAutoListenAudioShare, setAutoListenAudioShare } from "../utils/audioShareListen";
-import AccentColorPicker, { accentStyle } from "./AccentColorPicker.jsx";
+import { accentStyle } from "./AccentColorPicker.jsx";
 import { AboutBlocksEditor } from "./AboutBlocks.jsx";
+import CardColorsEditor from "./CardColorsEditor.jsx";
 
 const TABS = [
   { id: "perfil", label: "Perfil", Icon: UserIcon },
@@ -562,7 +563,7 @@ export default function SettingsModal({ onClose }) {
                   continuar animando).
                 </p>
                 {avatarError && <p className="auth-error">{avatarError}</p>}
-                <AccentColorPicker />
+                <CardColorsEditor />
                 <label className="settings-checkbox-row">
                   <input
                     type="checkbox"

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import api from "../api";
@@ -6,8 +6,10 @@ import { useTokens } from "../theme/ThemeContext";
 import { Avatar, Btn, Field, IconBtn, Screen, SectionTitle, Sticker, Txt } from "../ui/kit";
 import TopBar from "../ui/TopBar";
 import { ProfileBanner } from "./ProfileScreen";
+import { Image } from "expo-image";
+import CardColorsEditor from "./CardColorsEditor";
+import { blockFromPreview, looksLikeUrl, normalizeUrl } from "../utils/linkAutofill";
 
-const SWATCHES = ["#7C5CFF", "#FF5C8A", "#E5484D", "#FF8A3D", "#FFC93D", "#A3E635", "#3DDC97", "#2EC4F1", "#3D7BFF", "#C084FC"];
 const STATUSES = [
   ["ONLINE", "Online", "success"],
   ["AWAY", "Ausente", "orange"],
@@ -16,36 +18,52 @@ const STATUSES = [
 ];
 const BLOCK_TYPES = { music: "Música", game: "Jogo", link: "Link" };
 
-function Swatches({ value, onPick, disabled }) {
-  const t = useTokens();
-  return (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, opacity: disabled ? 0.45 : 1 }}>
-      <Pressable
-        disabled={disabled}
-        onPress={() => onPick(null)}
-        style={{ width: 36, height: 36, borderRadius: 12, borderWidth: value ? 2 : 3.5, borderColor: t.ink, backgroundColor: t.surface2, alignItems: "center", justifyContent: "center" }}
-      >
-        <Txt weight={900}>∅</Txt>
-      </Pressable>
-      {SWATCHES.map((c) => (
-        <Pressable
-          key={c}
-          disabled={disabled}
-          onPress={() => onPick(c)}
-          style={{ width: 36, height: 36, borderRadius: 12, borderWidth: value === c ? 3.5 : 2, borderColor: t.ink, backgroundColor: c }}
-          accessibilityLabel={c}
-        />
-      ))}
-    </View>
-  );
-}
-
 export default function EditProfileScreen({ navigation, user, onUserUpdate }) {
   const t = useTokens();
   const [nickname, setNickname] = useState(user?.nickname || "");
   const [bio, setBio] = useState(user?.bio || "");
   const [customStatus, setCustomStatus] = useState(user?.customStatus || "");
-  const [blocks, setBlocks] = useState(() => (user?.aboutBlocks || []).map((b) => ({ ...b, subtitle: b.subtitle || "", url: b.url || "" })));
+  const [blocks, setBlocks] = useState(() =>
+    (user?.aboutBlocks || []).map((b) => ({ ...b, subtitle: b.subtitle || "", url: b.url || "", image: b.image || null }))
+  );
+  // colou um link no bloco: busca a prévia e preenche título, detalhe e capa (igual ao site)
+  const [lookup, setLookup] = useState({});
+  const lookupTimers = useRef({});
+  const autoRef = useRef({});
+  useEffect(() => {
+    const timers = lookupTimers.current;
+    return () => Object.values(timers).forEach(clearTimeout);
+  }, []);
+
+  function onUrlChange(i, value) {
+    setBlocks((prev) => prev.map((x, j) => (j === i ? { ...x, url: value } : x)));
+    clearTimeout(lookupTimers.current[i]);
+    if (!looksLikeUrl(value)) return;
+    lookupTimers.current[i] = setTimeout(() => fetchPreview(i, value), 500);
+  }
+
+  async function fetchPreview(i, value) {
+    setLookup((p) => ({ ...p, [i]: "busy" }));
+    try {
+      const { data } = await api.get("/api/link-preview", { params: { url: normalizeUrl(value) } });
+      setBlocks((prev) =>
+        prev.map((b, j) => {
+          if (j !== i || b.url.trim() !== value.trim()) return b;
+          const found = blockFromPreview(data, b.type);
+          if (!found) return b;
+          const last = autoRef.current[i] || {};
+          const next = { ...b, image: found.image || b.image };
+          if (found.title && (!b.title.trim() || b.title === last.title)) next.title = found.title;
+          if (found.subtitle && b.type !== "link" && (!b.subtitle.trim() || b.subtitle === last.subtitle)) next.subtitle = found.subtitle;
+          autoRef.current[i] = { title: next.title, subtitle: next.subtitle };
+          return next;
+        })
+      );
+      setLookup((p) => ({ ...p, [i]: undefined }));
+    } catch {
+      setLookup((p) => ({ ...p, [i]: "fail" }));
+    }
+  }
   const [uploading, setUploading] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -91,7 +109,13 @@ export default function EditProfileScreen({ navigation, user, onUserUpdate }) {
       okProfile && customStatus.trim() !== (user?.customStatus || "")
         ? await call(() => api.put("/api/users/me/custom-status", { text: customStatus.trim() }))
         : okProfile;
-    const clean = blocks.map((b) => ({ type: b.type, title: b.title.trim(), subtitle: b.subtitle?.trim() || null, url: b.url?.trim() || null }));
+    const clean = blocks.map((b) => ({
+      type: b.type,
+      title: b.title.trim(),
+      subtitle: b.subtitle?.trim() || null,
+      url: b.url?.trim() || null,
+      image: b.image || null,
+    }));
     const missing = clean.findIndex((b) => !b.title || (b.type === "link" && !b.url));
     let okBlocks = okStatus;
     if (okStatus) {
@@ -115,7 +139,7 @@ export default function EditProfileScreen({ navigation, user, onUserUpdate }) {
         right={saving ? <ActivityIndicator color={t.onAccent} /> : <IconBtn icon="check" tone="mint" size={40} label="Salvar" onPress={saveAll} />}
       />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={{ padding: 14, gap: 16, paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ width: "100%", maxWidth: 720, alignSelf: "center", padding: 14, gap: 16, paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
           <Sticker radius={22} shadow={t.shadow}>
             <Pressable onPress={() => pick("banner")}>
               <ProfileBanner bannerUrl={user?.bannerUrl} accent={user?.accentColor} accent2={user?.accentColor2} height={110} />
@@ -142,13 +166,7 @@ export default function EditProfileScreen({ navigation, user, onUserUpdate }) {
 
           <Sticker radius={20} shadow={4}>
             <View style={{ padding: 16, gap: 10 }}>
-              <SectionTitle>Cor do perfil</SectionTitle>
-              <Swatches value={user?.accentColor} onPick={(c) => call(() => api.put("/api/users/me/accent-color", { color: c || "" }))} />
-              <SectionTitle style={{ marginTop: 6 }}>Segunda cor (gradiente)</SectionTitle>
-              <Swatches value={user?.accentColor2} disabled={!user?.accentColor} onPick={(c) => call(() => api.put("/api/users/me/accent-color-2", { color: c || "" }))} />
-              <Txt weight={600} size={12} color={t.textMuted}>
-                Pinta o card do perfil (sem banner) e o seu nome no chat. Com a segunda cor vira gradiente.
-              </Txt>
+              <CardColorsEditor user={user} onUserUpdate={onUserUpdate} />
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 6 }}>
                 <Txt weight={800} style={{ flex: 1 }}>
                   Na call, minha foto (GIF) só se mexe enquanto eu falo
@@ -206,11 +224,19 @@ export default function EditProfileScreen({ navigation, user, onUserUpdate }) {
 
               <SectionTitle style={{ marginTop: 6 }}>Blocos do perfil</SectionTitle>
               <Txt weight={600} size={12} color={t.textMuted}>
-                Música do momento, jogos favoritos e links (até 8).
+                Música do momento, jogos favoritos e links (até 8). Cole o link que o resto se preenche sozinho.
               </Txt>
               {blocks.map((b, i) => (
                 <View key={i} style={{ gap: 8, padding: 10, borderRadius: 14, borderWidth: 2.5, borderColor: t.ink, backgroundColor: t.surface2 }}>
                   <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                    {b.image ? (
+                      <Pressable
+                        onPress={() => setBlocks((prev) => prev.map((x, j) => (j === i ? { ...x, image: null } : x)))}
+                        accessibilityLabel="Tirar a capa"
+                      >
+                        <Image source={{ uri: b.image }} style={{ width: 34, height: 34, borderRadius: 9, borderWidth: 2, borderColor: t.ink }} />
+                      </Pressable>
+                    ) : null}
                     {Object.entries(BLOCK_TYPES).map(([type, label]) => (
                       <Pressable
                         key={type}
@@ -241,19 +267,28 @@ export default function EditProfileScreen({ navigation, user, onUserUpdate }) {
                   ) : null}
                   <Field
                     value={b.url}
-                    onChangeText={(v) => setBlocks((prev) => prev.map((x, j) => (j === i ? { ...x, url: v } : x)))}
-                    placeholder={b.type === "link" ? "https://..." : "Link (opcional)"}
+                    onChangeText={(v) => onUrlChange(i, v)}
+                    placeholder={b.type === "link" ? "https://..." : "Cole o link (Spotify, YouTube, Steam...)"}
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="url"
                     maxLength={300}
                   />
+                  {lookup[i] ? (
+                    <Txt weight={700} size={12} color={t.textMuted}>
+                      {lookup[i] === "busy" ? "Buscando o link..." : "Não deu pra ler esse link."}
+                    </Txt>
+                  ) : b.image ? (
+                    <Txt weight={700} size={12} color={t.textFaint}>
+                      Toque na capa pra tirar.
+                    </Txt>
+                  ) : null}
                 </View>
               ))}
               {blocks.length < 8 ? (
                 <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
                   {Object.entries(BLOCK_TYPES).map(([type, label]) => (
-                    <Btn key={type} small variant="surface" icon="plus" label={label} onPress={() => setBlocks((prev) => [...prev, { type, title: "", subtitle: "", url: "" }])} />
+                    <Btn key={type} small variant="surface" icon="plus" label={label} onPress={() => setBlocks((prev) => [...prev, { type, title: "", subtitle: "", url: "", image: null }])} />
                   ))}
                 </View>
               ) : null}

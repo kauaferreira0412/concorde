@@ -56,13 +56,26 @@ public final class AboutBlocks {
                 }
             }
             if ("link".equals(type) && url == null) throw new IllegalArgumentException("Bloco de link precisa do endereço");
-            clean.add(new AboutBlock(type, title, subtitle, url));
+            clean.add(new AboutBlock(type, title, subtitle, url, cleanImage(b.image())));
         }
         if (clean.isEmpty()) return null;
         try {
             return JSON.writeValueAsString(clean);
         } catch (Exception e) {
             throw new IllegalStateException(e);
+        }
+    }
+
+    /** Capa só se for um endereço https válido (vem da prévia do link); senão some sem dar erro. */
+    private static String cleanImage(String raw) {
+        String image = trim(raw);
+        if (image == null || image.length() > 600) return null;
+        try {
+            java.net.URI uri = new java.net.URI(image);
+            if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) return null;
+            return image;
+        } catch (Exception e) {
+            return null;
         }
     }
 

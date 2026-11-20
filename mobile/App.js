@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Linking, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
@@ -18,13 +18,46 @@ import VoiceScreen from "./src/screens/VoiceScreen";
 import DmChatScreen from "./src/screens/DmChatScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import EditProfileScreen from "./src/screens/EditProfileScreen";
-import { VoiceProvider } from "./src/voice/VoiceContext";
+import { VoiceProvider, useVoice } from "./src/voice/VoiceContext";
+import { parseCallLink } from "./src/widgets/activeCalls";
+import { useWidgetSync } from "./src/widgets/useWidgetSync";
 import VoiceBar from "./src/voice/VoiceBar";
+import { DmNotificationsProvider } from "./src/chat/DmNotifications";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+// cor clara? (decide o texto da barra de status pela cor real do topo, não pelo tema base)
+function isLightColor(hex) {
+  const n = parseInt(String(hex || "#000000").replace("#", "").slice(0, 6), 16);
+  if (Number.isNaN(n)) return false;
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6;
+}
+
 const navigationRef = createNavigationContainerRef();
 const Stack = createNativeStackNavigator();
+
+/**
+ * Links concorde://call/<id> (do widget "Em call agora"): abre a tela da call, que já entra nela.
+ * Se o app ainda está carregando, guarda o link e abre assim que der.
+ */
+function CallLinks({ user, navReady }) {
+  const voice = useVoice();
+  useWidgetSync(user, voice?.channel?.id);
+  useEffect(() => {
+    if (!user || !navReady) return undefined;
+    function open(url) {
+      const channel = parseCallLink(url);
+      if (channel && navigationRef.isReady()) navigationRef.navigate("Voice", { channel });
+    }
+    Linking.getInitialURL().then((url) => url && open(url)).catch(() => {});
+    const sub = Linking.addEventListener("url", ({ url }) => open(url));
+    return () => sub.remove();
+  }, [user, navReady]);
+  return null;
+}
 
 function Root() {
   const { t, loaded: themeLoaded } = useTheme();
@@ -32,6 +65,7 @@ function Root() {
   const [sessionReady, setSessionReady] = useState(false);
   const [user, setUser] = useState(null);
   const [currentRoute, setCurrentRoute] = useState(null);
+  const [navReady, setNavReady] = useState(false);
 
   useEffect(() => {
     setExpiredHandler(() => {
@@ -80,26 +114,40 @@ function Root() {
 
   return (
     <VoiceProvider user={user}>
-      <StatusBar style={t.dark ? "light" : "dark"} />
+      <DmNotificationsProvider user={user}>
+      {/* o topo das telas é a barra na cor de destaque: texto claro em destaque escuro e vice-versa */}
+      <StatusBar style={isLightColor(t.accent) ? "dark" : "light"} />
       <View style={{ flex: 1, backgroundColor: t.bg }}>
         <NavigationContainer
           theme={navTheme}
           ref={navigationRef}
-          onReady={() => setCurrentRoute(navigationRef.getCurrentRoute()?.name)}
+          onReady={() => {
+            setCurrentRoute(navigationRef.getCurrentRoute()?.name);
+            setNavReady(true);
+          }}
           onStateChange={() => setCurrentRoute(navigationRef.getCurrentRoute()?.name)}
         >
-          <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
+          <Stack.Navigator
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: t.bg },
+              animation: "slide_from_right",
+              gestureEnabled: true,
+              // no iOS cada tela controla a barra de status (o <StatusBar> sozinho não vale): texto claro em topo escuro
+              statusBarStyle: isLightColor(t.accent) ? "dark" : "light",
+            }}
+          >
             {user ? (
               <>
                 <Stack.Screen name="Home">
                   {(props) => <HomeScreen {...props} user={user} onLogout={handleLogout} onUserUpdate={handleUserUpdate} />}
                 </Stack.Screen>
-                <Stack.Screen name="Channels" component={ChannelsScreen} />
+                <Stack.Screen name="Channels">{(props) => <ChannelsScreen {...props} user={user} />}</Stack.Screen>
                 <Stack.Screen name="Chat">{(props) => <ChatScreen {...props} user={user} />}</Stack.Screen>
-                <Stack.Screen name="Voice">{(props) => <VoiceScreen {...props} user={user} />}</Stack.Screen>
+                <Stack.Screen name="Voice" options={{ animation: "slide_from_bottom" }}>{(props) => <VoiceScreen {...props} user={user} />}</Stack.Screen>
                 <Stack.Screen name="DmChat">{(props) => <DmChatScreen {...props} user={user} />}</Stack.Screen>
-                <Stack.Screen name="Profile">{(props) => <ProfileScreen {...props} user={user} />}</Stack.Screen>
-                <Stack.Screen name="EditProfile">
+                <Stack.Screen name="Profile" options={{ animation: "fade_from_bottom" }}>{(props) => <ProfileScreen {...props} user={user} />}</Stack.Screen>
+                <Stack.Screen name="EditProfile" options={{ animation: "fade_from_bottom" }}>
                   {(props) => <EditProfileScreen {...props} user={user} onUserUpdate={handleUserUpdate} />}
                 </Stack.Screen>
               </>
@@ -109,7 +157,9 @@ function Root() {
           </Stack.Navigator>
         </NavigationContainer>
         {user ? <VoiceBar navigationRef={navigationRef} currentRoute={currentRoute} /> : null}
+        <CallLinks user={user} navReady={navReady} />
       </View>
+      </DmNotificationsProvider>
     </VoiceProvider>
   );
 }

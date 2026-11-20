@@ -1,28 +1,55 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Modal, Platform, Pressable, ScrollView, StatusBar, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Linking, Modal, Platform, Pressable, ScrollView, StatusBar, StyleSheet, UIManager, View, findNodeHandle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VideoTrack } from "@livekit/react-native";
 import { startIOSPIP } from "@livekit/react-native-webrtc";
 import { Track } from "livekit-client";
+import { Image } from "expo-image";
+import { isPictureInPictureActive, startPictureInPicture, stopPictureInPicture } from "../../modules/concorde-sfx";
 import api from "../api";
 import { useTokens } from "../theme/ThemeContext";
 import { useVoice } from "../voice/VoiceContext";
-import { Avatar, Btn, IconBtn, Screen, SectionTitle, Sticker, Tag, Txt } from "../ui/kit";
-import Sheet, { SheetItem } from "../ui/Sheet";
+import { Avatar, Btn, Field, IconBtn, Screen, SectionTitle, Sticker, Tag, Txt } from "../ui/kit";
+import Sheet, { ALL_ORIENTATIONS, SheetItem } from "../ui/Sheet";
 import Slider from "../ui/Slider";
 import TopBar from "../ui/TopBar";
 import Icon from "../ui/icons";
+import { Enter } from "../ui/anim";
+import { useLayout } from "../ui/layout";
 
 const PIP = { enabled: true, startAutomatically: true, stopAutomatically: true, preferredSize: { width: 16, height: 9 } };
 
-function ParticipantCard({ p, onPress, mirrorLocal }) {
+/**
+ * Abre o PiP do vídeo. O comando da biblioteca não funciona na arquitetura nova do RN,
+ * então primeiro tenta pelo nosso módulo nativo (acha a view de vídeo e abre o PiP).
+ */
+async function openPip(viewRef) {
+  if (await startPictureInPicture()) return true;
+  if (!viewRef.current) return false;
+  try {
+    startIOSPIP(viewRef);
+    return true;
+  } catch {
+    try {
+      UIManager.dispatchViewManagerCommand(findNodeHandle(viewRef.current), "startIOSPIP", []);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+const CARD_HEIGHT = 168;
+
+function ParticipantCard({ p, onPress, mirrorLocal, onEnlarge }) {
   const t = useTokens();
   const cam = p.camera;
+  // tamanho fixo: falar só muda cor/anel, nunca o tamanho (o layout não pula)
   return (
     <Pressable style={{ flex: 1 }} onPress={onPress} accessibilityLabel={`Opções de ${p.name}`}>
-      <Sticker radius={20} shadow={4} bg={p.speaking ? t.voiceBg : t.surface} border={p.speaking ? 3 : 2.5}>
+      <Sticker radius={20} shadow={4} bg={p.speaking ? t.voiceBg : t.surface} shadowColor={p.speaking ? t.success : undefined} innerStyle={{ height: CARD_HEIGHT }}>
         {cam ? (
-          <View style={{ height: 150, backgroundColor: "#000" }}>
+          <View style={{ flex: 1, backgroundColor: "#000" }}>
             <VideoTrack
               trackRef={{ participant: cam.participant, publication: cam.publication, source: Track.Source.Camera }}
               objectFit="cover"
@@ -37,10 +64,14 @@ function ParticipantCard({ p, onPress, mirrorLocal }) {
               </View>
               {p.muted ? <Tag label="MUTADO" /> : null}
             </View>
+            {p.speaking ? <View pointerEvents="none" style={{ position: "absolute", inset: 0, borderWidth: 3, borderColor: t.success, borderRadius: 17 }} /> : null}
+            <View style={{ position: "absolute", top: 6, right: 6 }}>
+              <IconBtn icon="maximize" size={34} label="Ampliar câmera" onPress={onEnlarge} />
+            </View>
           </View>
         ) : (
-          <View style={{ alignItems: "center", paddingVertical: 16, paddingHorizontal: 8, gap: 6 }}>
-            <Avatar name={p.name} url={p.avatarUrl} size={64} ring={p.speaking ? t.success : undefined} />
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, gap: 6 }}>
+            <Avatar name={p.name} url={p.avatarUrl} size={64} ring={p.speaking ? t.success : "transparent"} />
             <Txt weight={900} size={15} numberOfLines={1} style={{ maxWidth: "100%" }}>
               {p.isLocal ? "Você" : p.name}
             </Txt>
@@ -57,13 +88,48 @@ function ParticipantCard({ p, onPress, mirrorLocal }) {
   );
 }
 
-/** Vídeo da live, com Picture in Picture no iPhone (manual pelo botão ou sozinho ao minimizar). */
-function StreamPlayer({ stream, onStop, onFullscreen, height = 210, fullscreen }) {
+/** O PiP está aberto? Confere de tempos em tempos enquanto a live está na tela (o sistema não avisa). */
+function usePipActive(enabled) {
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    if (!enabled || Platform.OS !== "ios") return undefined;
+    let alive = true;
+    const check = () => isPictureInPictureActive().then((v) => alive && setActive(v));
+    check();
+    const timer = setInterval(check, 800);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [enabled]);
+  return enabled && active;
+}
+
+/**
+ * Vídeo da live, com Picture in Picture no iPhone/iPad (manual pelo botão ou sozinho ao minimizar).
+ * Fora da tela cheia o quadro é 16:9 e cresce até onde dá (sem as faixas pretas enormes).
+ */
+function StreamPlayer({ stream, onStop, onFullscreen, fullscreen }) {
   const t = useTokens();
+  const layout = useLayout();
   const viewRef = useRef(null);
+  const [boxWidth, setBoxWidth] = useState(0);
+  const inPip = usePipActive(stream.hasVideo);
   const trackRef = { participant: stream.participant, publication: stream.publication, source: Track.Source.ScreenShare };
-  return (
-    <View style={{ height, backgroundColor: "#000", borderRadius: fullscreen ? 0 : 14, overflow: "hidden" }}>
+
+  // 16:9 na largura disponível, sem passar de ~62% da altura da tela (no iPad deitado fica centralizado)
+  const maxH = Math.round(layout.height * (layout.wide ? 0.62 : 0.4));
+  const frameW = boxWidth ? Math.min(boxWidth, Math.round((maxH * 16) / 9)) : 0;
+  const frameH = Math.round((frameW * 9) / 16);
+
+  const player = (
+    <View
+      style={
+        fullscreen
+          ? { flex: 1, backgroundColor: "#000" }
+          : { width: frameW, height: frameH, backgroundColor: "#000", borderRadius: 16, overflow: "hidden", borderWidth: 2.5, borderColor: t.ink }
+      }
+    >
       {stream.hasVideo ? (
         <VideoTrack ref={viewRef} trackRef={trackRef} objectFit="contain" style={{ flex: 1 }} iosPIP={Platform.OS === "ios" ? PIP : undefined} />
       ) : (
@@ -74,30 +140,71 @@ function StreamPlayer({ stream, onStop, onFullscreen, height = 210, fullscreen }
           </Txt>
         </View>
       )}
-      <View style={{ position: "absolute", top: 8, right: 8, flexDirection: "row", gap: 8 }}>
-        {Platform.OS === "ios" && stream.hasVideo ? (
-          <IconBtn icon="pip" size={38} label="Picture in Picture" onPress={() => viewRef.current && startIOSPIP(viewRef)} />
-        ) : null}
-        {onFullscreen ? <IconBtn icon="maximize" size={38} label="Tela cheia" onPress={onFullscreen} /> : null}
-        <IconBtn icon="x" size={38} label={fullscreen ? "Fechar" : "Parar de assistir"} onPress={onStop} />
-      </View>
-      <View style={{ position: "absolute", left: 8, bottom: 8, flexDirection: "row", gap: 6, alignItems: "center" }}>
-        <Tag label="AO VIVO" />
-        <View style={{ backgroundColor: t.backdrop, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 }}>
-          <Txt weight={800} size={12} color="#fff">
-            {stream.name}
+      {inPip ? (
+        // a live continua montada por baixo (o PiP depende dela); só cobre pra não aparecer duas vezes
+        <Pressable
+          onPress={() => stopPictureInPicture()}
+          style={{ ...StyleSheet.absoluteFillObject, backgroundColor: t.surface, alignItems: "center", justifyContent: "center", gap: 8, padding: 16 }}
+          accessibilityLabel="Voltar a live pro app"
+        >
+          <Icon name="pip" size={34} color={t.text} />
+          <Txt weight={900} size={15} style={{ textAlign: "center" }}>
+            Assistindo em Picture in Picture
           </Txt>
+          <Txt weight={700} size={12} color={t.textMuted} style={{ textAlign: "center" }}>
+            Toque aqui pra trazer a live de volta
+          </Txt>
+        </Pressable>
+      ) : null}
+      {!inPip ? (
+        <View style={{ position: "absolute", top: 8, right: 8, flexDirection: "row", gap: 8 }}>
+          {Platform.OS === "ios" && stream.hasVideo ? (
+            <IconBtn
+              icon="pip"
+              size={38}
+              label="Picture in Picture"
+              onPress={() => {
+                openPip(viewRef).then((ok) => !ok && Alert.alert("Picture in Picture", "Não deu pra abrir agora. Minimize o app com a live aberta que ele abre sozinho."));
+              }}
+            />
+          ) : null}
+          {onFullscreen ? <IconBtn icon="maximize" size={38} label="Tela cheia" onPress={onFullscreen} /> : null}
+          <IconBtn icon="x" size={38} label={fullscreen ? "Fechar" : "Parar de assistir"} onPress={onStop} />
         </View>
-      </View>
+      ) : null}
+      {!inPip ? (
+        <View style={{ position: "absolute", left: 8, bottom: 8, flexDirection: "row", gap: 6, alignItems: "center" }}>
+          <Tag label="AO VIVO" />
+          <View style={{ backgroundColor: t.backdrop, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 }}>
+            <Txt weight={800} size={12} color="#fff">
+              {stream.name}
+            </Txt>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+
+  if (fullscreen) return player;
+  return (
+    <View style={{ width: "100%", alignItems: "center" }} onLayout={(e) => setBoxWidth(Math.floor(e.nativeEvent.layout.width))}>
+      {boxWidth ? player : <View style={{ height: 200 }} />}
     </View>
   );
 }
 
-/** Soundboard: toca o som pra todo mundo da call (mesma API do site). */
+/** Soundboard: toca o som pra todo mundo da call (mesma API do site). Toque de novo pra parar; segure pra renomear. */
+const MAX_CLIP_MS = 15000; // o bot corta cada som em 15s
+
 function Soundboard({ channelId }) {
   const t = useTokens();
+  const voice = useVoice();
+  const [vol, setVol] = useState(voice.soundboardVolume);
   const [clips, setClips] = useState(null);
-  const [playingId, setPlayingId] = useState(null);
+  const [playing, setPlaying] = useState({});
+  const timers = useRef({});
+  const [renaming, setRenaming] = useState(null);
+  const [renameValue, setRenameValue] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -105,48 +212,225 @@ function Soundboard({ channelId }) {
       .get("/api/soundboard")
       .then(({ data }) => active && setClips(data || []))
       .catch(() => active && setClips([]));
+    const all = timers.current;
     return () => {
       active = false;
+      Object.values(all).forEach(clearTimeout);
     };
   }, []);
 
+  function clearPlaying(id) {
+    setPlaying((p) => {
+      const next = { ...p };
+      delete next[id];
+      return next;
+    });
+  }
+
   async function play(clip) {
-    setPlayingId(clip.id);
+    if (playing[clip.id]) return stop();
     try {
       await api.post(`/api/channels/${channelId}/soundboard/play/${clip.id}`);
-    } catch {
-      // som não tocou: só some o destaque
-    } finally {
-      setTimeout(() => setPlayingId(null), 500);
+      clearTimeout(timers.current[clip.id]);
+      setPlaying((p) => ({ ...p, [clip.id]: true }));
+      timers.current[clip.id] = setTimeout(() => clearPlaying(clip.id), MAX_CLIP_MS);
+    } catch (err) {
+      Alert.alert("Soundboard", err.response?.data?.error || "Não deu pra tocar esse som.");
+    }
+  }
+
+  /** Para os sons que você tocou (os dos outros continuam). */
+  async function stop() {
+    Object.values(timers.current).forEach(clearTimeout);
+    timers.current = {};
+    setPlaying({});
+    try {
+      await api.post(`/api/channels/${channelId}/soundboard/stop`);
+    } catch (err) {
+      Alert.alert("Soundboard", err.response?.data?.error || "Não deu pra parar o som.");
+    }
+  }
+
+  async function saveRename() {
+    const clip = renaming;
+    const name = renameValue.trim();
+    setRenaming(null);
+    if (!clip || !name || name === clip.name) return;
+    setClips((prev) => prev.map((c) => (c.id === clip.id ? { ...c, name } : c)));
+    try {
+      const { data } = await api.put(`/api/soundboard/${clip.id}`, { name });
+      setClips((prev) => prev.map((c) => (c.id === clip.id ? data : c)));
+    } catch (err) {
+      setClips((prev) => prev.map((c) => (c.id === clip.id ? clip : c)));
+      Alert.alert("Soundboard", err.response?.data?.error || "Não deu pra renomear.");
     }
   }
 
   if (!clips?.length) return null;
+  const anyPlaying = Object.keys(playing).length > 0;
   return (
     <Sticker radius={20} shadow={4}>
       <View style={{ padding: 12, gap: 10 }}>
-        <SectionTitle>SOUNDBOARD · {clips.length}</SectionTitle>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <SectionTitle>SOUNDBOARD · {clips.length}</SectionTitle>
+          </View>
+          {anyPlaying ? <Btn small icon="stop" label="Parar" onPress={stop} /> : null}
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Icon name="volume" size={16} color={t.textMuted} />
+          <View style={{ flex: 1 }}>
+            <Slider value={vol} onChange={setVol} onDone={(v) => voice.setSoundboardVolume(v)} />
+          </View>
+          <Txt weight={900} size={13} style={{ width: 44, textAlign: "right" }}>
+            {vol}%
+          </Txt>
+        </View>
+        <Txt weight={700} size={12} color={t.textFaint}>
+          Toque pra tocar (de novo pra parar) · segure pra renomear
+        </Txt>
         <FlatList
           data={clips}
           horizontal
           showsHorizontalScrollIndicator={false}
           keyExtractor={(c) => String(c.id)}
           contentContainerStyle={{ gap: 10, paddingRight: 6, paddingBottom: 4 }}
-          renderItem={({ item }) => (
-            <Pressable onPress={() => play(item)} accessibilityLabel={`Tocar ${item.name}`}>
-              {({ pressed }) => (
-                <Sticker radius={14} shadow={3} pressed={pressed} bg={playingId === item.id ? t.mint : t.surface2}>
-                  <View style={{ width: 92, paddingVertical: 10, paddingHorizontal: 8, alignItems: "center", gap: 4 }}>
-                    <Icon name="volume" size={20} color={playingId === item.id ? t.onPop : t.text} />
-                    <Txt weight={900} size={12} numberOfLines={1} color={playingId === item.id ? t.onPop : t.text}>
-                      {item.name}
-                    </Txt>
-                  </View>
-                </Sticker>
-              )}
-            </Pressable>
-          )}
+          renderItem={({ item }) => {
+            const on = !!playing[item.id];
+            return (
+              <Pressable
+                onPress={() => play(item)}
+                onLongPress={() => {
+                  setRenaming(item);
+                  setRenameValue(item.name);
+                }}
+                accessibilityLabel={on ? `Parar ${item.name}` : `Tocar ${item.name}`}
+                accessibilityHint="Segure pra renomear"
+              >
+                {({ pressed }) => (
+                  <Sticker radius={14} shadow={3} pressed={pressed} bg={on ? t.mint : t.surface2}>
+                    <View style={{ width: 92, paddingVertical: 10, paddingHorizontal: 8, alignItems: "center", gap: 4 }}>
+                      <Icon name={on ? "stop" : "volume"} size={20} color={on ? t.onPop : t.text} />
+                      <Txt weight={900} size={12} numberOfLines={1} color={on ? t.onPop : t.text}>
+                        {item.name}
+                      </Txt>
+                    </View>
+                  </Sticker>
+                )}
+              </Pressable>
+            );
+          }}
         />
+      </View>
+      <Sheet visible={!!renaming} onClose={() => setRenaming(null)} title="RENOMEAR SOM">
+        <View style={{ gap: 12 }}>
+          <Field value={renameValue} onChangeText={setRenameValue} maxLength={60} autoFocus returnKeyType="done" onSubmitEditing={saveRename} placeholder="Nome do som" />
+          <Btn icon="check" label="Salvar" onPress={saveRename} disabled={!renameValue.trim()} />
+        </View>
+      </Sheet>
+    </Sticker>
+  );
+}
+
+/** Transmissões só de áudio (música, jogo...): ouvir/parar e volume, igual ao site. */
+/** Música do Spotify de quem está transmitindo áudio (só pra quem conectou o Spotify), atualiza a cada 15s. */
+function useNowPlaying(identities) {
+  const ids = identities
+    .map((id) => /^user-(\d+)$/.exec(id || "")?.[1])
+    .filter(Boolean)
+    .sort()
+    .join(",");
+  const [tracks, setTracks] = useState({});
+  useEffect(() => {
+    if (!ids) return undefined;
+    let active = true;
+    function poll() {
+      api
+        .post("/api/spotify/now-playing/batch", { userIds: ids.split(",").map(Number) })
+        .then(({ data }) => active && setTracks(data || {}))
+        .catch(() => {});
+    }
+    poll();
+    const timer = setInterval(poll, 15000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [ids]);
+  return ids ? tracks : {};
+}
+
+function AudioShares() {
+  const t = useTokens();
+  const voice = useVoice();
+  const [vols, setVols] = useState({});
+  const tracks = useNowPlaying(voice.audioShares.map((a) => a.identity));
+  if (!voice.audioShares.length) return null;
+  return (
+    <Sticker radius={20} shadow={4}>
+      <View style={{ padding: 12, gap: 12 }}>
+        <SectionTitle>ÁUDIO AO VIVO</SectionTitle>
+        {voice.audioShares.map((a) => {
+          const v = vols[a.identity] ?? voice.getVolume(a.identity, "stream");
+          const np = tracks[/^user-(\d+)$/.exec(a.identity || "")?.[1]];
+          const track = np && np.playing !== false && np.trackName ? np : null;
+          return (
+            <View key={a.identity} style={{ gap: 6 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                {track?.albumArtUrl ? (
+                  <View>
+                    <Image source={{ uri: track.albumArtUrl }} cachePolicy="memory-disk" style={{ width: 48, height: 48, borderRadius: 10, borderWidth: 2, borderColor: t.ink }} />
+                    <View style={{ position: "absolute", right: -6, bottom: -6 }}>
+                      <Avatar name={a.name} url={a.avatarUrl} size={24} radius={8} />
+                    </View>
+                  </View>
+                ) : (
+                  <Avatar name={a.name} url={a.avatarUrl} size={38} />
+                )}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Txt weight={900} numberOfLines={1}>
+                    {a.name}
+                  </Txt>
+                  {track ? (
+                    <Pressable onPress={() => track.trackUrl && Linking.openURL(track.trackUrl).catch(() => {})} accessibilityLabel={`Abrir ${track.trackName} no Spotify`}>
+                      <Txt weight={900} size={13} numberOfLines={1}>
+                        ♪ {track.trackName}
+                        <Txt weight={700} size={12} color={t.textMuted}>
+                          {"  "}
+                          {track.artistNames}
+                        </Txt>
+                      </Txt>
+                    </Pressable>
+                  ) : null}
+                  <Txt weight={700} size={12} color={a.listening ? t.mintText : t.textMuted}>
+                    {a.listening ? "você está ouvindo" : "transmitindo áudio - você não está ouvindo"}
+                  </Txt>
+                </View>
+                <Btn
+                  small
+                  variant={a.listening ? "surface" : "accent"}
+                  icon={a.listening ? "headphonesOff" : "headphones"}
+                  label={a.listening ? "Parar" : "Ouvir"}
+                  onPress={() => voice.toggleListenAudio(a.identity)}
+                />
+              </View>
+              {a.listening ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 48 }}>
+                  <View style={{ flex: 1 }}>
+                    <Slider
+                      value={v}
+                      onChange={(nv) => setVols((prev) => ({ ...prev, [a.identity]: nv }))}
+                      onDone={(nv) => voice.setVolume(a.identity, nv, "stream")}
+                    />
+                  </View>
+                  <Txt weight={900} size={13} style={{ width: 44, textAlign: "right" }}>
+                    {v}%
+                  </Txt>
+                </View>
+              ) : null}
+            </View>
+          );
+        })}
       </View>
     </Sticker>
   );
@@ -305,6 +589,8 @@ export default function VoiceScreen({ route, navigation, user }) {
   const inThisCall = voice.channel && target && voice.channel.id === target.id;
   const [fullscreen, setFullscreen] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [bigCam, setBigCam] = useState(null);
+  const layout = useLayout();
 
   useEffect(() => {
     if (target && !inThisCall && !voice.connecting) voice.join(target);
@@ -332,8 +618,9 @@ export default function VoiceScreen({ route, navigation, user }) {
 
   // a câmera local entra no card "Você"
   const people = voice.participants.map((p) => (p.isLocal && voice.localCamera ? { ...p, camera: voice.localCamera } : p));
+  const cols = layout.wide ? layout.columns(230, 4) : 2;
   const rows = [];
-  for (let i = 0; i < people.length; i += 2) rows.push(people.slice(i, i + 2));
+  for (let i = 0; i < people.length; i += cols) rows.push(people.slice(i, i + cols));
   const selectedP = selected ? people.find((p) => p.identity === selected) : null;
 
   return (
@@ -376,15 +663,26 @@ export default function VoiceScreen({ route, navigation, user }) {
           </Sticker>
         ) : null}
 
+        <AudioShares />
+
         <Soundboard channelId={voice.channel.id} />
 
         <SectionTitle>NA CALL</SectionTitle>
         {rows.map((row, i) => (
           <View key={i} style={{ flexDirection: "row", gap: 12 }}>
             {row.map((p) => (
-              <ParticipantCard key={p.identity} p={p} mirrorLocal={voice.facing === "user"} onPress={() => setSelected(p.identity)} />
+              <Enter key={p.identity} kind="pop" style={{ flex: 1 }}>
+                <ParticipantCard
+                  p={p}
+                  mirrorLocal={voice.facing === "user"}
+                  onPress={() => setSelected(p.identity)}
+                  onEnlarge={() => setBigCam(p.identity)}
+                />
+              </Enter>
             ))}
-            {row.length === 1 ? <View style={{ flex: 1 }} /> : null}
+            {Array.from({ length: cols - row.length }, (_, k) => (
+              <View key={`f${k}`} style={{ flex: 1 }} />
+            ))}
           </View>
         ))}
       </ScrollView>
@@ -445,15 +743,43 @@ export default function VoiceScreen({ route, navigation, user }) {
       </View>
 
       {fullscreen && watched ? (
-        <Modal visible animationType="fade" onRequestClose={() => setFullscreen(false)} supportedOrientations={["portrait", "landscape"]}>
+        <Modal visible animationType="fade" onRequestClose={() => setFullscreen(false)} supportedOrientations={ALL_ORIENTATIONS}>
           <StatusBar hidden />
           <View style={{ flex: 1, backgroundColor: "#000", justifyContent: "center", paddingTop: insets.top }}>
-            <StreamPlayer stream={watched} fullscreen height="100%" onStop={() => setFullscreen(false)} />
+            <StreamPlayer stream={watched} fullscreen onStop={() => setFullscreen(false)} />
           </View>
         </Modal>
       ) : null}
 
       <ParticipantSheet p={selectedP} onClose={() => setSelected(null)} navigation={navigation} user={user} />
+
+      {/* câmera ampliada */}
+      {(() => {
+        const big = bigCam ? people.find((x) => x.identity === bigCam && x.camera) : null;
+        if (!big) return null;
+        return (
+          <Modal visible animationType="fade" onRequestClose={() => setBigCam(null)} supportedOrientations={ALL_ORIENTATIONS}>
+            <StatusBar hidden />
+            <View style={{ flex: 1, backgroundColor: "#000" }}>
+              <VideoTrack
+                trackRef={{ participant: big.camera.participant, publication: big.camera.publication, source: Track.Source.Camera }}
+                objectFit="contain"
+                mirror={big.isLocal && voice.facing === "user"}
+                style={{ flex: 1 }}
+              />
+              <View style={{ position: "absolute", top: insets.top + 10, right: 14, flexDirection: "row", gap: 8 }}>
+                {big.isLocal ? <IconBtn icon="switchCamera" size={42} label="Trocar câmera" onPress={voice.switchCamera} /> : null}
+                <IconBtn icon="x" size={42} label="Fechar" onPress={() => setBigCam(null)} />
+              </View>
+              <View style={{ position: "absolute", left: 14, bottom: insets.bottom + 14, backgroundColor: t.backdrop, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}>
+                <Txt weight={900} color="#fff">
+                  {big.isLocal ? "Você" : big.name}
+                </Txt>
+              </View>
+            </View>
+          </Modal>
+        );
+      })()}
     </Screen>
   );
 }

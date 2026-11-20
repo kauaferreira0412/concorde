@@ -14,7 +14,8 @@ export default function TopBar({ title, subtitle, onBack, right, tone = "accent"
       style={{
         paddingTop: insets.top + 6,
         paddingBottom: 12,
-        paddingHorizontal: 12,
+        paddingLeft: 12 + insets.left,
+        paddingRight: 12 + insets.right,
         backgroundColor: bg,
         borderBottomWidth: 2.5,
         borderBottomColor: t.ink,

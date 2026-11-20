@@ -48,6 +48,18 @@ public class SoundboardService {
     }
 
     @Transactional
+    public ClipResponse renameClip(Long userId, Long clipId, String name) {
+        SoundboardClip clip = requireOwned(userId, clipId);
+        String clean = name == null ? "" : name.trim();
+        if (clean.isEmpty()) throw new IllegalArgumentException("Dê um nome pro som");
+        if (clean.length() > 60) clean = clean.substring(0, 60);
+        clip.setName(clean);
+        soundboardClipRepository.save(clip);
+        broadcastList(userId);
+        return toResponse(clip);
+    }
+
+    @Transactional
     public void deleteClip(Long userId, Long clipId) {
         SoundboardClip clip = requireOwned(userId, clipId);
         soundboardClipRepository.delete(clip);

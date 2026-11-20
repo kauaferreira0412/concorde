@@ -76,6 +76,28 @@ public class ServerService {
                 .toList();
     }
 
+    /** Calls com alguém dentro agora, em todos os servidores da pessoa (só canais que ela pode ver, sem bots). */
+    public List<com.codagis.concorde.dto.VoiceDtos.ActiveCall> activeCalls(Long userId) {
+        List<com.codagis.concorde.dto.VoiceDtos.ActiveCall> out = new java.util.ArrayList<>();
+        for (Membership m : membershipRepository.findByUserId(userId)) {
+            Server server = serverRepository.findById(m.getServerId()).orElse(null);
+            if (server == null) continue;
+            for (ChannelResponse c : listChannels(server.getId(), userId)) {
+                if (c.type() != ChannelType.VOICE) continue;
+                List<com.codagis.concorde.dto.VoiceDtos.ActiveCallParticipant> people = voicePresenceService.snapshot(c.id()).stream()
+                        .filter(p -> p.userId() != null && p.userId() > 0)
+                        .map(p -> new com.codagis.concorde.dto.VoiceDtos.ActiveCallParticipant(p.userId(), p.username(), p.avatarUrl()))
+                        .toList();
+                if (people.isEmpty()) continue;
+                out.add(new com.codagis.concorde.dto.VoiceDtos.ActiveCall(c.id(), c.name(), server.getId(), server.getName(),
+                        server.getIconUrl(), people));
+            }
+        }
+        // as mais cheias primeiro
+        out.sort((a, b) -> Integer.compare(b.participants().size(), a.participants().size()));
+        return out;
+    }
+
     @Transactional
     public ServerResponse createServer(Long ownerId, CreateServerRequest req) {
         ServerType type = req.type() != null ? req.type() : ServerType.NORMAL;

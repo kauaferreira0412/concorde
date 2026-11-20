@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, View } from "react-native";
+import { Image } from "expo-image";
 import api from "../api";
 import { useTokens } from "../theme/ThemeContext";
 import { Screen, Sticker, Txt } from "../ui/kit";
 import Icon from "../ui/icons";
 import TopBar from "../ui/TopBar";
+import { Enter, stagger } from "../ui/anim";
+import { useLayout } from "../ui/layout";
 
 function sortByUserOrder(servers, order) {
   if (!Array.isArray(order) || order.length === 0) return servers;
@@ -20,7 +23,7 @@ function ServerTile({ server, onPress }) {
       <Sticker radius={20} shadow={4} pressed={pressed}>
         <View style={{ padding: 14, alignItems: "center", gap: 10 }}>
           {server.iconUrl ? (
-            <Image source={{ uri: server.iconUrl }} style={{ width: 64, height: 64, borderRadius: 20, borderWidth: 2.5, borderColor: t.ink }} />
+            <Image cachePolicy="memory-disk" transition={120} recyclingKey={server.iconUrl} source={{ uri: server.iconUrl }} style={{ width: 64, height: 64, borderRadius: 20, borderWidth: 2.5, borderColor: t.ink }} />
           ) : (
             <View
               style={{
@@ -53,6 +56,8 @@ export default function ServersScreen({ navigation, user }) {
   const [servers, setServers] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const layout = useLayout();
+  const cols = layout.wide ? layout.columns(190, 6, layout.contentWidth) : 2;
 
   const load = useCallback(async () => {
     try {
@@ -86,7 +91,8 @@ export default function ServersScreen({ navigation, user }) {
       ) : (
         <FlatList
           data={servers}
-          numColumns={2}
+          key={`cols-${cols}`}
+          numColumns={cols}
           keyExtractor={(item) => String(item.id)}
           columnWrapperStyle={{ gap: 12 }}
           contentContainerStyle={{ padding: 14, gap: 12, paddingBottom: 120 }}
@@ -103,8 +109,12 @@ export default function ServersScreen({ navigation, user }) {
           }
           renderItem={({ item, index }) => (
             <>
-              <ServerTile server={item} onPress={() => navigation.navigate("Channels", { server: item })} />
-              {servers.length % 2 === 1 && index === servers.length - 1 ? <View style={{ flex: 1 }} /> : null}
+              <Enter kind="pop" delay={stagger(index)} style={{ flex: 1 }}>
+                <ServerTile server={item} onPress={() => navigation.navigate("Channels", { server: item })} />
+              </Enter>
+              {index === servers.length - 1
+                ? Array.from({ length: (cols - (servers.length % cols)) % cols }, (_, i) => <View key={`f${i}`} style={{ flex: 1 }} />)
+                : null}
             </>
           )}
         />

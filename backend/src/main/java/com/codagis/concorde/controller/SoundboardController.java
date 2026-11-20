@@ -51,6 +51,27 @@ public class SoundboardController {
         return soundboardService.uploadClip(currentUser.id(), file, name);
     }
 
+    /** Renomeia um som da sua lista. */
+    @PutMapping("/api/soundboard/{clipId}")
+    public ClipResponse rename(@PathVariable Long clipId, @RequestBody com.codagis.concorde.dto.SoundboardDtos.RenameClipRequest req) {
+        return soundboardService.renameClip(currentUser.id(), clipId, req.name());
+    }
+
+    /** Para os sons que VOCÊ tocou nessa call (os dos outros continuam). */
+    @PostMapping("/api/channels/{channelId}/soundboard/stop")
+    public void stopMine(@PathVariable Long channelId) {
+        Long userId = currentUser.id();
+        if (!voicePresenceService.isPresent(channelId, userId)) {
+            throw new IllegalStateException("Você precisa estar conectado nessa call");
+        }
+        try {
+            restTemplate.postForObject(musicBotUrl + "/soundboard/stop-clips",
+                    Map.of("channelId", channelId, "userId", userId), Map.class);
+        } catch (RestClientException e) {
+            throw new IllegalStateException("Não foi possível parar o som agora");
+        }
+    }
+
     @DeleteMapping("/api/soundboard/{clipId}")
     public void delete(@PathVariable Long clipId) {
         soundboardService.deleteClip(currentUser.id(), clipId);
@@ -73,7 +94,8 @@ public class SoundboardController {
         SoundboardClip clip = soundboardService.requireOwned(userId, clipId);
 
         try {
-            restTemplate.postForObject(musicBotUrl + "/soundboard/play", Map.of("channelId", channelId, "url", clip.getFileUrl()), Map.class);
+            restTemplate.postForObject(musicBotUrl + "/soundboard/play",
+                    Map.of("channelId", channelId, "url", clip.getFileUrl(), "userId", userId), Map.class);
         } catch (RestClientException e) {
             throw new IllegalStateException("Não foi possível tocar o som agora - tente de novo em instantes");
         }

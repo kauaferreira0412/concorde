@@ -1,16 +1,23 @@
-import { Modal, Pressable, ScrollView, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTokens } from "../theme/ThemeContext";
 import { Txt } from "./kit";
 import Icon from "./icons";
+import { Enter } from "./anim";
+
+/** Sem isso o iOS trava o modal em retrato e ele fica torto ao girar o iPad. */
+export const ALL_ORIENTATIONS = ["portrait", "portrait-upside-down", "landscape", "landscape-left", "landscape-right"];
 
 /** Folha que sobe de baixo (menus de ações), no estilo adesivo. */
 export default function Sheet({ visible, onClose, title, children }) {
   const t = useTokens();
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={{ flex: 1, backgroundColor: t.backdrop }} onPress={onClose} />
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} supportedOrientations={ALL_ORIENTATIONS}>
+      <View style={{ flex: 1, justifyContent: "flex-end" }}>
+      <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: t.backdrop }]} onPress={onClose} />
+      {/* no iPad a folha não estica na largura toda */}
+      <Enter kind="rise" distance={60} style={{ maxHeight: "85%", width: "100%", maxWidth: 640, alignSelf: "center" }}>
       <View
         style={{
           backgroundColor: t.surface,
@@ -20,7 +27,7 @@ export default function Sheet({ visible, onClose, title, children }) {
           borderBottomWidth: 0,
           borderColor: t.ink,
           paddingBottom: insets.bottom + 12,
-          maxHeight: "85%",
+          flexShrink: 1,
         }}
       >
         <View style={{ alignItems: "center", paddingTop: 8 }}>
@@ -34,6 +41,8 @@ export default function Sheet({ visible, onClose, title, children }) {
         <ScrollView contentContainerStyle={{ padding: 14, gap: 8 }} keyboardShouldPersistTaps="handled">
           {children}
         </ScrollView>
+      </View>
+      </Enter>
       </View>
     </Modal>
   );

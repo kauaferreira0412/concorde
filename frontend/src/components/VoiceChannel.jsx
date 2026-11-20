@@ -32,6 +32,7 @@ import SoundboardPanel from "./SoundboardPanel.jsx";
 import { enterPip, exitPip, pipSupported, registerPipCandidate } from "../utils/screenSharePip";
 import { MembersToggleButton, MobileBackButton } from "../context/LayoutContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
+import { useSpotifyNowPlaying } from "../utils/useSpotifyNowPlaying";
 
 const isElectronDesktop = typeof window !== "undefined" && !!window.concordeDesktop;
 
@@ -258,7 +259,7 @@ function CallToolbar() {
   );
 }
 
-function CameraTile({ track, name, isLocal, size }) {
+function CameraTile({ track, name, isLocal, size, speaking, micOff, focused, onFocus }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -275,12 +276,72 @@ function CameraTile({ track, name, isLocal, size }) {
   }
 
   return (
-    <div className={"camera-tile camera-tile-" + size}>
-      <video ref={videoRef} autoPlay playsInline muted={isLocal} onDoubleClick={handleMaximize} />
-      <span className="camera-tile-name">{name}</span>
+    <div
+      className={
+        "camera-tile" +
+        (size ? " camera-tile-" + size : " camera-stage-tile") +
+        (speaking ? " speaking" : "") +
+        (focused ? " focused" : "") +
+        (isLocal ? " local" : "")
+      }
+    >
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted={isLocal}
+        onClick={onFocus}
+        onDoubleClick={handleMaximize}
+        title={onFocus ? (focused ? "Clique pra voltar à grade · duplo clique: tela cheia" : "Clique pra destacar · duplo clique: tela cheia") : undefined}
+      />
+      <span className="camera-tile-name">
+        {micOff && <MicOffIcon size={11} />}
+        {name}
+      </span>
       <button type="button" className="camera-tile-maximize" onClick={handleMaximize} title="Tela cheia">
         <MaximizeIcon size={13} />
       </button>
+    </div>
+  );
+}
+
+/**
+ * Câmeras da call: grade que ocupa a largura disponível (o tamanho escolhido é o mínimo de cada câmera),
+ * quem fala ganha o contorno verde e clicar numa câmera destaca ela em tamanho grande.
+ */
+function CameraStage({ cameraTracks, participants, speakingIds, size }) {
+  const [focusedId, setFocusedId] = useState(null);
+  const micOffOf = (identity) => {
+    const p = participants.find((x) => x.identity === identity);
+    return p ? !p.micEnabled : false;
+  };
+  const focused = cameraTracks.find((c) => c.identity === focusedId) || null;
+  const rest = focused ? cameraTracks.filter((c) => c !== focused) : cameraTracks;
+  const count = rest.length;
+  const tile = (c, isFocused) => (
+    <CameraTile
+      key={c.identity}
+      track={c.track}
+      name={c.isLocal ? "Você" : c.name}
+      isLocal={c.isLocal}
+      speaking={speakingIds.has(c.identity)}
+      micOff={micOffOf(c.identity)}
+      focused={isFocused}
+      onFocus={() => setFocusedId(isFocused ? null : c.identity)}
+    />
+  );
+  return (
+    <div className={"camera-stage camera-stage-" + size + (focused ? " has-focus" : "")}>
+      {focused && <div className="camera-stage-focus">{tile(focused, true)}</div>}
+      {count > 0 && (
+        <div
+          className="camera-stage-grid"
+          // poucas câmeras não esticam até ficar gigantes: a grade cresce só até ~1,8x o tamanho mínimo de cada uma
+          style={{ maxWidth: focused ? undefined : `calc(var(--cam-min) * ${(Math.min(count, 4) * 1.8).toFixed(1)} + ${(Math.min(count, 4) - 1) * 10}px)` }}
+        >
+          {rest.map((c) => tile(c, false))}
+        </div>
+      )}
     </div>
   );
 }
@@ -557,6 +618,9 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
     setStreamVolume,
     joinChannel,
   } = useVoiceCall();
+  // quem transmite áudio e tem o Spotify conectado: mostra a música que está tocando
+  const audioShareUserIds = audioShares.map((a) => userIdOfIdentity(a.identity)).filter((id) => id != null && id > 0);
+  const audioShareTracks = useSpotifyNowPlaying(audioShareUserIds);
 
   const isThisChannelActive = connected && activeChannel?.id === channel.id;
 
@@ -716,11 +780,34 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
               <span className="audio-shares-hint">o volume aqui muda só pra você</span>
             </div>
             <div className="audio-shares-list">
-              {audioShares.map((a) => (
-                <div key={a.identity} className={"audio-share-row" + (a.isLocal ? " me" : "") + (!a.isLocal && !a.listening ? " idle" : "")}>
-                  <Avatar name={a.name} url={a.avatarUrl} className="voice-avatar" />
+              {audioShares.map((a) => {
+                const np = audioShareTracks[userIdOfIdentity(a.identity)];
+                const track = np && np.playing !== false && np.trackName ? np : null;
+                return (
+                <div key={a.identity} className={"audio-share-row" + (a.isLocal ? " me" : "") + (!a.isLocal && !a.listening ? " idle" : "") + (track ? " has-track" : "")}>
+                  {track?.albumArtUrl ? (
+                    <span className="audio-share-cover">
+                      <img src={track.albumArtUrl} alt="" />
+                      <Avatar name={a.name} url={a.avatarUrl} className="voice-avatar audio-share-cover-avatar" />
+                    </span>
+                  ) : (
+                    <Avatar name={a.name} url={a.avatarUrl} className="voice-avatar" />
+                  )}
                   <div className="audio-share-info">
                     <strong>{a.isLocal ? "Você" : a.name}</strong>
+                    {track && (
+                      <a
+                        className="audio-share-track"
+                        href={track.trackUrl || undefined}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`${track.trackName} — ${track.artistNames} (abrir no Spotify)`}
+                      >
+                        <MusicNoteIcon size={11} />
+                        <span className="audio-share-track-name">{track.trackName}</span>
+                        <span className="audio-share-track-artist">{track.artistNames}</span>
+                      </a>
+                    )}
                     <span className="audio-share-eq" aria-hidden="true">
                       <i />
                       <i />
@@ -757,7 +844,8 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}
@@ -825,11 +913,7 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
                 </CameraPipWindow>
               </>
             ) : (
-              <div className="camera-grid">
-                {cameraTracks.map((c) => (
-                  <CameraTile key={c.identity} track={c.track} name={c.name} isLocal={c.isLocal} size={cameraSize} />
-                ))}
-              </div>
+              <CameraStage cameraTracks={cameraTracks} participants={participants} speakingIds={speakingIds} size={cameraSize} />
             )}
           </section>
         )}

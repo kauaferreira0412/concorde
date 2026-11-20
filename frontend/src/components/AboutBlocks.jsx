@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { blockFromPreview, looksLikeUrl, normalizeUrl } from "../utils/linkAutofill";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext.jsx";
 import { ChevronDownIcon, MusicNoteIcon, PlusIcon, TrashIcon } from "./icons.jsx";
@@ -66,9 +67,13 @@ export function AboutBlocksView({ blocks, compact = false, SectionTag = "div" })
             const href = safeUrl(b.url);
             const inner = (
               <>
-                <span className="about-block-icon">
-                  <meta.Icon size={16} />
-                </span>
+                {b.image ? (
+                  <img className={"about-block-cover cover-" + type} src={b.image} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="about-block-icon">
+                    <meta.Icon size={16} />
+                  </span>
+                )}
                 <span className="about-block-text">
                   <strong>{b.title}</strong>
                   {(b.subtitle || (type === "link" && href)) && <span>{b.subtitle || hostOf(href)}</span>}
@@ -92,13 +97,15 @@ export function AboutBlocksView({ blocks, compact = false, SectionTag = "div" })
 }
 
 const sameBlocks = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
-const emptyBlock = (type) => ({ type, title: "", subtitle: "", url: "" });
+const emptyBlock = (type) => ({ type, title: "", subtitle: "", url: "", image: null });
 
 /** Editor dos blocos nas Configurações (salva separado do resto). */
 export function AboutBlocksEditor() {
   const { user, updateUser } = useAuth();
   const saved = user?.aboutBlocks || [];
-  const [blocks, setBlocks] = useState(() => saved.map((b) => ({ ...emptyBlock(b.type), ...b, subtitle: b.subtitle || "", url: b.url || "" })));
+  const [blocks, setBlocks] = useState(() =>
+    saved.map((b) => ({ ...emptyBlock(b.type), ...b, subtitle: b.subtitle || "", url: b.url || "", image: b.image || null }))
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [ok, setOk] = useState(false);
@@ -108,11 +115,52 @@ export function AboutBlocksEditor() {
     title: b.title.trim(),
     subtitle: b.subtitle?.trim() || null,
     url: b.url?.trim() || null,
+    image: b.image || null,
   }));
   const dirty = !sameBlocks(
     normalized,
-    saved.map((b) => ({ type: b.type, title: b.title, subtitle: b.subtitle || null, url: b.url || null }))
+    saved.map((b) => ({ type: b.type, title: b.title, subtitle: b.subtitle || null, url: b.url || null, image: b.image || null }))
   );
+
+  // colou um link: busca a prévia e preenche título, detalhe e capa (sem apagar o que a pessoa escreveu)
+  const [lookup, setLookup] = useState({});
+  const lookupTimers = useRef({});
+  const autoRef = useRef({});
+  useEffect(() => {
+    const timers = lookupTimers.current;
+    return () => Object.values(timers).forEach(clearTimeout);
+  }, []);
+
+  function onUrlChange(i, value) {
+    patch(i, { url: value });
+    clearTimeout(lookupTimers.current[i]);
+    if (!looksLikeUrl(value)) return;
+    lookupTimers.current[i] = setTimeout(() => fetchPreview(i, value), 450);
+  }
+
+  async function fetchPreview(i, value) {
+    setLookup((p) => ({ ...p, [i]: "busy" }));
+    try {
+      const { data } = await api.get("/api/link-preview", { params: { url: normalizeUrl(value) } });
+      setBlocks((prev) =>
+        prev.map((b, j) => {
+          if (j !== i || b.url.trim() !== value.trim()) return b;
+          const found = blockFromPreview(data, b.type);
+          if (!found) return b;
+          const last = autoRef.current[i] || {};
+          const next = { ...b, image: found.image || b.image };
+          // só troca o campo se estiver vazio ou ainda com o que a gente mesmo preencheu
+          if (found.title && (!b.title.trim() || b.title === last.title)) next.title = found.title;
+          if (found.subtitle && b.type !== "link" && (!b.subtitle.trim() || b.subtitle === last.subtitle)) next.subtitle = found.subtitle;
+          autoRef.current[i] = { title: next.title, subtitle: next.subtitle };
+          return next;
+        })
+      );
+      setLookup((p) => ({ ...p, [i]: undefined }));
+    } catch {
+      setLookup((p) => ({ ...p, [i]: "fail" }));
+    }
+  }
 
   function patch(i, change) {
     setBlocks((prev) => prev.map((b, j) => (j === i ? { ...b, ...change } : b)));
@@ -139,7 +187,7 @@ export function AboutBlocksEditor() {
       const { data } = await api.put("/api/users/me/about-blocks", { blocks: normalized });
       const next = data.aboutBlocks || [];
       updateUser({ aboutBlocks: next });
-      setBlocks(next.map((b) => ({ ...emptyBlock(b.type), ...b, subtitle: b.subtitle || "", url: b.url || "" })));
+      setBlocks(next.map((b) => ({ ...emptyBlock(b.type), ...b, subtitle: b.subtitle || "", url: b.url || "", image: b.image || null })));
       setOk(true);
     } catch (err) {
       setError(err.response?.data?.error || "Não deu pra salvar os blocos agora");
@@ -161,9 +209,18 @@ export function AboutBlocksEditor() {
             return (
               <div key={i} className="about-editor-row">
                 <div className="about-editor-head">
-                  <span className="about-block-icon">
-                    <meta.Icon size={15} />
-                  </span>
+                  {b.image ? (
+                    <span className="about-editor-cover">
+                      <img src={b.image} alt="Capa" referrerPolicy="no-referrer" />
+                      <button type="button" className="icon-btn" onClick={() => patch(i, { image: null })} title="Tirar a capa">
+                        ×
+                      </button>
+                    </span>
+                  ) : (
+                    <span className="about-block-icon">
+                      <meta.Icon size={15} />
+                    </span>
+                  )}
                   <select value={b.type} onChange={(e) => patch(i, { type: e.target.value })} aria-label="Tipo do bloco">
                     {Object.entries(BLOCK_TYPES).map(([k, t]) => (
                       <option key={k} value={k}>
@@ -171,7 +228,10 @@ export function AboutBlocksEditor() {
                       </option>
                     ))}
                   </select>
-                  <span className="about-editor-spacer" />
+                  <span className="about-editor-spacer">
+                    {lookup[i] === "busy" && <span className="admin-hint">buscando o link...</span>}
+                    {lookup[i] === "fail" && <span className="admin-hint">não deu pra ler esse link</span>}
+                  </span>
                   <button type="button" className="icon-btn" onClick={() => move(i, -1)} disabled={i === 0} title="Subir">
                     <ChevronDownIcon size={15} className="about-chev-up" />
                   </button>
@@ -194,7 +254,7 @@ export function AboutBlocksEditor() {
                   )}
                   <input
                     value={b.url}
-                    onChange={(e) => patch(i, { url: e.target.value })}
+                    onChange={(e) => onUrlChange(i, e.target.value)}
                     placeholder={meta.urlPh}
                     maxLength={300}
                     inputMode="url"

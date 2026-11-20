@@ -5,7 +5,7 @@ import { useSpotifyNowPlaying } from "../utils/useSpotifyNowPlaying";
 import { useProfile } from "../context/ProfileContext.jsx";
 import { useAlert } from "../context/AlertContext.jsx";
 import { ChevronsLeftIcon, ChevronsRightIcon, MusicNoteIcon, PencilIcon, TrashIcon, UsersIcon } from "./icons.jsx";
-import Avatar from "./Avatar.jsx";
+import { FreezableAvatar } from "./Avatar.jsx";
 import EmptyState from "./EmptyState.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
 import { DrawerCloseButton, useLayout } from "../context/LayoutContext.jsx";
@@ -182,7 +182,7 @@ export function MemberRow({ member, serverId, canManage, nowPlaying }) {
         }
       >
         <div className="member-avatar-wrap">
-          <Avatar name={member.username} url={member.avatarUrl} className="voice-avatar small" />
+          <FreezableAvatar name={member.username} url={member.avatarUrl} className="voice-avatar small" animate={member.status !== "OFFLINE"} />
           <span className={"status-dot " + STATUS_DOT_CLASS[member.status]} title={STATUS_LABEL[member.status]} />
         </div>
         <span className="member-row-info">

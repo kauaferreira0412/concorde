@@ -58,6 +58,10 @@ public class User {
     @Column(length = 7)
     private String accentColor2;
 
+    /** Cores próprias do card de perfil em JSON (fundo, caixas, textos, destaque...). */
+    @Column(length = 500)
+    private String cardColors;
+
     /** Blocos do "Sobre mim" (links, jogos, música do momento) em JSON. */
     @Column(length = 6000)
     private String aboutBlocks;

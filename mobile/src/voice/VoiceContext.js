@@ -37,6 +37,7 @@ export function VoiceProvider({ user, children }) {
   const [connecting, setConnecting] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [streams, setStreams] = useState([]);
+  const [audioShares, setAudioShares] = useState([]);
   const [micEnabled, setMicEnabledState] = useState(false);
   const [deafened, setDeafenedState] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
@@ -51,6 +52,8 @@ export function VoiceProvider({ user, children }) {
   const deafRef = useRef(false);
   const forceMutedRef = useRef(false);
   const watchingRef = useRef(new Set());
+  // transmissões só de áudio que eu parei de ouvir (o padrão é ouvir, igual ao site)
+  const declinedAudioRef = useRef(new Set());
   const presenceRef = useRef(new Map());
   const volumesRef = useRef({});
   const joinSeqRef = useRef(0);
@@ -96,7 +99,7 @@ export function VoiceProvider({ user, children }) {
     const p = room?.remoteParticipants.get(identity);
     if (!p) return;
     for (const pub of p.audioTrackPublications.values()) {
-      const kind = pub.source === Track.Source.ScreenShareAudio && !isAudioOnlyShare(pub) ? "stream" : "voice";
+      const kind = pub.source === Track.Source.ScreenShareAudio ? "stream" : "voice";
       pub.track?.setVolume?.(volumeOf(identity, kind) / 100);
     }
   }
@@ -148,13 +151,28 @@ export function VoiceProvider({ user, children }) {
       });
     }
     setStreams(list);
+    const shares = [];
+    for (const p of room.remoteParticipants.values()) {
+      if (isSoundboardBot(p.identity)) continue;
+      const pub = [...p.trackPublications.values()].find(isAudioOnlyShare);
+      if (!pub) continue;
+      shares.push({
+        identity: p.identity,
+        name: p.name || p.identity,
+        avatarUrl: avatarUrlOf(p),
+        listening: !declinedAudioRef.current.has(p.identity),
+      });
+    }
+    setAudioShares(shares);
   }, []);
 
   /** O que a gente recebe de cada um: voz e câmera sempre (menos ensurdecido), live só se estiver assistindo. */
   const wants = useCallback((pub, identity) => {
     if (pub.source === Track.Source.Microphone) return !deafRef.current;
     if (pub.source === Track.Source.ScreenShareAudio) {
-      return isAudioOnlyShare(pub) ? !deafRef.current : !deafRef.current && watchingRef.current.has(identity);
+      return isAudioOnlyShare(pub)
+        ? !deafRef.current && !declinedAudioRef.current.has(identity)
+        : !deafRef.current && watchingRef.current.has(identity);
     }
     if (pub.source === Track.Source.ScreenShare) return watchingRef.current.has(identity);
     if (pub.source === Track.Source.Camera) return true;
@@ -211,7 +229,9 @@ export function VoiceProvider({ user, children }) {
     }
     channelRef.current = null;
     watchingRef.current = new Set();
+    declinedAudioRef.current = new Set();
     presenceRef.current = new Map();
+    setAudioShares([]);
     setConnecting(false);
     setChannel(null);
     setParticipants([]);
@@ -307,6 +327,24 @@ export function VoiceProvider({ user, children }) {
     applySubscriptions();
     publishWatching();
     refresh();
+  }
+
+  /** Parar / voltar a ouvir uma transmissão só de áudio. */
+  function toggleListenAudio(identity) {
+    if (declinedAudioRef.current.has(identity)) declinedAudioRef.current.delete(identity);
+    else declinedAudioRef.current.add(identity);
+    applySubscriptions();
+    refresh();
+  }
+
+  /** Volume do soundboard (vale pra todos os bots de som, igual ao site). */
+  function setSoundboardVolume(percent) {
+    const clamped = Math.max(0, Math.min(200, Math.round(percent)));
+    volumesRef.current = { ...volumesRef.current, soundboardbot: clamped };
+    setVolumesState(volumesRef.current);
+    AsyncStorage.setItem(VOLUMES_KEY, JSON.stringify(volumesRef.current)).catch(() => {});
+    const room = roomRef.current;
+    if (room) for (const p of room.remoteParticipants.values()) if (isSoundboardBot(p.identity)) applyVolume(p.identity);
   }
 
   function setVolume(identity, percent, kind = "voice") {
@@ -503,6 +541,10 @@ export function VoiceProvider({ user, children }) {
     connecting,
     participants,
     streams,
+    audioShares,
+    toggleListenAudio,
+    soundboardVolume: typeof volumes.soundboardbot === "number" ? volumes.soundboardbot : 100,
+    setSoundboardVolume,
     micEnabled,
     deafened,
     cameraOn,

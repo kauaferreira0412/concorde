@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import api from "../api";
@@ -6,6 +6,10 @@ import { useTokens } from "../theme/ThemeContext";
 import { Avatar, Screen, Sticker, Txt } from "../ui/kit";
 import Icon from "../ui/icons";
 import TopBar from "../ui/TopBar";
+import { Enter, stagger } from "../ui/anim";
+import { useLayout } from "../ui/layout";
+import ChatView from "../chat/ChatView";
+import { useDmNotifications } from "../chat/DmNotifications";
 
 const DOT = { ONLINE: "success", AWAY: "orange", DND: "danger" };
 
@@ -18,7 +22,7 @@ export function StatusDot({ status, size = 14 }) {
 export function AvatarWithStatus({ name, url, status, size = 46 }) {
   return (
     <View>
-      <Avatar name={name} url={url} size={size} />
+      <Avatar name={name} url={url} size={size} still={status === "OFFLINE" || status === "INVISIBLE"} />
       <View style={{ position: "absolute", right: -3, bottom: -3 }}>
         <StatusDot status={status} />
       </View>
@@ -48,6 +52,15 @@ export default function DmsScreen({ navigation, user }) {
   const t = useTokens();
   const [dms, setDms] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const layout = useLayout();
+  const [openDm, setOpenDm] = useState(null);
+  const notif = useDmNotifications();
+  const setActiveDm = notif.setActive;
+  useEffect(() => {
+    if (!layout.wide || !openDm) return;
+    setActiveDm(openDm.channelId);
+    return () => setActiveDm(null);
+  }, [layout.wide, openDm, setActiveDm]);
 
   const load = useCallback(async () => {
     try {
@@ -68,10 +81,12 @@ export default function DmsScreen({ navigation, user }) {
   return (
     <Screen>
       <TopBar title="MENSAGENS" subtitle="Conversas diretas" />
+      <View style={{ flex: 1, flexDirection: "row" }}>
       {!dms ? (
-        <ActivityIndicator color={t.text} style={{ marginTop: 40 }} />
+        <ActivityIndicator color={t.text} style={{ marginTop: 40, flex: 1 }} />
       ) : (
         <FlatList
+          style={layout.wide ? { width: layout.sideWidth, flexGrow: 0 } : undefined}
           data={dms}
           keyExtractor={(d) => String(d.channelId)}
           contentContainerStyle={{ padding: 14, gap: 10, paddingBottom: 110 }}
@@ -96,10 +111,13 @@ export default function DmsScreen({ navigation, user }) {
               </View>
             </Sticker>
           }
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
+            <Enter kind="rise" delay={stagger(index)}>
             <Pressable
               onPress={() =>
-                navigation.navigate("DmChat", {
+                layout.wide
+                  ? setOpenDm(item)
+                  : navigation.navigate("DmChat", {
                   channelId: item.channelId,
                   otherUserId: item.otherUserId,
                   otherUsername: item.otherUsername,
@@ -110,7 +128,7 @@ export default function DmsScreen({ navigation, user }) {
               }
             >
               {({ pressed }) => (
-                <Sticker radius={18} shadow={3} pressed={pressed}>
+                <Sticker radius={18} shadow={3} pressed={pressed} bg={layout.wide && openDm?.channelId === item.channelId ? t.hoverStrong : undefined}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 12 }}>
                     <AvatarWithStatus name={item.otherUsername} url={item.otherAvatarUrl} status={item.otherStatus} />
                     <View style={{ flex: 1, minWidth: 0 }}>
@@ -119,20 +137,60 @@ export default function DmsScreen({ navigation, user }) {
                           {item.otherNickname || item.otherUsername}
                         </Txt>
                         <Txt weight={700} size={12} color={t.textFaint}>
-                          {timeAgo(item.lastMessage?.createdAt)}
+                          {timeAgo((notif.lastMessages[item.channelId] || item.lastMessage)?.createdAt)}
                         </Txt>
+                        {notif.unread.has(item.channelId) ? (
+                          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: t.danger, borderWidth: 2, borderColor: t.ink }} />
+                        ) : null}
                       </View>
-                      <Txt weight={600} size={13} color={t.textMuted} numberOfLines={1}>
-                        {lastLine(item.lastMessage, user?.id)}
+                      <Txt
+                        weight={notif.unread.has(item.channelId) ? 900 : 600}
+                        size={13}
+                        color={notif.unread.has(item.channelId) ? t.text : t.textMuted}
+                        numberOfLines={1}
+                      >
+                        {lastLine(notif.lastMessages[item.channelId] || item.lastMessage, user?.id)}
                       </Txt>
                     </View>
                   </View>
                 </Sticker>
               )}
             </Pressable>
+            </Enter>
           )}
         />
       )}
+      {layout.wide ? (
+        openDm ? (
+          <View style={{ flex: 1 }}>
+            <Pressable
+              onPress={() => navigation.navigate("Profile", { userId: openDm.otherUserId })}
+              style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 22, paddingTop: 14 }}
+            >
+              <AvatarWithStatus name={openDm.otherUsername} url={openDm.otherAvatarUrl} status={openDm.otherStatus} size={34} />
+              <Txt weight="display" size={18} numberOfLines={1} style={{ flex: 1 }}>
+                {openDm.otherNickname || openDm.otherUsername}
+              </Txt>
+            </Pressable>
+            <ChatView
+              key={openDm.channelId}
+              kind="dm"
+              channelId={openDm.channelId}
+              placeholder={`Mensagem pra ${openDm.otherNickname || openDm.otherUsername}...`}
+              user={user}
+              navigation={navigation}
+            />
+          </View>
+        ) : (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 10 }}>
+            <Icon name="message" size={40} color={t.textMuted} />
+            <Txt weight={800} color={t.textMuted}>
+              Escolha uma conversa
+            </Txt>
+          </View>
+        )
+      ) : null}
+      </View>
     </Screen>
   );
 }

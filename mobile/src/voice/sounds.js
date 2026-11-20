@@ -1,7 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
+import { Asset } from "expo-asset";
+import { playFile } from "../../modules/concorde-sfx";
 
 // Os mesmos sons do site (renderizados da síntese de frontend/src/utils/soundEffects.js).
+// Tocam como "sons de sistema" do iOS (módulo nativo modules/concorde-sfx): NÃO mexem na sessão
+// de áudio. Um player comum (expo-audio) desativava a sessão ao terminar e derrubava o áudio da call.
 const FILES = {
   join: require("../../assets/sounds/join.wav"),
   leave: require("../../assets/sounds/leave.wav"),
@@ -14,8 +17,7 @@ const FILES = {
 
 const KEY = "concorde:sound-effects";
 let enabled = true;
-let modeSet = false;
-const players = {};
+const uris = {};
 
 AsyncStorage.getItem(KEY)
   .then((v) => {
@@ -32,30 +34,18 @@ export function setSoundsEnabled(value) {
   AsyncStorage.setItem(KEY, String(enabled)).catch(() => {});
 }
 
-async function ensureMode() {
-  if (modeSet) return;
-  modeSet = true;
-  // mesmo modo da call (grava + toca, mistura com o resto) pra não derrubar o áudio do LiveKit
-  await setAudioModeAsync({
-    playsInSilentMode: true,
-    interruptionMode: "mixWithOthers",
-    allowsRecording: true,
-    shouldPlayInBackground: true,
-  }).catch(() => {});
+async function uriOf(name) {
+  if (uris[name]) return uris[name];
+  const asset = Asset.fromModule(FILES[name]);
+  if (!asset.localUri) await asset.downloadAsync();
+  uris[name] = asset.localUri || asset.uri;
+  return uris[name];
 }
 
 export async function playSound(name) {
   if (!enabled || !FILES[name]) return;
   try {
-    await ensureMode();
-    let p = players[name];
-    if (!p) {
-      p = createAudioPlayer(FILES[name]);
-      p.volume = 0.8;
-      players[name] = p;
-    }
-    await p.seekTo(0).catch(() => {});
-    p.play();
+    playFile(await uriOf(name));
   } catch {
     // sem som: segue a vida
   }
