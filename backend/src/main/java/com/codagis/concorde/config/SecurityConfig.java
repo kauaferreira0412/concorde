@@ -59,6 +59,11 @@ public class SecurityConfig {
                 .map(String::trim)
                 .filter(o -> !o.isBlank())
                 .toList();
+        // qualquer porta localhost e aceita - o Vite as vezes sobe numa porta diferente
+        // da 5173 (ex: 5174, 5175...) quando a porta padrao ja esta em uso.
+        origins = new java.util.ArrayList<>(origins);
+        origins.add("http://localhost:*");
+        origins.add("http://127.0.0.1:*");
         config.setAllowedOriginPatterns(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
