@@ -23,3 +23,8 @@ vetfacility.{$DOMAIN} {
 	encode gzip
 	reverse_proxy frontend:80
 }
+
+endstep.{$DOMAIN} {
+	encode gzip
+	reverse_proxy endstep-frontend:80
+}
