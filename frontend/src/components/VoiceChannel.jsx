@@ -34,6 +34,7 @@ import { enterPip, exitPip, pipSupported, registerPipCandidate } from "../utils/
 import { MembersToggleButton, MobileBackButton } from "../context/LayoutContext.jsx";
 import { useProfile } from "../context/ProfileContext.jsx";
 import { useSpotifyNowPlaying } from "../utils/useSpotifyNowPlaying";
+import { clipRecorder, CLIP_DURATIONS } from "../utils/clipRecorder";
 
 const isElectronDesktop = typeof window !== "undefined" && !!window.concordeDesktop;
 
@@ -200,7 +201,45 @@ function CallToolbar() {
     toggleScreenShare,
     toggleAudioShare,
     leaveChannel,
+    clipMoment,
   } = useVoiceCall();
+  const { showAlert } = useAlert();
+  const [clipMenuOpen, setClipMenuOpen] = useState(false);
+  const [clipping, setClipping] = useState(false);
+  const clipBtnRef = useRef(null);
+  const clipMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!clipMenuOpen) return;
+    function handlePointerDown(e) {
+      if (clipMenuRef.current?.contains(e.target) || clipBtnRef.current?.contains(e.target)) return;
+      setClipMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [clipMenuOpen]);
+
+  useLayoutEffect(() => {
+    if (!clipMenuOpen || !clipMenuRef.current || !clipBtnRef.current) return;
+    const btnRect = clipBtnRef.current.getBoundingClientRect();
+    const menuRect = clipMenuRef.current.getBoundingClientRect();
+    const left = Math.max(8, Math.min(btnRect.left, window.innerWidth - menuRect.width - 8));
+    const top = Math.max(8, btnRect.top - menuRect.height - 10);
+    clipMenuRef.current.style.left = `${left}px`;
+    clipMenuRef.current.style.top = `${top}px`;
+  }, [clipMenuOpen]);
+
+  async function handleClip(seconds) {
+    setClipMenuOpen(false);
+    setClipping(true);
+    try {
+      const ok = await clipMoment(seconds);
+      if (ok) showAlert(`Clipe de ${seconds}s salvo!`);
+    } finally {
+      setClipping(false);
+    }
+  }
+
   return (
     <div className="call-toolbar" role="toolbar" aria-label="Controles da call">
       <button
@@ -252,6 +291,30 @@ function CallToolbar() {
       >
         <MusicNoteIcon size={22} />
       </button>
+      <button
+        type="button"
+        ref={clipBtnRef}
+        className={"call-toolbar-btn" + (clipMenuOpen ? " on" : "")}
+        onClick={() => setClipMenuOpen((v) => !v)}
+        disabled={clipping}
+        title="Clipar os últimos segundos da call"
+      >
+        <ClapperIcon size={22} />
+      </button>
+      {clipMenuOpen &&
+        createPortal(
+          <div className="volume-popover clip-menu" ref={clipMenuRef} style={{ left: 0, top: 0 }}>
+            <p className="volume-popover-title">Clipar os últimos...</p>
+            <div className="clip-menu-options">
+              {CLIP_DURATIONS.map((s) => (
+                <button key={s} type="button" className="appearance-btn" onClick={() => handleClip(s)}>
+                  {s}s
+                </button>
+              ))}
+            </div>
+          </div>,
+          document.body
+        )}
       <button type="button" className="call-toolbar-leave" onClick={leaveChannel} title="Sair da call" aria-label="Sair da call">
         <HangUpIcon size={22} />
         <span className="call-toolbar-leave-label">SAIR</span>
@@ -260,7 +323,7 @@ function CallToolbar() {
   );
 }
 
-function CameraTile({ track, name, isLocal, size, speaking, micOff, focused, onFocus }) {
+function CameraTile({ track, name, identity, isLocal, size, speaking, micOff, focused, onFocus }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -269,6 +332,14 @@ function CameraTile({ track, name, isLocal, size, speaking, micOff, focused, onF
     track.attach(el);
     return () => track.detach(el);
   }, [track]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !track) return;
+    const key = "camera-" + (identity ?? name);
+    clipRecorder.registerVideoCandidate(key, el, focused ? 8 : speaking ? 5 : 2);
+    return () => clipRecorder.unregisterVideoCandidate(key);
+  }, [track, identity, name, focused, speaking]);
 
   function handleMaximize() {
     const el = videoRef.current;
@@ -323,6 +394,7 @@ function CameraStage({ cameraTracks, participants, speakingIds, size }) {
     <CameraTile
       key={c.identity}
       track={c.track}
+      identity={c.identity}
       name={c.isLocal ? "Você" : c.name}
       isLocal={c.isLocal}
       speaking={speakingIds.has(c.identity)}
@@ -376,6 +448,14 @@ function ScreenShareTile({
     share.track.attach(el);
     return () => share.track.detach(el);
   }, [share.track, previewPaused]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !share.track || previewPaused) return;
+    const key = "share-" + share.participantIdentity;
+    clipRecorder.registerVideoCandidate(key, el, 10);
+    return () => clipRecorder.unregisterVideoCandidate(key);
+  }, [share.track, share.participantIdentity, previewPaused]);
 
   // Janela flutuante: só pra transmissões de outras pessoas que você está assistindo.
   const canPip = pipSupported && !share.isLocal && share.watching;

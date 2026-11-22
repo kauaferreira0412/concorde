@@ -1,4 +1,4 @@
-const { app, BrowserWindow, protocol, ipcMain, desktopCapturer, net, shell, globalShortcut, Menu, clipboard, nativeImage } = require("electron");
+const { app, BrowserWindow, protocol, ipcMain, desktopCapturer, net, shell, globalShortcut, Menu, clipboard, nativeImage, dialog } = require("electron");
 const path = require("path");
 const { pathToFileURL } = require("url");
 const { spawn } = require("child_process");
@@ -100,6 +100,23 @@ function createCameraPipWindow(channelId, appToken) {
 
 ipcMain.handle("concorde:open-camera-pip", (_event, { channelId, token }) => {
   createCameraPipWindow(channelId, token);
+});
+
+ipcMain.handle("concorde:save-clip", async (event, arrayBuffer, suggestedName) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  if (!win) return { ok: false, error: "Janela não encontrada" };
+  try {
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: "Salvar clipe",
+      defaultPath: suggestedName || `concorde-clipe-${Date.now()}.webm`,
+      filters: [{ name: "Vídeo WebM", extensions: ["webm"] }],
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
+    return { ok: true, path: filePath };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  }
 });
 
 function registerAppProtocol() {

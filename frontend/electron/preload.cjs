@@ -39,4 +39,6 @@ contextBridge.exposeInMainWorld("concordeDesktop", {
   zoomReset: () => ipcRenderer.invoke("concorde:zoom-reset"),
 
   openCameraPip: (channelId, token) => ipcRenderer.invoke("concorde:open-camera-pip", { channelId, token }),
+
+  saveClip: (arrayBuffer, suggestedName) => ipcRenderer.invoke("concorde:save-clip", arrayBuffer, suggestedName),
 });

@@ -2201,6 +2201,9 @@ h3.chat-heading {
   max-height: calc(100vh - 16px);
   overflow-y: auto;
 }
+.clip-menu { width: auto; }
+.clip-menu-options { display: flex; gap: 6px; }
+.clip-menu-options .appearance-btn { padding: 6px 12px; font-size: 13px; }
 .volume-popover-title {
   margin: 0 0 8px;
   font-size: 12px;

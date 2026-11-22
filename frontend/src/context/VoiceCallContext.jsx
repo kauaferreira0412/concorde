@@ -48,6 +48,7 @@ import ScreenSharePicker from "../components/ScreenSharePicker.jsx";
 import { startWindowAudioTrack } from "../utils/windowAudioTrack";
 import { getAutoListenAudioShare } from "../utils/audioShareListen";
 import { startSystemAudioExcludingSelfTrack } from "../utils/systemAudioTrack";
+import { clipRecorder } from "../utils/clipRecorder";
 
 const VoiceCallContext = createContext(null);
 
@@ -780,6 +781,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     setScreenShareWatchers({});
     micAudioTracksRef.current.clear();
     screenAudioTracksRef.current.clear();
+    clipRecorder.stop();
     participantVolumesRef.current = new Map();
     streamVolumesRef.current = new Map();
     electronScreenTracksRef.current.video?.stop();
@@ -886,6 +888,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           if (pub.source === Track.Source.Microphone) {
             micAudioTracksRef.current.set(participant.identity, track);
             track.setVolume(silenced ? 0 : effectiveVolume(resolveParticipantVolume(participant.identity)));
+            clipRecorder.setAudioTrack(participant.identity, track.mediaStreamTrack);
           } else if (pub.source === Track.Source.ScreenShareAudio) {
             screenAudioTracksRef.current.set(shareAudioKey(participant.identity, pub), track);
             track.setVolume(silenced ? 0 : effectiveVolume(resolveStreamVolume(participant.identity)));
@@ -903,6 +906,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         }
         if (pub.source === Track.Source.Microphone) {
           micAudioTracksRef.current.delete(participant.identity);
+          clipRecorder.removeAudioTrack(participant.identity);
           refreshParticipants(newRoom);
         }
         if (pub.source === Track.Source.ScreenShareAudio) screenAudioTracksRef.current.delete(shareAudioKey(participant.identity, pub));
@@ -951,6 +955,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         if (pub.source === Track.Source.Microphone && pub.track) {
           localMicTrackRef.current = pub.track;
           applyNoiseSuppression(pub.track);
+          clipRecorder.setAudioTrack("local-mic", pub.track.mediaStreamTrack);
         }
         if (pub.source === Track.Source.ScreenShare && pub.track) {
           upsertScreenShare(pub.trackSid, {
@@ -976,6 +981,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
           cameraTracksRef.current.delete(newRoom.localParticipant.identity);
           syncCameraTracks();
         }
+        if (pub.source === Track.Source.Microphone) clipRecorder.removeAudioTrack("local-mic");
       });
       newRoom.on(RoomEvent.Reconnected, () => {
         resyncFromRoom(newRoom);
@@ -1058,6 +1064,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       setActiveChannel(channel);
       saveActiveChannel(channel);
       setConnected(true);
+      clipRecorder.start();
       startPingMeter(newRoom);
       forceMutedRef.current = data.forceMuted;
       forceDeafenedRef.current = data.forceDeafened;
@@ -1094,6 +1101,35 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     } finally {
       joiningRef.current = false;
     }
+  }
+
+  /** Junta os últimos `seconds` segundos da call num vídeo e salva no dispositivo. */
+  async function clipMoment(seconds) {
+    const blob = await clipRecorder.clip(seconds);
+    if (!blob) {
+      showAlert("Ainda não tem gravação suficiente pra clipar esse trecho - espere alguns segundos na call e tenta de novo.");
+      return false;
+    }
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const fileName = `concorde-clipe-${stamp}.webm`;
+    if (isElectronDesktop && window.concordeDesktop?.saveClip) {
+      const buffer = await blob.arrayBuffer();
+      const result = await window.concordeDesktop.saveClip(buffer, fileName);
+      if (!result?.ok && !result?.canceled) {
+        showAlert("Não foi possível salvar o clipe: " + (result?.error || "erro desconhecido"));
+        return false;
+      }
+      return !!result?.ok;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    return true;
   }
 
   async function leaveChannel() {
@@ -1636,6 +1672,7 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
         kickParticipant,
         forceMuteParticipant,
         forceDeafenParticipant,
+        clipMoment,
       }}
     >
       {children}

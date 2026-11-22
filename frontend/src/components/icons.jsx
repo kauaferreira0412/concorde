@@ -604,3 +604,14 @@ export function PictureInPictureIcon(props) {
     </svg>
   );
 }
+
+export function ClapperIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <path d="M3 10h18v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z" />
+      <path d="M3 10 4.5 4h3L6 9" />
+      <path d="M9.5 9 11 4h3l-1.5 5" />
+      <path d="M16 9l1.5-5h2l-1.5 5" />
+    </svg>
+  );
+}
