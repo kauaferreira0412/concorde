@@ -5,6 +5,7 @@ import { useAlert } from "../context/AlertContext.jsx";
 import {
   CameraIcon,
   CameraOffIcon,
+  ClapperIcon,
   ExternalLinkIcon,
   EyeIcon,
   EyeOffIcon,
@@ -334,10 +335,9 @@ function CameraTile({ track, name, identity, isLocal, size, speaking, micOff, fo
   }, [track]);
 
   useEffect(() => {
-    const el = videoRef.current;
-    if (!el || !track) return;
+    if (!track?.mediaStreamTrack) return;
     const key = "camera-" + (identity ?? name);
-    clipRecorder.registerVideoCandidate(key, el, focused ? 8 : speaking ? 5 : 2);
+    clipRecorder.registerVideoCandidate(key, track.mediaStreamTrack, focused ? 8 : speaking ? 5 : 2);
     return () => clipRecorder.unregisterVideoCandidate(key);
   }, [track, identity, name, focused, speaking]);
 
@@ -450,12 +450,11 @@ function ScreenShareTile({
   }, [share.track, previewPaused]);
 
   useEffect(() => {
-    const el = videoRef.current;
-    if (!el || !share.track || previewPaused) return;
+    if (!share.track?.mediaStreamTrack) return;
     const key = "share-" + share.participantIdentity;
-    clipRecorder.registerVideoCandidate(key, el, 10);
+    clipRecorder.registerVideoCandidate(key, share.track.mediaStreamTrack, 10);
     return () => clipRecorder.unregisterVideoCandidate(key);
-  }, [share.track, share.participantIdentity, previewPaused]);
+  }, [share.track, share.participantIdentity]);
 
   // Janela flutuante: só pra transmissões de outras pessoas que você está assistindo.
   const canPip = pipSupported && !share.isLocal && share.watching;

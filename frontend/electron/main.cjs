@@ -102,6 +102,11 @@ ipcMain.handle("concorde:open-camera-pip", (_event, { channelId, token }) => {
   createCameraPipWindow(channelId, token);
 });
 
+ipcMain.handle("concorde:get-own-window-source-id", (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  return win && !win.isDestroyed() ? win.getMediaSourceId() : null;
+});
+
 ipcMain.handle("concorde:save-clip", async (event, arrayBuffer, suggestedName) => {
   const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
   if (!win) return { ok: false, error: "Janela não encontrada" };

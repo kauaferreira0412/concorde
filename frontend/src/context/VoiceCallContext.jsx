@@ -756,7 +756,8 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
     if (localMicTrackRef.current) applyNoiseSuppression(localMicTrackRef.current);
   }
 
-  async function disconnectInternal({ skipPresenceLeave = false } = {}) {
+  async function disconnectInternal({ skipPresenceLeave = false, keepAppCapture = false } = {}) {
+    if (!keepAppCapture) clipRecorder.stopAppCapture();
     intentionalDisconnectRef.current = true;
     const channelLeaving = activeChannelRef.current;
     // substituído por outro aparelho/aba: a presença agora é dele, não avisa "saí"
@@ -819,9 +820,13 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
   async function joinChannel(channel) {
     if (joiningRef.current) return;
     joiningRef.current = true;
+    // tela do Concorde pro clipe: no navegador o seletor só abre se o pedido sair direto
+    // do clique, então tem que ser antes de qualquer await
+    const appCapture = clipRecorder.requestAppCapture();
+    let joined = false;
     try {
       if (roomRef.current) {
-        await disconnectInternal();
+        await disconnectInternal({ keepAppCapture: true });
       }
 
       const { data } = await api.post(`/api/channels/${channel.id}/voice-token`);
@@ -1065,6 +1070,16 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       saveActiveChannel(channel);
       setConnected(true);
       clipRecorder.start();
+      joined = true;
+      appCapture.then((track) => {
+        if (roomRef.current === newRoom) {
+          clipRecorder.useAppCapture(track);
+          if (!track && clipRecorder.lastCaptureError) showAlert(clipRecorder.lastCaptureError);
+        } else {
+          track?._concordeCleanup?.();
+          track?.stop();
+        }
+      });
       startPingMeter(newRoom);
       forceMutedRef.current = data.forceMuted;
       forceDeafenedRef.current = data.forceDeafened;
@@ -1100,6 +1115,15 @@ export function VoiceCallProvider({ stompClient, stompConnected, children }) {
       refreshParticipants(newRoom);
     } finally {
       joiningRef.current = false;
+      if (!joined) {
+        appCapture.then((track) => {
+          if (track && track === clipRecorder.appTrack) clipRecorder.stopAppCapture();
+          else {
+            track?._concordeCleanup?.();
+            track?.stop();
+          }
+        });
+      }
     }
   }
 

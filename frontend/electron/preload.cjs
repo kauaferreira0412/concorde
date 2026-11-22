@@ -41,4 +41,5 @@ contextBridge.exposeInMainWorld("concordeDesktop", {
   openCameraPip: (channelId, token) => ipcRenderer.invoke("concorde:open-camera-pip", { channelId, token }),
 
   saveClip: (arrayBuffer, suggestedName) => ipcRenderer.invoke("concorde:save-clip", arrayBuffer, suggestedName),
+  getOwnWindowSourceId: () => ipcRenderer.invoke("concorde:get-own-window-source-id"),
 });
