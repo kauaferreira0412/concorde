@@ -6321,3 +6321,43 @@ a.about-block:hover { transform: translate(-1px, -1px); box-shadow: var(--pop-1)
 }
 .camera-stage-tile .camera-tile-name svg { color: #ff8a8a; flex-shrink: 0; }
 .camera-stage-tile .camera-tile-maximize { top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 8px; }
+
+/* =====================================================================
+   Enfeite de Natal (neve + bola no canto) - decorativo, desligável
+   ===================================================================== */
+.snow-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 2147483000;
+}
+.snowflake {
+  position: absolute;
+  top: -6%;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 5px rgba(255, 255, 255, 0.75);
+  animation-name: snowflake-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+@keyframes snowflake-fall {
+  0% { transform: translate(0, -10vh); }
+  100% { transform: translate(var(--drift), 112vh); }
+}
+.xmas-corner {
+  position: absolute;
+  top: -6px;
+  right: 18px;
+  width: 78px;
+  height: auto;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
+}
+@media (max-width: 560px) {
+  .xmas-corner { width: 54px; right: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .snow-overlay { display: none; }
+}

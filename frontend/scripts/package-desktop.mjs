@@ -5,21 +5,30 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
-const DESKTOP_ORIGIN = "https://187-127-37-101.sslip.io";
+const args = process.argv.slice(2);
+const isLocal = args.includes("--local");
+
+// --local: aponta pro backend rodando na sua maquina (precisa estar de pe em
+// localhost:8080) em vez da VPS de producao, e gera so' a pasta "unpacked" (sem
+// instalador), pra testar rapido antes de subir de verdade.
+const DESKTOP_ORIGIN = isLocal ? "http://localhost:8080" : "https://187-127-37-101.sslip.io";
 
 const releaseDir = join(root, "release");
 const downloadsDir = join(root, "public", "downloads");
 
 const BUILD_ID = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "");
 const desktopMinVersionFile = join(root, "..", "backend", "src", "main", "resources", "desktop-min-version.txt");
-writeFileSync(desktopMinVersionFile, BUILD_ID + "\n");
-console.log(`Build id gerado: ${BUILD_ID} (gravado em backend/src/main/resources/desktop-min-version.txt)`);
+if (!isLocal) {
+  writeFileSync(desktopMinVersionFile, BUILD_ID + "\n");
+  console.log(`Build id gerado: ${BUILD_ID} (gravado em backend/src/main/resources/desktop-min-version.txt)`);
+}
 
-const args = process.argv.slice(2);
 const platform = args.includes("--mac") ? "mac" : args.includes("--linux") ? "linux" : "win";
 
 const targetExt = { win: ".exe", mac: ".dmg", linux: ".AppImage" }[platform];
-const builderFlag = { win: "--win nsis", mac: "--mac dmg", linux: "--linux AppImage" }[platform];
+const builderFlag = isLocal
+  ? { win: "--win dir", mac: "--mac dir", linux: "--linux dir" }[platform]
+  : { win: "--win nsis", mac: "--mac dmg", linux: "--linux AppImage" }[platform];
 
 function run(cmd, extraEnv) {
   console.log(`\n> ${cmd}`);
@@ -44,6 +53,19 @@ run(`npx electron-builder ${builderFlag} --publish=never`);
 
 if (!existsSync(releaseDir)) {
   throw new Error(`Pasta "release" nao foi criada - electron-builder falhou?`);
+}
+
+if (isLocal) {
+  const unpackedDir = join(releaseDir, "win-unpacked");
+  const exePath = join(unpackedDir, "Concorde.exe");
+  console.log(
+    `\nPronto! Build local apontando pra ${DESKTOP_ORIGIN} gerado em:` +
+      `\n  ${existsSync(exePath) ? exePath : unpackedDir}` +
+      `\n(precisa do backend local rodando em localhost:8080 pra funcionar - ` +
+      `sem ADMIN_PASSWORD configurado no backend, o gate de versao nao bloqueia.)` +
+      `\nNao commitei nem mudei o desktop-min-version.txt - isso e' so' teste local.`
+  );
+  process.exit(0);
 }
 
 const installer = readdirSync(releaseDir)

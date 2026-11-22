@@ -11,6 +11,7 @@ import AdminPage from "./pages/admin";
 import CameraPipPage from "./pages/camera-pip";
 import UpdateRequiredGate from "./components/UpdateRequiredGate.jsx";
 import DesktopTitleBar from "./components/DesktopTitleBar.jsx";
+import SnowEffect from "./components/SnowEffect.jsx";
 
 function PrivateRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -20,6 +21,7 @@ function PrivateRoute({ children }) {
 export default function App() {
   return (
     <UpdateRequiredGate>
+      <SnowEffect />
       {window.concordeDesktop && <DesktopTitleBar />}
       <AlertProvider>
         <ProfileProvider>

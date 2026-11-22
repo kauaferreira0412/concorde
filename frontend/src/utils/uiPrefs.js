@@ -15,6 +15,7 @@ const DEFAULTS = {
   wallpaperBlur: 0, // 0-20 px
   glassPanels: false, // no modo "app": painéis um pouco transparentes
   wallpaperRemote: null, // imagem que veio de um tema da galeria (link); a local tem prioridade
+  snowEffect: true, // enfeite de Natal (neve caindo) - desligável nas configurações de aparência
 };
 
 function load() {
@@ -27,6 +28,7 @@ function load() {
     p.wallpaperDim = clamp(Number(p.wallpaperDim), 0, 90, DEFAULTS.wallpaperDim);
     p.wallpaperBlur = clamp(Number(p.wallpaperBlur), 0, 20, DEFAULTS.wallpaperBlur);
     p.glassPanels = !!p.glassPanels;
+    p.snowEffect = p.snowEffect !== false;
     p.wallpaperRemote = typeof p.wallpaperRemote === "string" && /^https?:\/\//.test(p.wallpaperRemote) ? p.wallpaperRemote : null;
     return p;
   } catch {

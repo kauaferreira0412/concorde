@@ -164,6 +164,14 @@ export default function ChatLookSettings() {
         então o texto continua legível no claro e no escuro.
       </p>
       {error && <p className="auth-error">{error}</p>}
+
+      <div className="settings-divider" />
+
+      <p className="settings-section-title">Natal 🎄</p>
+      <label className="settings-checkbox-row">
+        <input type="checkbox" checked={prefs.snowEffect} onChange={(e) => setUiPrefs({ snowEffect: e.target.checked })} />
+        Neve caindo e enfeite no canto da tela
+      </label>
     </>
   );
 }
