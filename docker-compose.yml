@@ -2,7 +2,9 @@ services:
 
   livekit:
     image: livekit/livekit-server:latest
-    command: --dev --bind 0.0.0.0 --node-ip=192.168.1.11
+    # node-ip: IP da sua maquina na rede (Firefox ignora 127.0.0.1 no WebRTC).
+    # Defina LIVEKIT_NODE_IP no arquivo .env ao lado deste (ja ignorado pelo git).
+    command: --dev --bind 0.0.0.0 --node-ip=${LIVEKIT_NODE_IP:-127.0.0.1}
     ports:
       - "7880:7880"
       - "7881:7881"
