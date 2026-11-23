@@ -16,6 +16,35 @@ const DESKTOP_ORIGIN = isLocal ? "http://localhost:8080" : "https://187-127-37-1
 const releaseDir = join(root, "release");
 const downloadsDir = join(root, "public", "downloads");
 
+// Antes de tudo (e antes de mexer no desktop-min-version.txt): os modulos nativos de audio
+// precisam carregar dentro do Electron. Um "npm install" pode remover o process-audio-capture
+// em silencio (e' dependencia opcional e a compilacao dele falha sem Python + Visual Studio C++),
+// e ai o instalador iria pra producao sem audio no compartilhamento de tela.
+function audioModulesOk() {
+  const electronBin = join(root, "node_modules", "electron", "dist", process.platform === "win32" ? "electron.exe" : "electron");
+  try {
+    execSync(`"${electronBin}" "${join(root, "scripts", "check-audio-module.cjs")}"`, {
+      cwd: root,
+      stdio: "inherit",
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+console.log("Conferindo os modulos de audio do app desktop...");
+if (!audioModulesOk()) {
+  // tenta recompilar os modulos nativos contra a versao do Electron (precisa de Python + VS C++)
+  console.log("Tentando recompilar os modulos nativos pro Electron...");
+  try {
+    execSync("npx electron-builder install-app-deps", { cwd: root, stdio: "inherit" });
+  } catch {
+    // o check abaixo explica o que falta
+  }
+  if (!audioModulesOk()) process.exit(1);
+}
+
 const BUILD_ID = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "");
 const desktopMinVersionFile = join(root, "..", "backend", "src", "main", "resources", "desktop-min-version.txt");
 if (!isLocal) {
@@ -47,10 +76,6 @@ run("npx vite build", {
   // desktop-min-version.txt nao muda em teste local, entao o app ficaria sempre "desatualizado")
   VITE_APP_BUILD_ID: isLocal ? "" : BUILD_ID,
 });
-// garante que os modulos nativos (ex: captura de audio) estao compilados contra
-// a versao do Electron, nao a do Node do sistema - senao carregam silenciosamente
-// quebrados dentro do app empacotado (sem nenhum aviso visivel pro usuario).
-run("npx electron-builder install-app-deps");
 run(`npx electron-builder ${builderFlag} --publish=never`);
 
 if (!existsSync(releaseDir)) {
