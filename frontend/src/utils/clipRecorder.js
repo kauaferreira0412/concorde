@@ -1,12 +1,18 @@
 // Buffer circular de "replay" da call: grava continuamente os últimos 60s (video
 // de quem está em destaque + áudio de todo mundo) em pedaços de 1s, descartando os
-// mais antigos - e quando alguém clica em "Clipar", junta os últimos N segundos
-// num arquivo de vídeo. Singleton (não é hook) porque precisa sobreviver a troca
-// de telas/componentes sem perder o buffer.
+// mais antigos - e quando alguém clica em "Clipar", monta um WebM novo com os últimos
+// N segundos (ver webmClip.js). Singleton (não é hook) porque precisa sobreviver a
+// troca de telas/componentes sem perder o buffer.
+
+import { WebmBuffer } from "./webmClip";
 
 const MAX_BUFFER_SECONDS = 60;
 const CHUNK_MS = 1000;
 const VIDEO_BITRATE = 1_800_000; // ~1.8 Mbps - 60s fica em torno de 13-15MB, 30s ~7MB
+// Quadro-chave a cada 1s: é onde o clipe pode começar, então o corte fica preciso
+const KEYFRAME_INTERVAL_MS = 1000;
+// Teto de memória caso o navegador ignore o intervalo de quadro-chave
+const HARD_MAX_BUFFER_SECONDS = 180;
 
 function pickMimeType(hasVideo) {
   const candidates = hasVideo
@@ -101,10 +107,9 @@ function cropToPageContent(sourceTrack) {
 class ClipRecorder {
   constructor() {
     this.recorder = null;
-    this.chunks = []; // { blob, t }
-    // Só o primeiro pedaço de cada gravação tem o cabeçalho do WebM - sem ele o arquivo
-    // não abre. Fica guardado à parte pra não sair do buffer junto com os antigos.
-    this.headerChunk = null;
+    this.webm = null; // WebmBuffer da gravação atual
+    this.parseQueue = Promise.resolve(); // pedaços são lidos em ordem
+    this.flushWaiters = [];
     this.audioCtx = null;
     this.audioDest = null;
     this.audioSources = new Map(); // key -> AudioNode
@@ -274,8 +279,7 @@ class ClipRecorder {
     this.enabled = false;
     clearTimeout(this.restartTimer);
     this._stopRecorder();
-    this.chunks = [];
-    this.headerChunk = null;
+    this.webm = null;
     this.currentVideoTrack = null;
   }
 
@@ -295,8 +299,8 @@ class ClipRecorder {
     this._stopRecorder();
     this._ensureAudioGraph();
     // trocar de fonte começa um arquivo novo - o que tinha antes não junta com ele
-    this.chunks = [];
-    this.headerChunk = null;
+    const webm = new WebmBuffer();
+    this.webm = webm;
 
     const best = this._bestVideoCandidate();
     this.currentVideoTrack = best?.track ?? null;
@@ -310,17 +314,27 @@ class ClipRecorder {
     try {
       recorder = new MediaRecorder(new MediaStream(tracks), {
         ...(mimeType ? { mimeType } : {}),
-        ...(best ? { videoBitsPerSecond: VIDEO_BITRATE } : {}),
+        ...(best
+          ? { videoBitsPerSecond: VIDEO_BITRATE, videoKeyFrameIntervalDuration: KEYFRAME_INTERVAL_MS }
+          : {}),
       });
       recorder.ondataavailable = (e) => {
-        if (recorder !== this.recorder || !e.data || e.data.size === 0) return;
-        if (!this.headerChunk) {
-          this.headerChunk = e.data;
-          return;
-        }
-        this.chunks.push({ blob: e.data, t: Date.now() });
-        const cutoff = Date.now() - (MAX_BUFFER_SECONDS + 2) * 1000;
-        while (this.chunks.length && this.chunks[0].t < cutoff) this.chunks.shift();
+        if (recorder !== this.recorder || !e.data) return;
+        const data = e.data;
+        this.parseQueue = this.parseQueue
+          .then(() => (data.size ? data.arrayBuffer() : null))
+          .then((ab) => {
+            if (ab && this.webm === webm) {
+              webm.push(new Uint8Array(ab));
+              webm.prune((MAX_BUFFER_SECONDS + 2) * 1000, HARD_MAX_BUFFER_SECONDS * 1000);
+            }
+          })
+          .catch(() => {})
+          .finally(() => {
+            const waiters = this.flushWaiters;
+            this.flushWaiters = [];
+            waiters.forEach((resolve) => resolve());
+          });
       };
       this.recorder = recorder;
       recorder.start(CHUNK_MS);
@@ -330,13 +344,31 @@ class ClipRecorder {
     }
   }
 
-  /** Junta os últimos `seconds` segundos do buffer num Blob de vídeo (ou null se não tiver nada). */
+  /** Pede ao MediaRecorder o que ele já gravou e ainda não entregou (até 1s), e espera ler. */
+  _flush() {
+    const recorder = this.recorder;
+    if (!recorder || recorder.state !== "recording") return this.parseQueue;
+    return new Promise((resolve) => {
+      const timeout = setTimeout(resolve, 800);
+      this.flushWaiters.push(() => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      try {
+        recorder.requestData();
+      } catch {
+        clearTimeout(timeout);
+        resolve();
+      }
+    }).then(() => this.parseQueue);
+  }
+
+  /** Monta um vídeo com os últimos `seconds` segundos do buffer (ou null se não tiver nada). */
   async clip(seconds) {
     this._ensureAudioGraph();
-    if (!this.headerChunk) return null;
-    const cutoff = Date.now() - seconds * 1000;
-    const picked = this.chunks.filter((c) => c.t >= cutoff).map((c) => c.blob);
-    return new Blob([this.headerChunk, ...picked], { type: this.headerChunk.type || "video/webm" });
+    if (!this.webm) return null;
+    await this._flush();
+    return this.webm?.build(seconds) ?? null;
   }
 }
 
