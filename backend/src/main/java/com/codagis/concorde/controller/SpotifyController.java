@@ -1,6 +1,7 @@
 package com.codagis.concorde.controller;
 
 import com.codagis.concorde.security.CurrentUser;
+import com.codagis.concorde.service.SpotifyListenAlongService;
 import com.codagis.concorde.service.SpotifyService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -16,20 +17,48 @@ import java.util.stream.Collectors;
 public class SpotifyController {
 
     private final SpotifyService spotifyService;
+    private final SpotifyListenAlongService listenAlongService;
     private final CurrentUser currentUser;
 
-    public SpotifyController(SpotifyService spotifyService, CurrentUser currentUser) {
+    public SpotifyController(SpotifyService spotifyService, SpotifyListenAlongService listenAlongService,
+                             CurrentUser currentUser) {
         this.spotifyService = spotifyService;
+        this.listenAlongService = listenAlongService;
         this.currentUser = currentUser;
     }
 
-    public record StatusResponse(boolean configured, boolean connected) {}
+    /** canControl: a conta autorizou controlar o player (necessário pro "Ouvir junto"). */
+    public record StatusResponse(boolean configured, boolean connected, boolean canControl) {}
     public record AuthorizeResponse(String url) {}
     public record NowPlayingBatchRequest(List<Long> userIds) {}
 
     @GetMapping("/status")
     public StatusResponse status() {
-        return new StatusResponse(spotifyService.isConfigured(), spotifyService.isConnected(currentUser.id()));
+        Long userId = currentUser.id();
+        return new StatusResponse(spotifyService.isConfigured(), spotifyService.isConnected(userId),
+                spotifyService.canControlPlayback(userId));
+    }
+
+    /* ---------- "Ouvir junto" ---------- */
+
+    @PostMapping("/listen-along/{hostId}")
+    public SpotifyListenAlongService.State startListenAlong(@PathVariable Long hostId) {
+        return listenAlongService.start(currentUser.id(), hostId);
+    }
+
+    @PostMapping("/listen-along/sync")
+    public SpotifyListenAlongService.State syncListenAlong() {
+        return listenAlongService.sync(currentUser.id());
+    }
+
+    @GetMapping("/listen-along")
+    public SpotifyListenAlongService.State currentListenAlong() {
+        return listenAlongService.current(currentUser.id());
+    }
+
+    @DeleteMapping("/listen-along")
+    public void stopListenAlong() {
+        listenAlongService.stop(currentUser.id());
     }
 
     @GetMapping("/authorize")
@@ -39,6 +68,7 @@ public class SpotifyController {
 
     @DeleteMapping("/connection")
     public void disconnect() {
+        listenAlongService.stop(currentUser.id());
         spotifyService.disconnect(currentUser.id());
     }
 

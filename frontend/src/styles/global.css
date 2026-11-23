@@ -29,6 +29,10 @@ html, body, #root { height: 100%; margin: 0; }
 html[data-desktop-titlebar="true"] #root {
   padding-top: 38px;
 }
+/* no app desktop a barra de título fica por cima de tudo: os modais começam abaixo dela
+   e a altura máxima desconta a barra, senão o topo do modal some atrás dela */
+html[data-desktop-titlebar="true"] .modal-backdrop { top: 38px; }
+html[data-desktop-titlebar="true"] .modal { max-height: calc(100vh - 38px - 32px); }
 body {
   font-family: var(--font);
   font-weight: 600;
@@ -39,15 +43,26 @@ body {
 a { color: var(--t-accent-text); }
 ::selection { background: color-mix(in srgb, var(--c-accent) 35%, transparent); }
 
-::-webkit-scrollbar { width: 12px; height: 12px; }
-::-webkit-scrollbar-track { background: transparent; }
+/* barras de rolagem finas e discretas em todo o app (cor vem do tema) */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--c-text) 22%, transparent);
+  background: color-mix(in srgb, var(--c-text) 16%, transparent);
   border-radius: 99px;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  min-height: 32px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--c-accent) 55%, transparent);
   background-clip: content-box;
 }
-::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--c-text) 38%, transparent); background-clip: content-box; }
+::-webkit-scrollbar-thumb:active { background: var(--c-accent); background-clip: content-box; }
+/* Firefox não tem ::-webkit-scrollbar: usa as propriedades padrão */
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--c-text) 22%, transparent) transparent; }
+}
 
 button {
   cursor: pointer;
@@ -2382,18 +2397,54 @@ h3.chat-heading {
   min-width: 0;
 }
 .member-row.offline .member-row-name { color: var(--t-text-faint); font-weight: 700; }
-.member-row-spotify {
+/* atividade embaixo do nome: capinha + "JOGANDO/OUVINDO" + título (Steam e Spotify) */
+.member-activity {
+  --activity-color: var(--t-accent-text);
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--t-mint-text);
+  gap: 7px;
+  min-width: 0;
+  margin-top: 4px;
+}
+.member-activity-music { --activity-color: var(--t-mint-text); }
+/* jogando + ouvindo ao mesmo tempo: separa um pouco mais as duas atividades */
+.member-activity + .member-activity { margin-top: 9px; }
+.member-activity-cover {
+  width: 44px;
+  height: 21px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 6px;
+  border: var(--sticker-sm);
+  background: var(--t-hover);
+  transition: transform 0.18s var(--ease-spring), box-shadow 0.15s ease;
+}
+/* capa de álbum é quadrada */
+.member-activity-music .member-activity-cover { width: 24px; height: 24px; border-radius: 7px; }
+.member-activity-cover-empty { display: grid; place-items: center; color: var(--activity-color); }
+.member-row:hover .member-activity-cover { transform: rotate(-3deg) scale(1.06); box-shadow: var(--pop-1); }
+.member-row:hover .member-activity-music .member-activity-cover { transform: rotate(-8deg) scale(1.08); }
+.member-activity-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.member-activity-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+}
+.member-activity-label svg { flex-shrink: 0; color: var(--activity-color); }
+.member-activity-title {
+  min-width: 0;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.member-row-spotify svg { flex-shrink: 0; }
+.member-activity-title strong { font-weight: 800; color: var(--activity-color); }
+.member-activity-subtitle { font-weight: 700; color: var(--c-text-muted); }
 .member-avatar-wrap { position: relative; flex-shrink: 0; display: flex; }
 .status-dot {
   position: absolute;
@@ -3154,6 +3205,10 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 .spotify-connect-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .spotify-connect-info strong { font-size: 13.5px; }
 .spotify-connect-card button { width: auto !important; margin-top: 0 !important; flex-shrink: 0; white-space: nowrap; }
+.steam-connect-card { align-items: flex-start; }
+.steam-connect-card > svg { color: #66c0f4; }
+.steam-connect-avatar { width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0; object-fit: cover; border: var(--sticker-sm); }
+.spotify-connect-card .steam-connect-profile { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; padding: 2px 0; font-size: 12.5px; }
 .settings-server-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .settings-server-list li {
   display: flex; align-items: center; gap: 8px;
@@ -3256,7 +3311,8 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
   flex-shrink: 0;
 }
 
-.profile-modal { width: 400px; padding: 0; gap: 0; overflow: hidden; }
+.profile-modal { width: 460px; padding: 0; gap: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.profile-modal > * { flex-shrink: 0; }
 .profile-banner {
   height: 90px;
   flex-shrink: 0;
@@ -3357,6 +3413,29 @@ html[data-desktop-titlebar="true"] .lightbox-copy-toast { top: 102px; }
 .profile-spotify-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .profile-spotify-info strong { font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-spotify-info span { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ---------- Steam (perfil) ---------- */
+.profile-spotify-info { flex: 1; }
+.steam-playing-card:hover, .steam-profile-card:hover { border-color: #66c0f4; }
+.steam-playing-art { width: 92px; height: 43px; border-radius: var(--radius-sm); flex-shrink: 0; object-fit: cover; border: var(--sticker-sm); }
+.steam-playing-art-empty { display: grid; place-items: center; background: var(--t-hover); color: var(--c-text-muted); }
+.steam-level-badge {
+  display: grid; place-items: center; flex-shrink: 0;
+  min-width: 30px; height: 30px; padding: 0 6px; border-radius: 999px;
+  font-size: 12px; font-weight: 900;
+  background: var(--t-tone-a-bg); color: var(--t-tone-a-fg); border: var(--sticker-sm);
+}
+.steam-profile-link-icon { flex-shrink: 0; color: var(--text-muted); }
+.steam-recent-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.steam-recent-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 8px; border-radius: var(--radius-sm);
+  text-decoration: none; color: inherit;
+}
+.steam-recent-item:hover { background: var(--t-hover); }
+.steam-recent-icon { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; object-fit: cover; background: var(--t-hover); }
+.steam-recent-info { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.steam-recent-info strong { font-size: 13px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.steam-recent-info span { font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .category-access-list {
   display: flex;
   flex-direction: column;
@@ -6363,4 +6442,123 @@ a.about-block:hover { transform: translate(-1px, -1px); box-shadow: var(--pop-1)
 }
 @media (prefers-reduced-motion: reduce) {
   .snow-overlay { display: none; }
+}
+
+/* ---------- "Ouvir junto" (Spotify) ---------- */
+.listen-along-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(420px, calc(100vw - 24px));
+  padding: 8px 8px 8px 8px;
+  background: var(--c-surface);
+  color: var(--c-text);
+  border: var(--sticker);
+  border-radius: 16px;
+  box-shadow: var(--pop-3);
+  animation: listen-along-in 0.28s var(--ease-spring) backwards;
+}
+@keyframes listen-along-in {
+  from { opacity: 0; transform: translate(-50%, 16px) scale(0.96); }
+}
+.listen-along-art {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  object-fit: cover;
+  border-radius: 10px;
+  border: var(--sticker-sm);
+}
+.listen-along-art-empty { display: grid; place-items: center; background: var(--t-tone-b-bg); color: var(--t-tone-b-fg); }
+.listen-along-info { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.2; }
+.listen-along-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.listen-along-label svg { flex-shrink: 0; color: var(--t-mint-text); }
+.listen-along-track { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.listen-along-track strong { font-weight: 800; color: var(--t-mint-text); }
+.listen-along-track span { font-weight: 700; color: var(--c-text-muted); }
+.listen-along-eq { display: flex; align-items: flex-end; gap: 2px; height: 14px; flex-shrink: 0; }
+.listen-along-eq span {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--t-mint-text);
+  transform-origin: bottom;
+  animation: listen-along-eq 0.9s ease-in-out infinite;
+}
+.listen-along-eq span:nth-child(2) { animation-delay: -0.3s; }
+.listen-along-eq span:nth-child(3) { animation-delay: -0.6s; }
+@keyframes listen-along-eq {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .listen-along-bar, .listen-along-eq span { animation: none; }
+}
+@media (max-width: 760px) {
+  .listen-along-bar { bottom: 84px; }
+}
+
+/* botão "Ouvir junto" no card do Spotify do perfil */
+.profile-listen-along { display: flex; gap: 8px; margin-top: 8px; }
+.profile-listen-along button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.profile-listen-along button.active { background: var(--t-tone-b-bg); color: var(--t-tone-b-fg); }
+.spotify-connect-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.spotify-reconnect-hint { margin: 4px 0 0 !important; color: var(--t-orange-text) !important; }
+
+/* ---------- tooltip do tema (substitui o tooltip nativo dos title="...") ---------- */
+.themed-tooltip {
+  position: fixed;
+  z-index: 200000;
+  max-width: 280px;
+  padding: 6px 10px;
+  background: var(--c-surface-2);
+  color: var(--c-text);
+  border: var(--sticker-sm);
+  border-radius: 10px;
+  box-shadow: var(--pop-accent);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  opacity: 0;
+}
+.themed-tooltip.visible { opacity: 1; animation: themed-tooltip-in 0.16s var(--ease-out) backwards; }
+.themed-tooltip-bottom.visible { animation-name: themed-tooltip-in-bottom; }
+/* setinha apontando pro elemento */
+.themed-tooltip::after {
+  content: "";
+  position: absolute;
+  left: var(--tooltip-arrow, 50%);
+  width: 8px;
+  height: 8px;
+  background: inherit;
+  border: var(--sticker-sm);
+  transform: translateX(-50%) rotate(45deg);
+}
+.themed-tooltip-top::after { bottom: -6px; border-top: none; border-left: none; }
+.themed-tooltip-bottom::after { top: -6px; border-bottom: none; border-right: none; }
+@keyframes themed-tooltip-in { from { opacity: 0; transform: translateY(4px) scale(0.96); } }
+@keyframes themed-tooltip-in-bottom { from { opacity: 0; transform: translateY(-4px) scale(0.96); } }
+@media (prefers-reduced-motion: reduce) {
+  .themed-tooltip.visible { animation: none; }
 }

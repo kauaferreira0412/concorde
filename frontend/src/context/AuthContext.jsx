@@ -107,9 +107,11 @@ export function AuthProvider({ children }) {
   const isAdmin = user?.role === "ADMIN";
   // painel /admin: alem do cargo, precisa da flag admin_panel (liberada so direto no banco)
   const hasAdminPanel = isAdmin && !!user?.adminPanel;
+  // terminal da VPS no painel: flag terminal_access (tambem so liberada direto no banco)
+  const hasTerminal = hasAdminPanel && !!user?.terminalAccess;
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, updateUser, isAuthenticated: !!token, isAdmin, hasAdminPanel }}>
+    <AuthContext.Provider value={{ token, user, login, logout, updateUser, isAuthenticated: !!token, isAdmin, hasAdminPanel, hasTerminal }}>
       {children}
     </AuthContext.Provider>
   );

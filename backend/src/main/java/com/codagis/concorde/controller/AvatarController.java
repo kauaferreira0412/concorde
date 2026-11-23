@@ -182,6 +182,7 @@ public class AvatarController {
                 user.getStatus(), user.getNickname(), user.getBio(), user.getBannerUrl(), user.getCustomStatus(), user.getAccentColor(),
                 com.codagis.concorde.util.ServerOrder.parse(user.getServerOrder()), user.isAvatarAnimateOnSpeakEnabled(),
                 user.getAccentColor2(), com.codagis.concorde.util.AboutBlocks.parse(user.getAboutBlocks()),
-                com.codagis.concorde.util.CardColors.parse(user.getCardColors()), user.isAdminPanel());
+                com.codagis.concorde.util.CardColors.parse(user.getCardColors()), user.isAdminPanel(),
+                user.isAdminPanel() && user.isTerminalAccess());
     }
 }

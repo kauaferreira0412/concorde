@@ -20,7 +20,8 @@ public class AuthDtos {
                                 String accentColor, java.util.List<Long> serverOrder,
                                 boolean avatarAnimateOnSpeak, String accentColor2,
                                 java.util.List<com.codagis.concorde.dto.UserProfileDtos.AboutBlock> aboutBlocks,
-                                java.util.Map<String, String> cardColors, boolean adminPanel) {}
+                                java.util.Map<String, String> cardColors, boolean adminPanel,
+                                boolean terminalAccess) {}
 
     public record AuthResponse(String token, UserResponse user) {}
 

@@ -44,10 +44,15 @@ services:
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
       SPOTIFY_REDIRECT_URI: https://${DOMAIN}/api/spotify/callback
+      STEAM_API_KEY: ${STEAM_API_KEY:-}
+      STEAM_RETURN_URL: https://${DOMAIN}/api/steam/callback
       GIPHY_API_KEY: ${GIPHY_API_KEY:-}
     dns:
       - 8.8.8.8
       - 1.1.1.1
+    # terminal da VPS no painel admin: o backend entra por SSH na propria VPS
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - postgres
       - livekit

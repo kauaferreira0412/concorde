@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import api from "../../api/client";
 import { useAuth } from "../../context/AuthContext.jsx";
 
-export const ADMIN_TABS = ["visao-geral", "usuarios", "acesso", "bots"];
+export const ADMIN_TABS = ["visao-geral", "usuarios", "acesso", "bots", "terminal"];
 
 /** Foto de perfil de um bot (Melodion / Batera) - mesma lógica pros dois. */
 function useBotAvatar(basePath, enabled) {
@@ -43,13 +43,14 @@ function useBotAvatar(basePath, enabled) {
 }
 
 export function useAdminContainer() {
-  const { hasAdminPanel: isAdmin, isAdmin: hasAdminRole, user: currentUser } = useAuth();
+  const { hasAdminPanel: isAdmin, isAdmin: hasAdminRole, hasTerminal, user: currentUser } = useAuth();
   // cache antigo do localStorage ainda sem a flag: espera o /api/users/me antes de expulsar
   const panelPending = hasAdminRole && currentUser?.adminPanel === undefined;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const tabParam = searchParams.get("aba");
-  const tab = ADMIN_TABS.includes(tabParam) ? tabParam : "visao-geral";
+  const tab =
+    ADMIN_TABS.includes(tabParam) && (tabParam !== "terminal" || hasTerminal) ? tabParam : "visao-geral";
 
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(true);
@@ -206,6 +207,7 @@ export function useAdminContainer() {
 
   return {
     isAdmin,
+    hasTerminal,
     panelPending,
     currentUser,
     tab,

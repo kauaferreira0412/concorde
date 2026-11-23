@@ -615,3 +615,24 @@ export function ClapperIcon(props) {
     </svg>
   );
 }
+
+export function GamepadIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <path d="M6 11h4" />
+      <path d="M8 9v4" />
+      <line x1="15" y1="12" x2="15.01" y2="12" />
+      <line x1="18" y1="10" x2="18.01" y2="10" />
+      <path d="M17.32 5H6.68a4 4 0 0 0-3.98 3.59l-.9 7.94A2.5 2.5 0 0 0 4.28 19.4c1 0 1.92-.6 2.3-1.53L7.6 15h8.8l1.02 2.87a2.5 2.5 0 0 0 2.3 1.53 2.5 2.5 0 0 0 2.48-2.87l-.9-7.94A4 4 0 0 0 17.32 5z" />
+    </svg>
+  );
+}
+
+export function TerminalIcon(props) {
+  return (
+    <svg {...base} width={props.size || 18} height={props.size || 18} className={props.className}>
+      <polyline points="4 17 10 11 4 5" />
+      <line x1="12" y1="19" x2="20" y2="19" />
+    </svg>
+  );
+}

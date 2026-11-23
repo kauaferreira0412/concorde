@@ -32,6 +32,7 @@ public class AdminBootstrap implements CommandLineRunner {
     public void run(String... args) {
         if (userRepository.existsByRole(Role.ADMIN)) {
             ensurePanelOwner();
+            ensureTerminalOwner();
             return;
         }
         User admin = User.builder()
@@ -40,6 +41,7 @@ public class AdminBootstrap implements CommandLineRunner {
                 .passwordHash(passwordEncoder.encode(adminPassword))
                 .role(Role.ADMIN)
                 .adminPanel(true)
+                .terminalAccess(true)
                 .build();
         userRepository.save(admin);
         System.out.println("==============================================================");
@@ -62,6 +64,19 @@ public class AdminBootstrap implements CommandLineRunner {
             userRepository.save(owner);
             System.out.println("Acesso ao painel de administracao liberado para '" + owner.getUsername()
                     + "' (nenhuma conta tinha a flag admin_panel)");
+        });
+    }
+
+    /** Mesma ideia pro terminal da VPS: se ninguem tem terminal_access, o dono do painel recebe. */
+    private void ensureTerminalOwner() {
+        if (userRepository.existsByTerminalAccessTrue()) {
+            return;
+        }
+        userRepository.findFirstByRoleAndAdminPanelTrueOrderByIdAsc(Role.ADMIN).ifPresent(owner -> {
+            owner.setTerminalAccess(true);
+            userRepository.save(owner);
+            System.out.println("Acesso ao terminal da VPS liberado para '" + owner.getUsername()
+                    + "' (nenhuma conta tinha a flag terminal_access)");
         });
     }
 }

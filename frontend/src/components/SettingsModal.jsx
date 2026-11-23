@@ -39,6 +39,7 @@ import { getAutoListenAudioShare, setAutoListenAudioShare } from "../utils/audio
 import { accentStyle } from "./AccentColorPicker.jsx";
 import { AboutBlocksEditor } from "./AboutBlocks.jsx";
 import CardColorsEditor from "./CardColorsEditor.jsx";
+import SteamConnectCard from "./SteamConnectCard.jsx";
 
 const TABS = [
   { id: "perfil", label: "Perfil", Icon: UserIcon },
@@ -219,7 +220,7 @@ export default function SettingsModal({ onClose }) {
         .get("/api/spotify/status")
         .then(({ data }) => {
           if (cancelled) return;
-          if (data.connected) {
+          if (data.connected && data.canControl) {
             setSpotifyStatus(data);
             setSpotifyConnecting(false);
           } else if (attempts >= 60) {
@@ -950,14 +951,27 @@ export default function SettingsModal({ onClose }) {
                       <strong>{spotifyStatus.connected ? "Conta conectada" : "Conecte sua conta do Spotify"}</strong>
                       <p className="admin-hint" style={{ margin: 0 }}>
                         {spotifyStatus.connected
-                          ? "O que você estiver ouvindo aparece na lista de membros e no seu perfil, pros outros do servidor."
-                          : "Opcional - mostra pros outros membros (na lista de membros e no seu perfil) a música que você está ouvindo agora, igual o Discord. Só você decide conectar."}
+                          ? "O que você estiver ouvindo aparece na lista de membros e no seu perfil, e os outros podem \"Ouvir junto\" com você."
+                          : "Opcional - mostra pros outros membros (na lista de membros e no seu perfil) a música que você está ouvindo agora e libera o \"Ouvir junto\", igual o Discord. Só você decide conectar."}
                       </p>
+                      {spotifyStatus.connected && !spotifyStatus.canControl && (
+                        <p className="admin-hint spotify-reconnect-hint">
+                          Reconecte pra liberar o "Ouvir junto" - ele precisa de uma permissão nova do Spotify (controlar o
+                          player). Ouvir junto com alguém exige Spotify Premium.
+                        </p>
+                      )}
                     </div>
                     {spotifyStatus.connected ? (
-                      <button type="button" className="danger" onClick={handleDisconnectSpotify}>
-                        Desconectar
-                      </button>
+                      <div className="spotify-connect-actions">
+                        {!spotifyStatus.canControl && (
+                          <button type="button" onClick={handleConnectSpotify} disabled={spotifyConnecting}>
+                            {spotifyConnecting ? "Aguardando..." : "Reconectar"}
+                          </button>
+                        )}
+                        <button type="button" className="danger" onClick={handleDisconnectSpotify}>
+                          Desconectar
+                        </button>
+                      </div>
                     ) : (
                       <button type="button" onClick={handleConnectSpotify} disabled={spotifyConnecting}>
                         {spotifyConnecting ? "Aguardando..." : "Conectar Spotify"}
@@ -971,6 +985,8 @@ export default function SettingsModal({ onClose }) {
                   </p>
                 )}
                 {spotifyError && <p className="auth-error">{spotifyError}</p>}
+
+                <SteamConnectCard />
               </>
             )}
           </div>

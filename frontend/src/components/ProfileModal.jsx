@@ -6,7 +6,9 @@ import { useAlert } from "../context/AlertContext.jsx";
 import { useSpotifyNowPlaying } from "../utils/useSpotifyNowPlaying";
 import Avatar from "./Avatar.jsx";
 import CustomStatusEditor from "./CustomStatusEditor.jsx";
-import { CheckIcon, MessageSquareIcon, MusicNoteIcon, PlusIcon, ShieldIcon } from "./icons.jsx";
+import SteamProfileSection from "./SteamProfileSection.jsx";
+import { CheckIcon, HeadphonesIcon, MessageSquareIcon, MusicNoteIcon, PlusIcon, ShieldIcon } from "./icons.jsx";
+import { useListenAlong } from "../context/ListenAlongContext.jsx";
 import { accentStyle } from "./AccentColorPicker.jsx";
 import { AboutBlocksView } from "./AboutBlocks.jsx";
 import { cardColorClass, cardColorStyle } from "../utils/cardColors";
@@ -26,6 +28,7 @@ export default function ProfileModal({ userId, onClose }) {
   const isMe = me?.id === userId;
   const profileIds = useMemo(() => (profile ? [profile.id] : []), [profile]);
   const nowPlaying = useSpotifyNowPlaying(profileIds)[profile?.id];
+  const listenAlong = useListenAlong();
 
   useEffect(() => {
     setProfile(null);
@@ -173,8 +176,29 @@ export default function ProfileModal({ userId, onClose }) {
                       {nowPlaying.albumName && <span>{nowPlaying.albumName}</span>}
                     </div>
                   </a>
+                  {!isMe && listenAlong && (
+                    <div className="profile-listen-along">
+                      {listenAlong.session?.hostId === profile.id ? (
+                        <button type="button" className="active" onClick={listenAlong.stop}>
+                          <HeadphonesIcon size={14} /> Parar de ouvir junto
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => listenAlong.start(profile.id)}
+                          disabled={listenAlong.starting === profile.id}
+                          title="Toca a mesma música no seu Spotify, no mesmo ponto (precisa de Premium)"
+                        >
+                          <HeadphonesIcon size={14} />
+                          {listenAlong.starting === profile.id ? "Conectando..." : "Ouvir junto"}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
+
+              <SteamProfileSection userId={profile.id} />
 
               <div className="profile-section">
                 <p className="profile-section-title">Sobre mim</p>
@@ -212,7 +236,7 @@ export default function ProfileModal({ userId, onClose }) {
               </button>
               {isMe && (
                 <button type="button" onClick={openSettingsInstead}>
-                  Editar nas Configurações
+                  Editar
                 </button>
               )}
             </div>

@@ -169,6 +169,30 @@ O app desktop carrega o **mesmo bundle web** (mesmo HTML/CSS/JS) - a única dife
 compartilhar tela, ele usa um seletor nativo (janela ou tela inteira) em vez do diálogo do
 navegador (ver `frontend/electron/main.cjs`, `preload.cjs` e `src/components/ScreenSharePicker.jsx`).
 
+## Integração com a Steam
+
+Os usuários vinculam a conta em **Configurações → Conexões → Steam**, pelo login oficial da Steam
+(OpenID). O Concorde nunca vê a senha da Steam: só recebe o SteamID confirmado pela própria Steam.
+Depois de vinculado, o jogo atual aparece na lista de membros ("Jogando X") e o perfil ganha um bloco
+com nome, nível e jogos recentes.
+
+Para ligar:
+
+1. Gere uma chave em https://steamcommunity.com/dev/apikey. É grátis, mas a conta Steam precisa ter
+   gasto pelo menos US$5 na loja. Em "Domain name" coloque o `DOMAIN` da VPS.
+2. Coloque no `.env.prod` da VPS: `STEAM_API_KEY=suachave`
+3. Suba o backend de novo (o `deploy-vps.ps1` já faz isso).
+
+O endereço de retorno do login (`STEAM_RETURN_URL`) já é montado no `docker-compose.prod.yml` como
+`https://${DOMAIN}/api/steam/callback`. Sem a chave, a seção aparece como "não configurada" e nada é
+consultado.
+
+Limitações (são da Steam, não do Concorde):
+- O jogo atual só aparece se a pessoa deixar o perfil **e** os "Detalhes de jogos" como públicos
+  nas configurações de privacidade da Steam.
+- Não existe aviso em tempo real: o app consulta a cada 30s (com cache no backend), então pode
+  levar até ~1 minuto para "Jogando X" aparecer ou sumir.
+
 ## Acesso ao painel de administração (`/admin`)
 
 Ter o cargo **Administrador** não basta para abrir o painel: a conta também precisa da flag
@@ -202,6 +226,47 @@ Ver quem tem acesso:
 ```bash
 docker compose --env-file .env.prod -f docker-compose.prod.yml exec postgres \
   psql -U postgres -d discord_clone -c "SELECT id, username, role, admin_panel FROM users WHERE admin_panel;"
+```
+
+## Terminal da VPS no painel (`/admin?aba=terminal`)
+
+O painel tem uma aba **Terminal da VPS**: um terminal de verdade (SSH) da VPS dentro do navegador,
+com acesso total ao servidor. Para aparecer, a conta precisa de três coisas: cargo ADMIN, `admin_panel`
+e a flag `terminal_access`. Essa flag também só muda direto no banco. Na primeira subida, o admin mais
+antigo com acesso ao painel (você) recebe a flag automaticamente.
+
+**Como funciona a segurança:**
+- Na configuração, você digita a senha do usuário SSH da VPS (normalmente `root`). O backend entra uma
+  vez com ela e instala uma chave SSH própria no `~/.ssh/authorized_keys`, com o comentário
+  `concorde-admin-terminal`.
+- A chave privada fica no banco **criptografada com a sua senha** (PBKDF2 + AES-GCM). A senha em si
+  não é salva em lugar nenhum.
+- Para abrir o terminal, a senha é pedida **toda vez**. Ela é o que destrava a chave, então um login
+  roubado do Concorde sozinho não abre o terminal. Depois de 5 senhas erradas, o terminal fica
+  bloqueado por 15 minutos.
+- O backend guarda a identidade do servidor SSH vista na configuração e recusa conectar se ela mudar.
+- No máximo 3 terminais abertos ao mesmo tempo. O terminal fecha sozinho depois de 30 minutos sem uso.
+- Cada abertura e cada tentativa negada fica no log do backend (`docker compose ... logs backend | grep Terminal`).
+
+**Requisitos na VPS:**
+- O container do backend alcança a VPS por `host.docker.internal` (o `docker-compose.prod.yml` já tem o
+  `extra_hosts` para isso), na porta 22.
+- O SSH precisa aceitar login por senha **só na hora de configurar** (`PasswordAuthentication yes`).
+  Depois, se quiser, pode desligar o login por senha: o terminal usa só a chave.
+- Se a senha do root mudar, a senha do terminal continua sendo a antiga (ela só destrava a chave).
+  Para usar a nova, clique em "Reconfigurar".
+
+Liberar ou tirar o terminal de alguém (a pessoa também precisa ter `admin_panel`):
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec postgres \
+  psql -U postgres -d discord_clone -c "UPDATE users SET terminal_access = true WHERE username = 'fulano';"
+```
+
+Cortar o acesso do terminal à VPS na hora, mesmo para quem tem a flag (remove a chave do Concorde):
+
+```bash
+sed -i '/ concorde-admin-terminal$/d' ~/.ssh/authorized_keys
 ```
 
 ## Sobre as portas de voz (LiveKit)

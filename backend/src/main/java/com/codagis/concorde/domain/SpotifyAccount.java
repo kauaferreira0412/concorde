@@ -34,6 +34,10 @@ public class SpotifyAccount {
     @Column(nullable = false)
     private Instant expiresAt;
 
+    /** Permissões concedidas pelo usuário (contas antigas ficam null e precisam reconectar pro "Ouvir junto"). */
+    @Column(length = 512)
+    private String scope;
+
     @Builder.Default
     private Instant connectedAt = Instant.now();
 }

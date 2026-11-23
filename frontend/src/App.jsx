@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./context/AuthContext.jsx";
 import { AlertProvider } from "./context/AlertContext.jsx";
 import { ProfileProvider } from "./context/ProfileContext.jsx";
+import { ListenAlongProvider } from "./context/ListenAlongContext.jsx";
 import { DmNotificationsProvider } from "./context/DmNotificationsContext.jsx";
 import { GlobalVoiceCallProvider } from "./context/GlobalVoiceCallProvider.jsx";
 import LoginPage from "./pages/login";
@@ -12,6 +13,7 @@ import CameraPipPage from "./pages/camera-pip";
 import UpdateRequiredGate from "./components/UpdateRequiredGate.jsx";
 import DesktopTitleBar from "./components/DesktopTitleBar.jsx";
 import SnowEffect from "./components/SnowEffect.jsx";
+import ThemedTooltip from "./components/ThemedTooltip.jsx";
 
 function PrivateRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -22,8 +24,10 @@ export default function App() {
   return (
     <UpdateRequiredGate>
       <SnowEffect />
+      <ThemedTooltip />
       {window.concordeDesktop && <DesktopTitleBar />}
       <AlertProvider>
+        <ListenAlongProvider>
         <ProfileProvider>
         <DmNotificationsProvider>
         <GlobalVoiceCallProvider>
@@ -59,6 +63,7 @@ export default function App() {
         </GlobalVoiceCallProvider>
         </DmNotificationsProvider>
         </ProfileProvider>
+        </ListenAlongProvider>
       </AlertProvider>
     </UpdateRequiredGate>
   );

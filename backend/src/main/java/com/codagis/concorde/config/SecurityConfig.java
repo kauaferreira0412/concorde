@@ -43,7 +43,7 @@ public class SecurityConfig {
                     // "/error" liberado: senão qualquer erro (validação, 500...) é encaminhado pra cá sem o token
                     // e vira 401, o que faz o front deslogar o usuário.
                     .requestMatchers("/error").permitAll()
-                    .requestMatchers("/api/auth/**", "/api/desktop/**", "/ws/**", "/h2-console/**", "/internal/**", "/api/spotify/callback").permitAll()
+                    .requestMatchers("/api/auth/**", "/api/desktop/**", "/ws/**", "/h2-console/**", "/internal/**", "/api/spotify/callback", "/api/steam/callback").permitAll()
                     .anyRequest().authenticated()
             )
             .exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))

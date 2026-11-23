@@ -34,7 +34,9 @@ public class SpotifyService {
     private static final String TOKEN_URL = "https://accounts.spotify.com/api/token";
     private static final String NOW_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing";
     private static final String TRACK_URL = "https://api.spotify.com/v1/tracks/";
-    private static final String SCOPE = "user-read-currently-playing user-read-playback-state";
+    // user-modify-playback-state: usado pelo "Ouvir junto" (controla o player de quem está ouvindo)
+    public static final String CONTROL_SCOPE = "user-modify-playback-state";
+    private static final String SCOPE = "user-read-currently-playing user-read-playback-state " + CONTROL_SCOPE;
     private static final Pattern SPOTIFY_TRACK_PATTERN =
             Pattern.compile("(?:open\\.spotify\\.com/(?:intl-\\w+/)?track/|spotify:track:)([a-zA-Z0-9]+)");
     private static final long CACHE_TTL_MILLIS = 8_000;
@@ -106,6 +108,8 @@ public class SpotifyService {
         account.setAccessToken(accessToken);
         account.setRefreshToken(refreshToken);
         account.setExpiresAt(Instant.now().plusSeconds(expiresIn));
+        Object grantedScope = tokenResponse.get("scope");
+        account.setScope(grantedScope == null ? null : String.valueOf(grantedScope));
         if (account.getConnectedAt() == null) account.setConnectedAt(Instant.now());
         accountRepository.save(account);
         nowPlayingCache.remove(pending.userId);
@@ -127,6 +131,31 @@ public class SpotifyService {
                 .map(id -> Map.entry(id, nowPlaying(id)))
                 .filter(e -> e.getValue().playing())
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    /** Consulta sem cache (o "Ouvir junto" precisa da posição atual de verdade). */
+    public NowPlaying freshNowPlaying(Long userId) {
+        NowPlaying result = fetchNowPlaying(userId);
+        nowPlayingCache.put(userId, new CachedNowPlaying(result, System.currentTimeMillis()));
+        return result;
+    }
+
+    /** Se a conta autorizou controlar o player (contas conectadas antes do "Ouvir junto" precisam reconectar). */
+    public boolean canControlPlayback(Long userId) {
+        return accountRepository.findByUserId(userId)
+                .map(a -> a.getScope() != null && a.getScope().contains(CONTROL_SCOPE))
+                .orElse(false);
+    }
+
+    /** Token válido do usuário (renova se precisar). Null se não estiver conectado ou o token foi revogado. */
+    public String accessTokenFor(Long userId) {
+        SpotifyAccount account = accountRepository.findByUserId(userId).orElse(null);
+        if (account == null) return null;
+        try {
+            return ensureValidToken(account);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     public String resolveIfSpotifyTrack(String text) {
@@ -218,8 +247,10 @@ public class SpotifyService {
         String trackUrl = externalUrls == null ? null : String.valueOf(externalUrls.get("spotify"));
         Number progressMs = (Number) body.get("progress_ms");
         Number durationMs = (Number) item.get("duration_ms");
+        Object uri = item.get("uri");
         return new NowPlaying(true, isPlaying, trackName, artistNames, albumName, albumArtUrl, trackUrl,
-                progressMs == null ? null : progressMs.intValue(), durationMs == null ? null : durationMs.intValue());
+                progressMs == null ? null : progressMs.intValue(), durationMs == null ? null : durationMs.intValue(),
+                uri == null ? null : String.valueOf(uri));
     }
 
     private String ensureValidToken(SpotifyAccount account) {
@@ -236,6 +267,8 @@ public class SpotifyService {
         account.setAccessToken(accessToken);
         account.setExpiresAt(Instant.now().plusSeconds(expiresIn));
         if (newRefreshToken != null) account.setRefreshToken(String.valueOf(newRefreshToken));
+        Object grantedScope = tokenResponse.get("scope");
+        if (grantedScope != null) account.setScope(String.valueOf(grantedScope));
         accountRepository.save(account);
         return accessToken;
     }
@@ -281,13 +314,13 @@ public class SpotifyService {
 
     public record NowPlaying(boolean connected, boolean playing, String trackName, String artistNames,
                               String albumName, String albumArtUrl, String trackUrl,
-                              Integer progressMs, Integer durationMs) {
+                              Integer progressMs, Integer durationMs, String trackUri) {
         public static NowPlaying notConnected() {
-            return new NowPlaying(false, false, null, null, null, null, null, null, null);
+            return new NowPlaying(false, false, null, null, null, null, null, null, null, null);
         }
 
         public static NowPlaying idle() {
-            return new NowPlaying(true, false, null, null, null, null, null, null, null);
+            return new NowPlaying(true, false, null, null, null, null, null, null, null, null);
         }
     }
 }

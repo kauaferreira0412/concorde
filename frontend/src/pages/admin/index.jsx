@@ -14,9 +14,11 @@ import {
   TrashIcon,
   UserIcon,
   UsersIcon,
+  TerminalIcon,
   XIcon,
 } from "../../components/icons.jsx";
 import { useAdminContainer } from "./Container.jsx";
+import TerminalSection from "./TerminalSection.jsx";
 import "./style.css";
 
 const NAV = [
@@ -24,6 +26,7 @@ const NAV = [
   { id: "usuarios", label: "Usuários", icon: UsersIcon },
   { id: "acesso", label: "Acesso a servidores", icon: LockIcon },
   { id: "bots", label: "Bots", icon: MusicNoteIcon },
+  { id: "terminal", label: "Terminal da VPS", icon: TerminalIcon, requiresTerminal: true },
 ];
 
 const SECTION_META = {
@@ -31,6 +34,7 @@ const SECTION_META = {
   usuarios: { title: "Usuários", subtitle: "Não existe cadastro público: toda conta é criada aqui." },
   acesso: { title: "Acesso a servidores", subtitle: "Coloque um usuário dentro de um servidor que você criou." },
   bots: { title: "Bots", subtitle: "Aparência dos bots que entram nas calls de qualquer servidor." },
+  terminal: { title: "Terminal da VPS", subtitle: "Acesso total ao servidor pelo navegador. Use com cuidado." },
 };
 
 export default function AdminPage() {
@@ -66,7 +70,7 @@ export default function AdminPage() {
 
       <div className="admin-layout">
         <nav className="admin-nav" aria-label="Seções do painel">
-          {NAV.map(({ id, label, icon: Icon }) => (
+          {NAV.filter((item) => !item.requiresTerminal || c.hasTerminal).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
@@ -109,6 +113,7 @@ export default function AdminPage() {
           {c.tab === "usuarios" && <UsersSection c={c} />}
           {c.tab === "acesso" && <AccessSection c={c} />}
           {c.tab === "bots" && <BotsSection c={c} />}
+          {c.tab === "terminal" && c.hasTerminal && <TerminalSection />}
         </main>
       </div>
 

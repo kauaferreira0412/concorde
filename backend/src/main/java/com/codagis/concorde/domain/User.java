@@ -98,6 +98,15 @@ public class User {
     @Builder.Default
     private boolean adminPanel = false;
 
+    /**
+     * Acesso ao terminal da VPS no painel (alem de admin_panel). Tambem so muda direto no banco:
+     *   UPDATE users SET terminal_access = true WHERE username = 'fulano';
+     */
+    @Column(name = "terminal_access", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean terminalAccess = false;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     @ColumnDefault("'ONLINE'")

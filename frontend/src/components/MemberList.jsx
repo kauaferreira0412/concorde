@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { useServerMembers } from "../utils/useServerMembers";
 import { useSpotifyNowPlaying } from "../utils/useSpotifyNowPlaying";
+import { useSteamPlaying } from "../utils/useSteamPlaying";
 import { useProfile } from "../context/ProfileContext.jsx";
 import { useAlert } from "../context/AlertContext.jsx";
-import { ChevronsLeftIcon, ChevronsRightIcon, MusicNoteIcon, PencilIcon, TrashIcon, UsersIcon } from "./icons.jsx";
+import { ChevronsLeftIcon, ChevronsRightIcon, GamepadIcon, MusicNoteIcon, PencilIcon, TrashIcon, UsersIcon } from "./icons.jsx";
 import { FreezableAvatar } from "./Avatar.jsx";
 import EmptyState from "./EmptyState.jsx";
 import ConfirmModal from "./ConfirmModal.jsx";
@@ -51,6 +52,7 @@ export default function MemberList({ serverId, stompClient, stompConnected }) {
   const online = members.filter((m) => m.status !== "OFFLINE");
   const offline = members.filter((m) => m.status === "OFFLINE");
   const nowPlayingByUser = useSpotifyNowPlaying(online.map((m) => m.userId));
+  const steamPlayingByUser = useSteamPlaying(online.map((m) => m.userId));
 
   if (!serverId) return null;
 
@@ -85,6 +87,7 @@ export default function MemberList({ serverId, stompClient, stompConnected }) {
                   serverId={serverId}
                   canManage={canManage}
                   nowPlaying={nowPlayingByUser[m.userId]}
+                  steamGame={steamPlayingByUser[m.userId]}
                 />
               ))}
             </>
@@ -111,7 +114,31 @@ export default function MemberList({ serverId, stompClient, stompConnected }) {
   );
 }
 
-export function MemberRow({ member, serverId, canManage, nowPlaying }) {
+/** Atividade embaixo do nome (jogo da Steam, música do Spotify): capinha + rótulo + título. */
+function ActivityLine({ kind, icon: Icon, label, title, subtitle, coverUrl, tooltip }) {
+  return (
+    <span className={`member-activity member-activity-${kind}`} title={tooltip}>
+      {coverUrl ? (
+        <img src={coverUrl} alt="" className="member-activity-cover" loading="lazy" />
+      ) : (
+        <span className="member-activity-cover member-activity-cover-empty" aria-hidden="true">
+          <Icon size={12} />
+        </span>
+      )}
+      <span className="member-activity-text">
+        <span className="member-activity-label">
+          <Icon size={10} /> {label}
+        </span>
+        <span className="member-activity-title">
+          <strong>{title}</strong>
+          {subtitle && <span className="member-activity-subtitle"> · {subtitle}</span>}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+export function MemberRow({ member, serverId, canManage, nowPlaying, steamGame }) {
   const { openProfile } = useProfile();
   const { showAlert } = useAlert();
   const [menu, setMenu] = useState(null);
@@ -195,11 +222,26 @@ export function MemberRow({ member, serverId, canManage, nowPlaying }) {
               {member.customStatus}
             </span>
           )}
+          {steamGame && (
+            <ActivityLine
+              kind="game"
+              icon={GamepadIcon}
+              label="Jogando"
+              title={steamGame.name}
+              coverUrl={steamGame.headerUrl}
+              tooltip={`Jogando ${steamGame.name} na Steam`}
+            />
+          )}
           {nowPlaying && (
-            <span className="member-row-spotify" title={`Ouvindo ${nowPlaying.trackName} — ${nowPlaying.artistNames}`}>
-              <MusicNoteIcon size={11} />
-              {nowPlaying.trackName} — {nowPlaying.artistNames}
-            </span>
+            <ActivityLine
+              kind="music"
+              icon={MusicNoteIcon}
+              label="Ouvindo"
+              title={nowPlaying.trackName}
+              subtitle={nowPlaying.artistNames}
+              coverUrl={nowPlaying.albumArtUrl}
+              tooltip={`Ouvindo ${nowPlaying.trackName} — ${nowPlaying.artistNames} no Spotify`}
+            />
           )}
         </span>
       </button>

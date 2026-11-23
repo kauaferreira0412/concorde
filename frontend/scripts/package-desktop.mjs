@@ -43,7 +43,9 @@ run("npx vite build", {
   VITE_API_URL: DESKTOP_ORIGIN,
   VITE_WS_URL: `${DESKTOP_ORIGIN.replace(/^http/, "ws")}/ws`,
   VITE_DESKTOP_BUILD: "true",
-  VITE_APP_BUILD_ID: BUILD_ID,
+  // build --local nao leva build id: sem ele o UpdateRequiredGate nao checa versao (o
+  // desktop-min-version.txt nao muda em teste local, entao o app ficaria sempre "desatualizado")
+  VITE_APP_BUILD_ID: isLocal ? "" : BUILD_ID,
 });
 // garante que os modulos nativos (ex: captura de audio) estao compilados contra
 // a versao do Electron, nao a do Node do sistema - senao carregam silenciosamente
@@ -62,7 +64,7 @@ if (isLocal) {
     `\nPronto! Build local apontando pra ${DESKTOP_ORIGIN} gerado em:` +
       `\n  ${existsSync(exePath) ? exePath : unpackedDir}` +
       `\n(precisa do backend local rodando em localhost:8080 pra funcionar - ` +
-      `sem ADMIN_PASSWORD configurado no backend, o gate de versao nao bloqueia.)` +
+      `build local nao tem build id, entao a tela de "atualizacao necessaria" nao aparece.)` +
       `\nNao commitei nem mudei o desktop-min-version.txt - isso e' so' teste local.`
   );
   process.exit(0);

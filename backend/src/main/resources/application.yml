@@ -56,3 +56,13 @@ app:
     client-id: ${SPOTIFY_CLIENT_ID:}
     client-secret: ${SPOTIFY_CLIENT_SECRET:}
     redirect-uri: ${SPOTIFY_REDIRECT_URI:http://127.0.0.1:8080/api/spotify/callback}
+  steam:
+    # chave gratis em https://steamcommunity.com/dev/apikey - sem ela a integracao fica desligada
+    api-key: ${STEAM_API_KEY:}
+    # para onde a Steam devolve depois do login (endereco publico do backend)
+    return-url: ${STEAM_RETURN_URL:http://localhost:8080/api/steam/callback}
+  terminal:
+    # SSH da propria VPS visto de dentro do container (host.docker.internal = a maquina host)
+    ssh-host: ${TERMINAL_SSH_HOST:host.docker.internal}
+    ssh-port: ${TERMINAL_SSH_PORT:22}
+    ssh-user: ${TERMINAL_SSH_USER:root}

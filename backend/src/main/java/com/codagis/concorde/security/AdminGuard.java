@@ -34,4 +34,17 @@ public class AdminGuard {
             throw new IllegalStateException("Você não tem acesso ao painel de administração");
         }
     }
+
+    /** Terminal da VPS: painel + flag terminal_access (também só liberada direto no banco). */
+    public boolean hasTerminalAccess(Long userId) {
+        return userRepository.findById(userId)
+                .map(u -> u.getRole() == Role.ADMIN && u.isAdminPanel() && u.isTerminalAccess())
+                .orElse(false);
+    }
+
+    public void assertTerminalAccess(Long userId) {
+        if (!hasTerminalAccess(userId)) {
+            throw new IllegalStateException("Você não tem acesso ao terminal da VPS");
+        }
+    }
 }

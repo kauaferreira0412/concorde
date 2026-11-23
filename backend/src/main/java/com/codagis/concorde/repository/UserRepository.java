@@ -15,5 +15,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByAdminPanelTrue();
 
+    boolean existsByTerminalAccessTrue();
+
+    java.util.Optional<User> findFirstByRoleAndAdminPanelTrueOrderByIdAsc(Role role);
+
     java.util.Optional<User> findFirstByRoleOrderByIdAsc(Role role);
 }
