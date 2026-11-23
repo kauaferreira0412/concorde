@@ -169,6 +169,29 @@ O app desktop carrega o **mesmo bundle web** (mesmo HTML/CSS/JS) - a única dife
 compartilhar tela, ele usa um seletor nativo (janela ou tela inteira) em vez do diálogo do
 navegador (ver `frontend/electron/main.cjs`, `preload.cjs` e `src/components/ScreenSharePicker.jsx`).
 
+## Novidades da versão (changelog)
+
+A cada versão nova, o Concorde mostra um modal **"Novidades"** uma vez para cada usuário, na primeira
+vez que ele abrir o app (web ou desktop) depois do deploy.
+
+**Para publicar as novidades de uma versão:**
+1. Crie um arquivo Markdown em `backend/src/main/resources/changelog/`, com a data como nome:
+   `AAAA-MM-DD.md` (ex.: `2026-11-23.md`). Se sair mais de uma versão no mesmo dia, use
+   `2026-11-23b.md`. A versão mais recente é a de maior nome em ordem alfabética.
+2. A primeira linha `# Título` vira o título do modal. O primeiro parágrafo de texto vira o resumo
+   do post no canal. O resto é o conteúdo, que aceita `##` títulos, listas, `**negrito**`, `> citação`,
+   `---` e links.
+3. Commite e rode o `deploy-vps.bat` normalmente.
+
+**O que acontece quando o backend sobe:**
+- Ele posta sozinho no canal **Atualizações** de cada servidor o título e o resumo, com o botão
+  **"Ver novidades"**, que abre o modal. Não posta duas vezes a mesma versão.
+- Cada usuário vê o modal **uma vez**. Depois de fechar, o modal só volta pelo botão do canal. O
+  "já vi" fica salvo no servidor, então vale para todos os aparelhos da pessoa.
+- A pessoa pode desligar o modal automático em **Configurações → Notificações** ou no próprio modal.
+  O botão do canal continua funcionando.
+- Contas criadas depois de uma versão não recebem o modal dessa versão, só das próximas.
+
 ## Integração com a Steam
 
 Os usuários vinculam a conta em **Configurações → Conexões → Steam**, pelo login oficial da Steam

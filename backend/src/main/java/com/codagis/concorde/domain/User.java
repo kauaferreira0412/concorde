@@ -107,6 +107,16 @@ public class User {
     @Builder.Default
     private boolean terminalAccess = false;
 
+    /** Ultima versao do changelog que a pessoa ja viu (o modal de novidades abre so pra versoes depois dessa). */
+    @Column(name = "last_seen_changelog", length = 40)
+    private String lastSeenChangelog;
+
+    /** Se o modal de novidades abre sozinho ao entrar (o botao no canal Atualizacoes funciona sempre). */
+    @Column(name = "show_changelog", nullable = false)
+    @ColumnDefault("true")
+    @Builder.Default
+    private boolean showChangelog = true;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     @ColumnDefault("'ONLINE'")

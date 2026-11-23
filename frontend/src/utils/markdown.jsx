@@ -24,6 +24,13 @@ export function parseMarkdownBlocks(content) {
       continue;
     }
 
+    // linha divisória: --- / *** / ___
+    if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+      blocks.push({ type: "hr" });
+      i++;
+      continue;
+    }
+
     if (/^>\s?/.test(line)) {
       const quoteLines = [];
       while (i < lines.length && /^>\s?/.test(lines[i])) {
@@ -60,7 +67,11 @@ export function parseMarkdownBlocks(content) {
     }
 
     const paraLines = [];
-    while (i < lines.length && lines[i].trim() !== "" && !/^```|^#{1,3}\s|^>\s?|^[-*]\s+|^\d+\.\s+/.test(lines[i])) {
+    while (
+      i < lines.length &&
+      lines[i].trim() !== "" &&
+      !/^```|^#{1,3}\s|^>\s?|^[-*]\s+|^\d+\.\s+|^(-{3,}|\*{3,}|_{3,})\s*$/.test(lines[i])
+    ) {
       paraLines.push(lines[i]);
       i++;
     }

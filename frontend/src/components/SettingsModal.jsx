@@ -40,6 +40,7 @@ import { accentStyle } from "./AccentColorPicker.jsx";
 import { AboutBlocksEditor } from "./AboutBlocks.jsx";
 import CardColorsEditor from "./CardColorsEditor.jsx";
 import SteamConnectCard from "./SteamConnectCard.jsx";
+import { useChangelog } from "../context/ChangelogContext.jsx";
 
 const TABS = [
   { id: "perfil", label: "Perfil", Icon: UserIcon },
@@ -88,6 +89,7 @@ function ShortcutRecorder({ value, onChange }) {
 
 export default function SettingsModal({ onClose }) {
   const { user, updateUser, hasAdminPanel } = useAuth();
+  const changelog = useChangelog();
   const { activeChannel, deafened, toggleDeafen, micGain, setMicGainPercent, masterVolume, setMasterVolumePercent } = useVoiceCall();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("perfil");
@@ -929,6 +931,17 @@ export default function SettingsModal({ onClose }) {
                   </p>
                 )}
                 {notificationError && <p className="auth-error">{notificationError}</p>}
+
+                {changelog && (
+                  <label className="settings-checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={changelog.showOnOpen}
+                      onChange={(e) => changelog.setShowOnOpen(e.target.checked)}
+                    />
+                    Mostrar novidades ao abrir o Concorde (depois de cada atualização)
+                  </label>
+                )}
               </>
             )}
 

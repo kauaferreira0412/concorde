@@ -3,6 +3,7 @@ import { useAuth } from "./context/AuthContext.jsx";
 import { AlertProvider } from "./context/AlertContext.jsx";
 import { ProfileProvider } from "./context/ProfileContext.jsx";
 import { ListenAlongProvider } from "./context/ListenAlongContext.jsx";
+import { ChangelogProvider } from "./context/ChangelogContext.jsx";
 import { DmNotificationsProvider } from "./context/DmNotificationsContext.jsx";
 import { GlobalVoiceCallProvider } from "./context/GlobalVoiceCallProvider.jsx";
 import LoginPage from "./pages/login";
@@ -28,6 +29,7 @@ export default function App() {
       {window.concordeDesktop && <DesktopTitleBar />}
       <AlertProvider>
         <ListenAlongProvider>
+        <ChangelogProvider>
         <ProfileProvider>
         <DmNotificationsProvider>
         <GlobalVoiceCallProvider>
@@ -63,6 +65,7 @@ export default function App() {
         </GlobalVoiceCallProvider>
         </DmNotificationsProvider>
         </ProfileProvider>
+        </ChangelogProvider>
         </ListenAlongProvider>
       </AlertProvider>
     </UpdateRequiredGate>

@@ -22,14 +22,17 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AdminGuard adminGuard;
+    private final ChangelogService changelogService;
 
     public AuthService(UserRepository userRepository, MembershipRepository membershipRepository,
-                        PasswordEncoder passwordEncoder, JwtService jwtService, AdminGuard adminGuard) {
+                        PasswordEncoder passwordEncoder, JwtService jwtService, AdminGuard adminGuard,
+                        ChangelogService changelogService) {
         this.userRepository = userRepository;
         this.membershipRepository = membershipRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.adminGuard = adminGuard;
+        this.changelogService = changelogService;
     }
 
     public AuthResponse login(LoginRequest req) {
@@ -56,6 +59,8 @@ public class AuthService {
                 .email(req.email())
                 .passwordHash(passwordEncoder.encode(req.password()))
                 .role(Role.USER)
+                // conta nova nao recebe o modal de novidades de versoes anteriores a ela
+                .lastSeenChangelog(changelogService.currentVersion())
                 .build();
         user = userRepository.save(user);
         return toUserResponse(user);

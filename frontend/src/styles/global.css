@@ -6562,3 +6562,110 @@ a.about-block:hover { transform: translate(-1px, -1px); box-shadow: var(--pop-1)
 @media (prefers-reduced-motion: reduce) {
   .themed-tooltip.visible { animation: none; }
 }
+
+/* ---------- Novidades (changelog) ---------- */
+.chat-markdown .chat-hr { border: none; border-top: var(--bw-sm) dashed var(--border-soft); margin: 12px 0; }
+
+.modal.changelog-modal {
+  width: 600px;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.changelog-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 16px 18px 20px;
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+  border-bottom: var(--sticker);
+  flex-shrink: 0;
+}
+.changelog-header-badge {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  background: var(--c-surface);
+  color: var(--t-accent-text);
+  border: var(--sticker);
+  border-radius: 14px;
+  box-shadow: var(--pop-1);
+  transform: rotate(-6deg);
+}
+.changelog-header-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.changelog-kicker { font-size: 11px; font-weight: 900; letter-spacing: 1.2px; text-transform: uppercase; opacity: 0.85; }
+.changelog-header h2 { margin: 0; font-size: 20px; line-height: 1.2; color: inherit; }
+.changelog-header .icon-btn { color: var(--c-on-accent); align-self: flex-start; }
+.changelog-header .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--c-on-accent) 16%, transparent); color: var(--c-on-accent); }
+
+.changelog-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 22px 8px;
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+.changelog-body .chat-heading { margin: 14px 0 6px; font-family: var(--font-display); font-weight: 400; }
+.changelog-body h2.chat-heading { font-size: 17px; }
+.changelog-body ul, .changelog-body ol { padding-left: 20px; margin: 4px 0 8px; }
+.changelog-body li { margin: 3px 0; }
+.changelog-body p { margin: 6px 0; }
+.changelog-body .chat-blockquote { margin: 8px 0; }
+
+.changelog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 20px 16px;
+  border-top: var(--bw-sm) solid var(--border-soft);
+  flex-shrink: 0;
+}
+.changelog-optout { margin: 0; font-size: 13px; }
+.modal button.changelog-ok {
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+  box-shadow: var(--pop-1);
+  width: auto;
+  margin: 0;
+}
+.modal button.changelog-ok:hover:not(:disabled) { background: var(--t-accent-hover); }
+
+/* mensagem automática no canal Atualizações */
+.changelog-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  max-width: 560px;
+  padding: 12px 14px;
+  margin-top: 4px;
+  background: var(--bg-panel-2);
+  border: var(--sticker-sm);
+  border-left: 5px solid var(--c-accent);
+  border-radius: 14px;
+}
+.changelog-card .chat-markdown { width: 100%; }
+.changelog-card .chat-heading { margin-top: 0; }
+.changelog-card-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+  box-shadow: var(--pop-1);
+  font-size: 13.5px;
+}
+.changelog-card-btn:hover:not(:disabled) { background: var(--t-accent-hover); }
+
+@media (max-width: 760px) {
+  .modal.changelog-modal { width: 100%; }
+  .changelog-body { padding: 14px 16px 6px; }
+  .changelog-footer { padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); }
+}

@@ -46,6 +46,8 @@ export default function MessageText({ content, memberUsernames, myUsername, memb
               </Tag>
             );
           }
+          case "hr":
+            return <hr key={key} className="chat-hr" />;
           default:
             return <p key={key}>{renderInline(block.text, ctx, key)}</p>;
         }

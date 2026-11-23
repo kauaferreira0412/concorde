@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MessageRepository extends JpaRepository<Message, Long> {
+    boolean existsByChannelIdAndContentContaining(Long channelId, String text);
+
     List<Message> findTop50ByChannelIdOrderByIdDesc(Long channelId);
     List<Message> findByChannelIdAndPinnedTrueOrderByPinnedAtDesc(Long channelId);
     List<Message> findTop50ByChannelIdAndContentContainingIgnoreCaseOrderByIdDesc(Long channelId, String content);

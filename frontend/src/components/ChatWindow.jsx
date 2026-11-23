@@ -39,6 +39,7 @@ import DiceRollCard from "./DiceRollCard.jsx";
 import EmojiPicker from "./EmojiPicker.jsx";
 import MusicQueueCard from "./MusicQueueCard.jsx";
 import PollCard from "./PollCard.jsx";
+import ChangelogCard, { CHANGELOG_MARKER_RE } from "./ChangelogCard.jsx";
 import { useStickToBottom } from "../utils/useStickToBottom";
 import {
   CheckIcon,
@@ -965,6 +966,15 @@ export default function ChatWindow({ channel, stompClient, stompConnected, stomp
                       queueId={MUSIC_QUEUE_MARKER_RE.exec(m.content)[2]}
                       stompClient={stompClient}
                       stompConnected={stompConnected}
+                    />
+                  ) : CHANGELOG_MARKER_RE.test(m.content || "") ? (
+                    <ChangelogCard
+                      content={m.content}
+                      memberUsernames={memberUsernames}
+                      myUsername={user?.username}
+                      members={members}
+                      openProfile={openProfile}
+                      customEmojis={customEmojis}
                     />
                   ) : (
                     <MessageText
