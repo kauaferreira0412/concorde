@@ -46,10 +46,13 @@ export default function EditUserModal({ user, onClose, onSaved }) {
 
         <div className="settings-field">
           <label className="settings-label">Cargo</label>
-          <select value={role} onChange={(e) => setRole(e.target.value)}>
+          <select value={role} onChange={(e) => setRole(e.target.value)} disabled={user.adminPanel}>
             <option value="USER">Usuário</option>
             <option value="ADMIN">Administrador</option>
           </select>
+          {user.adminPanel && (
+            <p className="admin-hint" style={{ marginTop: 6 }}>Conta com acesso ao painel: o cargo só muda direto no banco.</p>
+          )}
         </div>
 
         <div className="settings-field">

@@ -26,7 +26,7 @@ public class MusicBotSettingsService {
 
     @Transactional
     public MusicBotSettings uploadAvatar(Long requesterId, MultipartFile file) {
-        adminGuard.assertAdmin(requesterId);
+        adminGuard.assertAdminPanel(requesterId);
         String url = storageService.upload(file, "music-bot");
         MusicBotSettings settings = repository.findById(1L).orElseGet(MusicBotSettings::new);
         settings.setAvatarUrl(url);

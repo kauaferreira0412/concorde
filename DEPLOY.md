@@ -169,6 +169,41 @@ O app desktop carrega o **mesmo bundle web** (mesmo HTML/CSS/JS) - a única dife
 compartilhar tela, ele usa um seletor nativo (janela ou tela inteira) em vez do diálogo do
 navegador (ver `frontend/electron/main.cjs`, `preload.cjs` e `src/components/ScreenSharePicker.jsx`).
 
+## Acesso ao painel de administração (`/admin`)
+
+Ter o cargo **Administrador** não basta para abrir o painel: a conta também precisa da flag
+`admin_panel` na tabela `users`. Nenhuma tela ou endpoint altera essa flag, então só quem tem
+acesso à VPS (e ao banco) consegue liberar ou tirar o acesso.
+
+- Na primeira subida depois dessa mudança, o backend entrega a flag automaticamente ao
+  administrador mais antigo (o dono), se ninguém tiver ela ainda.
+- Contas com a flag não podem ser excluídas nem rebaixadas pelo painel, e outros admins do painel
+  não conseguem editar essas contas. Só o próprio dono edita a dele.
+- A mudança vale na próxima vez que a pessoa abrir ou recarregar o app (não precisa relogar).
+
+Liberar o acesso (o usuário precisa ser ADMIN):
+
+```bash
+ssh root@187.127.37.101
+cd ~/concorde
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec postgres \
+  psql -U postgres -d discord_clone -c "UPDATE users SET role = 'ADMIN', admin_panel = true WHERE username = 'fulano';"
+```
+
+Tirar o acesso:
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec postgres \
+  psql -U postgres -d discord_clone -c "UPDATE users SET admin_panel = false WHERE username = 'fulano';"
+```
+
+Ver quem tem acesso:
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec postgres \
+  psql -U postgres -d discord_clone -c "SELECT id, username, role, admin_panel FROM users WHERE admin_panel;"
+```
+
 ## Sobre as portas de voz (LiveKit)
 
 - `443` (HTTPS/Caddy): site, API, chat e a *sinalização* da chamada de voz — tudo nessa porta só.

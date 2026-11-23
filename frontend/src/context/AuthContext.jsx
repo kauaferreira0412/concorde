@@ -84,14 +84,32 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener("auth:expired", handleExpired);
   }, []);
 
+  // Atualiza os dados da conta ao abrir o app - o que vem do localStorage pode estar
+  // velho (ex: cargo ou flag admin_panel alterados direto no banco).
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    api
+      .get("/api/users/me")
+      .then(({ data }) => {
+        if (!cancelled) setUser((prev) => (prev ? { ...prev, ...data } : data));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
   function updateUser(patch) {
     setUser((prev) => (prev ? { ...prev, ...patch } : prev));
   }
 
   const isAdmin = user?.role === "ADMIN";
+  // painel /admin: alem do cargo, precisa da flag admin_panel (liberada so direto no banco)
+  const hasAdminPanel = isAdmin && !!user?.adminPanel;
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, updateUser, isAuthenticated: !!token, isAdmin }}>
+    <AuthContext.Provider value={{ token, user, login, logout, updateUser, isAuthenticated: !!token, isAdmin, hasAdminPanel }}>
       {children}
     </AuthContext.Provider>
   );

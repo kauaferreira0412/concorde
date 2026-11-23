@@ -34,6 +34,14 @@ public class AvatarController {
         this.presenceService = presenceService;
     }
 
+    /** Dados atualizados da conta logada (ex: flag admin_panel alterada direto no banco). */
+    @GetMapping
+    public UserResponse me() {
+        User user = userRepository.findById(currentUser.id())
+                .orElseThrow(() -> new IllegalStateException("Usuario nao encontrado"));
+        return toResponse(user);
+    }
+
     @PostMapping(value = "/avatar", consumes = "multipart/form-data")
     @Transactional
     public UserResponse uploadAvatar(@RequestParam("file") MultipartFile file) {
@@ -174,6 +182,6 @@ public class AvatarController {
                 user.getStatus(), user.getNickname(), user.getBio(), user.getBannerUrl(), user.getCustomStatus(), user.getAccentColor(),
                 com.codagis.concorde.util.ServerOrder.parse(user.getServerOrder()), user.isAvatarAnimateOnSpeakEnabled(),
                 user.getAccentColor2(), com.codagis.concorde.util.AboutBlocks.parse(user.getAboutBlocks()),
-                com.codagis.concorde.util.CardColors.parse(user.getCardColors()));
+                com.codagis.concorde.util.CardColors.parse(user.getCardColors()), user.isAdminPanel());
     }
 }

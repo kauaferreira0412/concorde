@@ -44,7 +44,7 @@ public class AuthService {
 
     @Transactional
     public UserResponse createUserAsAdmin(Long requesterId, CreateUserRequest req) {
-        adminGuard.assertAdmin(requesterId);
+        adminGuard.assertAdminPanel(requesterId);
         if (userRepository.existsByUsername(req.username())) {
             throw new IllegalArgumentException("Nome de usuario ja esta em uso");
         }
@@ -62,13 +62,13 @@ public class AuthService {
     }
 
     public List<UserResponse> listUsersAsAdmin(Long requesterId) {
-        adminGuard.assertAdmin(requesterId);
+        adminGuard.assertAdminPanel(requesterId);
         return userRepository.findAll().stream().map(this::toUserResponse).toList();
     }
 
     @Transactional
     public UserResponse updateUserAsAdmin(Long requesterId, Long targetUserId, UpdateUserRequest req) {
-        adminGuard.assertAdmin(requesterId);
+        adminGuard.assertAdminPanel(requesterId);
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario nao encontrado"));
 
@@ -80,6 +80,16 @@ public class AuthService {
         }
         if (user.getRole() == Role.ADMIN && req.role() != Role.ADMIN && countAdmins() <= 1) {
             throw new IllegalArgumentException("Não é possível rebaixar o único administrador");
+        }
+        // Quem tem acesso ao painel so e gerenciado direto no banco: outro admin do painel
+        // nao pode mexer na conta dele, e ninguem tira o cargo ADMIN dele por aqui.
+        if (user.isAdminPanel()) {
+            if (!requesterId.equals(targetUserId)) {
+                throw new IllegalArgumentException("Contas com acesso ao painel só podem ser alteradas pelo próprio dono");
+            }
+            if (req.role() != Role.ADMIN) {
+                throw new IllegalArgumentException("Não é possível tirar o cargo de quem tem acesso ao painel");
+            }
         }
 
         user.setUsername(req.username());
@@ -97,7 +107,7 @@ public class AuthService {
 
     @Transactional
     public void deleteUserAsAdmin(Long requesterId, Long targetUserId) {
-        adminGuard.assertAdmin(requesterId);
+        adminGuard.assertAdminPanel(requesterId);
         if (requesterId.equals(targetUserId)) {
             throw new IllegalArgumentException("Você não pode excluir a própria conta");
         }
@@ -105,6 +115,9 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("Usuario nao encontrado"));
         if (user.getRole() == Role.ADMIN && countAdmins() <= 1) {
             throw new IllegalArgumentException("Não é possível excluir o único administrador");
+        }
+        if (user.isAdminPanel()) {
+            throw new IllegalArgumentException("Contas com acesso ao painel não podem ser excluídas por aqui");
         }
         membershipRepository.findByUserId(targetUserId).forEach(membershipRepository::delete);
         userRepository.delete(user);
@@ -124,6 +137,6 @@ public class AuthService {
                 user.getStatus(), user.getNickname(), user.getBio(), user.getBannerUrl(), user.getCustomStatus(), user.getAccentColor(),
                 com.codagis.concorde.util.ServerOrder.parse(user.getServerOrder()), user.isAvatarAnimateOnSpeakEnabled(),
                 user.getAccentColor2(), com.codagis.concorde.util.AboutBlocks.parse(user.getAboutBlocks()),
-                com.codagis.concorde.util.CardColors.parse(user.getCardColors()));
+                com.codagis.concorde.util.CardColors.parse(user.getCardColors()), user.isAdminPanel());
     }
 }

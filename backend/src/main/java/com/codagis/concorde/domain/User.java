@@ -88,6 +88,16 @@ public class User {
     @Builder.Default
     private Role role = Role.USER;
 
+    /**
+     * Acesso ao painel de administracao (/admin). Separado do cargo ADMIN de proposito:
+     * nenhum endpoint altera essa flag - so da pra liberar direto no banco:
+     *   UPDATE users SET admin_panel = true WHERE username = 'fulano';
+     */
+    @Column(name = "admin_panel", nullable = false)
+    @ColumnDefault("false")
+    @Builder.Default
+    private boolean adminPanel = false;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     @ColumnDefault("'ONLINE'")

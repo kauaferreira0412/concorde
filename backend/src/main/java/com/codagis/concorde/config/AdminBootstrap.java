@@ -31,6 +31,7 @@ public class AdminBootstrap implements CommandLineRunner {
     @Override
     public void run(String... args) {
         if (userRepository.existsByRole(Role.ADMIN)) {
+            ensurePanelOwner();
             return;
         }
         User admin = User.builder()
@@ -38,11 +39,29 @@ public class AdminBootstrap implements CommandLineRunner {
                 .email(adminEmail)
                 .passwordHash(passwordEncoder.encode(adminPassword))
                 .role(Role.ADMIN)
+                .adminPanel(true)
                 .build();
         userRepository.save(admin);
         System.out.println("==============================================================");
         System.out.println(" Conta ADMIN criada: usuario='" + adminUsername + "'");
         System.out.println(" Troque a senha padrao em application.yml (app.admin.password)");
         System.out.println("==============================================================");
+    }
+
+    /**
+     * Na primeira subida depois que a coluna admin_panel foi criada ninguem tem a flag -
+     * entrega pro admin mais antigo (o dono) pra ele nao ficar trancado fora do painel.
+     * Depois disso, a flag so muda direto no banco.
+     */
+    private void ensurePanelOwner() {
+        if (userRepository.existsByAdminPanelTrue()) {
+            return;
+        }
+        userRepository.findFirstByRoleOrderByIdAsc(Role.ADMIN).ifPresent(owner -> {
+            owner.setAdminPanel(true);
+            userRepository.save(owner);
+            System.out.println("Acesso ao painel de administracao liberado para '" + owner.getUsername()
+                    + "' (nenhuma conta tinha a flag admin_panel)");
+        });
     }
 }

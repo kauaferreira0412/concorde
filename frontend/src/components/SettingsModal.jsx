@@ -86,13 +86,13 @@ function ShortcutRecorder({ value, onChange }) {
 }
 
 export default function SettingsModal({ onClose }) {
-  const { user, updateUser, isAdmin } = useAuth();
+  const { user, updateUser, hasAdminPanel } = useAuth();
   const { activeChannel, deafened, toggleDeafen, micGain, setMicGainPercent, masterVolume, setMasterVolumePercent } = useVoiceCall();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("perfil");
   const [autoPip, setAutoPip] = useState(getAutoPipEnabled);
   const [autoListenAudio, setAutoListenAudio] = useState(getAutoListenAudioShare);
-  const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
+  const tabs = hasAdminPanel ? [...TABS, ADMIN_TAB] : TABS;
 
   function handleTabClick(tabId) {
     if (tabId === "administracao") {

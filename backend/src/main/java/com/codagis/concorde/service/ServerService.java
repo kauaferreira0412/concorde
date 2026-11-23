@@ -131,7 +131,7 @@ public class ServerService {
 
     @Transactional
     public void grantAccessAsAdmin(Long requesterId, Long serverId, Long targetUserId) {
-        adminGuard.assertAdmin(requesterId);
+        adminGuard.assertAdminPanel(requesterId);
         if (!serverRepository.existsById(serverId)) {
             throw new IllegalArgumentException("Servidor nao existe");
         }

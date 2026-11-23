@@ -26,7 +26,7 @@ public class SoundboardBotSettingsService {
 
     @Transactional
     public SoundboardBotSettings uploadAvatar(Long requesterId, MultipartFile file) {
-        adminGuard.assertAdmin(requesterId);
+        adminGuard.assertAdminPanel(requesterId);
         String url = storageService.upload(file, "soundboard-bot");
         SoundboardBotSettings settings = repository.findById(1L).orElseGet(SoundboardBotSettings::new);
         settings.setAvatarUrl(url);
