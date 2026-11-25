@@ -6669,3 +6669,26 @@ a.about-block:hover { transform: translate(-1px, -1px); box-shadow: var(--pop-1)
   .changelog-body { padding: 14px 16px 6px; }
   .changelog-footer { padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); }
 }
+
+/* "Seu mic": a dica fica sempre na linha de baixo e o número tem largura fixa (não pula quando o volume sobe) */
+.voice-mic-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 8px;
+}
+.voice-mic-row .voice-mic-hint { grid-column: 1 / -1; }
+.voice-mic-pct { display: inline-block; min-width: 4ch; font-variant-numeric: tabular-nums; }
+.voice-mic-row .mic-meter-bar { min-width: 0; }
+
+/* card do perfil: status + "Enviar mensagem" na mesma linha */
+.profile-status-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.profile-status-row .profile-status-pill,
+.profile-status-row .profile-friend-action { margin-bottom: 0; }
+.profile-status-row .profile-friend-action button { padding: 5px 12px !important; }
+
+/* blocos com capa (música do momento): mais compactos e centralizados */
+.about-block:has(.about-block-cover) { padding: 7px 10px; }
+.about-block-cover { display: block; width: 40px; height: 40px; }
+.about-block-text { justify-content: center; gap: 1px; line-height: 1.25; }

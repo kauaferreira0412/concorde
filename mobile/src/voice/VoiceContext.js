@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, PermissionsAndroid, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AudioSession } from "@livekit/react-native";
 import { DisconnectReason, Room, RoomEvent, Track } from "livekit-client";
 import api, { getToken } from "../api";
 import { createChatClient } from "../socket";
 import { playSound } from "./sounds";
+import { startCallService, stopCallService } from "../../modules/concorde-sfx";
 
 const VoiceContext = createContext(null);
 const VOLUMES_KEY = "concorde:participant-volumes";
@@ -248,6 +249,7 @@ export function VoiceProvider({ user, children }) {
       await room.disconnect().catch(() => {});
     }
     await AudioSession.stopAudioSession().catch(() => {});
+    stopCallService();
     if (wasIn && !silent) playSound("leave");
   }, []);
 
@@ -410,6 +412,14 @@ export function VoiceProvider({ user, children }) {
         watchingRef.current = new Set();
         setChannel(target);
 
+        // Android: notificação "Em call" (serviço em primeiro plano) pra call não cair com o app minimizado
+        if (Platform.OS === "android") {
+          if (Platform.Version >= 33) {
+            PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS).catch(() => {});
+          }
+          startCallService(`Em call: ${target.name || "canal de voz"}`, target.serverName ? `${target.serverName} · toque pra voltar` : "Toque pra voltar pra call");
+        }
+
         if (target.serverId) {
           api
             .get(`/api/servers/${target.serverId}/me/permissions`)
@@ -505,6 +515,10 @@ export function VoiceProvider({ user, children }) {
           try {
             await room.localParticipant.setMicrophoneEnabled(true);
             setMic(true);
+            // na 1ª call a permissão do mic chega só agora: religa o serviço já com o tipo "microfone"
+            if (Platform.OS === "android" && seq === joinSeqRef.current) {
+              startCallService(`Em call: ${target.name || "canal de voz"}`, target.serverName ? `${target.serverName} · toque pra voltar` : "Toque pra voltar pra call");
+            }
           } catch (err) {
             setMic(false);
             Alert.alert("Microfone", "Conectado, mas sem acesso ao microfone: " + (err?.message || err));

@@ -953,7 +953,13 @@ export default function VoiceChannel({ channel, serverName, stompClient, stompCo
             <div className="mic-meter-bar-fill" style={{ width: `${micEnabled ? micLevel : 0}%` }} />
           </div>
           <span className="voice-mic-hint">
-            {micEnabled ? `${micLevel}% · fala perto do mic pra testar` : "microfone mutado"}
+            {micEnabled ? (
+              <>
+                <span className="voice-mic-pct">{micLevel}%</span> · fala perto do mic pra testar
+              </>
+            ) : (
+              "microfone mutado"
+            )}
           </span>
         </section>
 
