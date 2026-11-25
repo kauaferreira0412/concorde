@@ -46,3 +46,25 @@ export async function stopPictureInPicture() {
     return false;
   }
 }
+
+/**
+ * Android: liga a notificação "Em call" (serviço em primeiro plano). Sem ela o sistema derruba a call
+ * quando o app vai pro segundo plano. No iOS não faz nada (lá o modo de áudio em segundo plano já cuida).
+ */
+export function startCallService(title, text) {
+  if (!Native?.startCallService) return;
+  try {
+    Native.startCallService(String(title || "Em call no Concorde"), String(text || "Toque pra voltar pra call"));
+  } catch {
+    // sem serviço: a call continua, só pode cair em segundo plano
+  }
+}
+
+export function stopCallService() {
+  if (!Native?.stopCallService) return;
+  try {
+    Native.stopCallService();
+  } catch {
+    // já tinha parado
+  }
+}

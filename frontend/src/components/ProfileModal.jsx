@@ -133,6 +133,8 @@ export default function ProfileModal({ userId, onClose }) {
               ) : (
                 profile.customStatus && <p className="profile-custom-status">{profile.customStatus}</p>
               )}
+              {/* status e o botão de amizade/mensagem lado a lado (o card não fica comprido à toa) */}
+              <div className="profile-status-row">
               <span className={"profile-status-pill " + STATUS_DOT_CLASS[profile.status]}>
                 <span className={"status-dot " + STATUS_DOT_CLASS[profile.status]} />
                 {STATUS_LABEL[profile.status]}
@@ -162,6 +164,7 @@ export default function ProfileModal({ userId, onClose }) {
                   )}
                 </div>
               )}
+              </div>
 
               {nowPlaying && (
                 <div className="profile-section">

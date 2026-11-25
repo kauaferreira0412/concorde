@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import api from "../api";
 import { useTokens } from "../theme/ThemeContext";
 import { Avatar, Btn, Field, IconBtn, Screen, SectionTitle, Sticker, Txt } from "../ui/kit";
@@ -65,6 +66,8 @@ export default function EditProfileScreen({ navigation, user, onUserUpdate }) {
     }
   }
   const [uploading, setUploading] = useState(null);
+  // a foto escolhida aparece na hora, enquanto sobe (antes só aparecia quando o envio terminava)
+  const [preview, setPreview] = useState({});
   const [saving, setSaving] = useState(false);
 
   async function call(fn, okMsg) {
@@ -94,11 +97,34 @@ export default function EditProfileScreen({ navigation, user, onUserUpdate }) {
     });
     if (res.canceled || !res.assets?.[0]) return;
     const a = res.assets[0];
-    const type = a.mimeType && /png|gif|webp|jpe?g/.test(a.mimeType) ? a.mimeType : "image/jpeg";
-    const form = new FormData();
-    form.append("file", { uri: a.uri, name: `${kind}.${type.split("/")[1].replace("jpeg", "jpg")}`, type });
+    let uri = a.uri;
+    let type = a.mimeType && /png|gif|webp|jpe?g/.test(a.mimeType) ? a.mimeType : "image/jpeg";
+    setPreview((p) => ({ ...p, [kind]: uri }));
     setUploading(kind);
-    await call(() => api.post(`/api/users/me/${kind}`, form, { headers: { "Content-Type": "multipart/form-data" } }));
+    // foto da galeria vem com vários MB: reduz (igual ao recorte do site) pra subir rápido. GIF vai inteiro.
+    if (type !== "image/gif") {
+      try {
+        const width = kind === "avatar" ? 512 : 1500;
+        const ctx = ImageManipulator.manipulate(a.uri);
+        if ((a.width || 0) > width) ctx.resize({ width });
+        const rendered = await ctx.renderAsync();
+        const saved = await rendered.saveAsync({ compress: 0.85, format: SaveFormat.JPEG });
+        uri = saved.uri;
+        type = "image/jpeg";
+      } catch {
+        // não deu pra reduzir: manda a original
+      }
+    }
+    const form = new FormData();
+    form.append("file", { uri, name: `${kind}.${type.split("/")[1].replace("jpeg", "jpg")}`, type });
+    await call(async () => {
+      const response = await api.post(`/api/users/me/${kind}`, form, { headers: { "Content-Type": "multipart/form-data" } });
+      // já baixa a foto nova pro cache antes de trocar, pra não piscar
+      const next = kind === "avatar" ? response.data?.avatarUrl : response.data?.bannerUrl;
+      if (next) await Image.prefetch(next, "memory-disk").catch(() => {});
+      return response;
+    });
+    setPreview((p) => ({ ...p, [kind]: undefined }));
     setUploading(null);
   }
 
@@ -142,11 +168,11 @@ export default function EditProfileScreen({ navigation, user, onUserUpdate }) {
         <ScrollView contentContainerStyle={{ width: "100%", maxWidth: 720, alignSelf: "center", padding: 14, gap: 16, paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
           <Sticker radius={22} shadow={t.shadow}>
             <Pressable onPress={() => pick("banner")}>
-              <ProfileBanner bannerUrl={user?.bannerUrl} accent={user?.accentColor} accent2={user?.accentColor2} height={110} />
+              <ProfileBanner bannerUrl={preview.banner || user?.bannerUrl} accent={user?.accentColor} accent2={user?.accentColor2} height={110} />
             </Pressable>
             <View style={{ flexDirection: "row", gap: 12, paddingHorizontal: 16, marginTop: -36, alignItems: "flex-end" }}>
               <Pressable onPress={() => pick("avatar")}>
-                <Avatar name={user?.username} url={user?.avatarUrl} size={80} radius={24} />
+                <Avatar name={user?.username} url={preview.avatar || user?.avatarUrl} size={80} radius={24} />
               </Pressable>
               {uploading ? <ActivityIndicator color={t.text} style={{ marginBottom: 10 }} /> : null}
             </View>
